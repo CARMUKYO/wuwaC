@@ -1,0 +1,502 @@
+import { z } from 'zod';
+
+/**
+ * Data layer: canonical shapes for game data and user data.
+ *
+ * Every schema here is the single source of truth — TypeScript types are
+ * inferred via `z.infer`, never declared separately. API sync output and
+ * the bundled snapshot are validated against these before anything reaches
+ * the domain layer ("validate, don't trust blindly", reference doc §8.2).
+ *
+ * Units: ratios are decimals (0.05 = 5%), flat stats are raw numbers.
+ * Realm of this file is *shape*, not math — no game logic lives here.
+ */
+
+/** Increment on any breaking change to the snapshot file layout. */
+export const SNAPSHOT_VERSION = 2;
+
+const slug = z
+  .string()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a URL-safe slug');
+
+export const attributeSchema = z.enum([
+  'Glacio',
+  'Fusion',
+  'Electro',
+  'Aero',
+  'Spectro',
+  'Havoc',
+]);
+export type Attribute = z.infer<typeof attributeSchema>;
+
+export const weaponTypeSchema = z.enum([
+  'Sword',
+  'Broadblade',
+  'Pistols',
+  'Gauntlets',
+  'Rectifier',
+]);
+export type WeaponType = z.infer<typeof weaponTypeSchema>;
+
+/** Damage-type buckets from reference doc §1/§6 (`forte` = Forte Circuit). */
+export const damageTypeSchema = z.enum([
+  'basic',
+  'heavy',
+  'skill',
+  'liberation',
+  'intro',
+  'outro',
+  'echo',
+]);
+export type DamageType = z.infer<typeof damageTypeSchema>;
+
+/**
+ * Every aggregatable stat. Flat record keys — aggregation is pure addition,
+ * except `amplify` which the domain layer applies as a separate
+ * multiplicative stage (reference doc §6).
+ */
+export const statKeySchema = z.enum([
+  'hp',
+  'hpPct',
+  'atk',
+  'atkPct',
+  'def',
+  'defPct',
+  'critRate',
+  'critDmg',
+  'energyRegen',
+  'healingBonus',
+  'dmgBonus:Glacio',
+  'dmgBonus:Fusion',
+  'dmgBonus:Electro',
+  'dmgBonus:Aero',
+  'dmgBonus:Spectro',
+  'dmgBonus:Havoc',
+  'dmgBonus:basic',
+  'dmgBonus:heavy',
+  'dmgBonus:skill',
+  'dmgBonus:liberation',
+  'dmgBonus:intro',
+  'dmgBonus:outro',
+  'dmgBonus:echo',
+  /**
+   * Physical DMG (echo skills such as Diamondclaw's; no character attribute
+   * maps to it). Aggregates like any bucket; unscored by character skills.
+   */
+  'dmgBonus:physical',
+  'amplify',
+  /** Amplification that applies to Negative Status damage only. */
+  'negativeStatusAmplify',
+  /** Attacker-side DEF ignore (ratio) and flat DEF reduction (pre-ratio). */
+  'defIgnore',
+  'defReduction',
+  /** Attacker-side resistance penetration, signed (shred goes negative). */
+  'resistancePenetration',
+  /** Unused by every live kit today; modeled for completeness (doc §6). */
+  'specialBase',
+  'specialBonus',
+]);
+export type StatKey = z.infer<typeof statKeySchema>;
+
+/**
+ * A stat contribution. `conditional` preserves the trigger wording without
+ * inventing numbers; `custom` is an honest escape hatch for effects the
+ * data layer cannot structure (never fabricate structure from prose).
+ */
+export const statEffectSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('stat'),
+    stat: statKeySchema,
+    value: z.number(),
+  }),
+  z.object({
+    kind: z.literal('conditional'),
+    condition: z.string().min(1),
+    stat: statKeySchema,
+    value: z.number(),
+  }),
+  z.object({
+    kind: z.literal('custom'),
+    note: z.string().min(1),
+  }),
+]);
+export type StatEffect = z.infer<typeof statEffectSchema>;
+
+/** Provenance: every game-data record carries its source. */
+export const sourceSchema = z.object({
+  provider: z.literal('encore.moe'),
+  fetchedAt: z.string().datetime({ offset: true }),
+  /** Numeric id in the provider API (for re-sync/debugging). */
+  apiId: z.number().int().nonnegative(),
+});
+export type Source = z.infer<typeof sourceSchema>;
+
+const levelPointSchema = z.object({
+  /** Weapon curves use x.5 for the post-ascension tier of level x. */
+  level: z.number().min(1).max(90).multipleOf(0.5),
+  value: z.number().nonnegative(),
+});
+export type LevelPoint = z.infer<typeof levelPointSchema>;
+
+// --- Characters -------------------------------------------------------------
+
+const scalingSchema = z.enum(['ATK', 'HP', 'DEF']);
+
+/**
+ * Which DMG-bonus bucket a single motion scores against.
+ * From the provider `DamageList[].Type` per hit (Fandom wiki Damage page:
+ * "On hit, the attack will use its corresponding Type Bonus"), NOT the
+ * parent `SkillType` — e.g. Luuk Herssen's Liberation hits are typed
+ * `Basic Attack`, Jiyan's Liberation hits are typed `Heavy Attack`.
+ * `forte` is the fallback when the provider type is unknown/empty and
+ * preserves the v1 attribute-only behavior for Forte Circuit.
+ */
+export const motionBonusKindSchema = z.union([damageTypeSchema, z.literal('forte')]);
+export type MotionBonusKind = z.infer<typeof motionBonusKindSchema>;
+
+export const characterSkillSchema = z.object({
+  id: z.string().min(1),
+  kind: z.union([damageTypeSchema, z.literal('forte')]),
+  /** Human-readable label, e.g. "Lone Lance (Normal Attack)". */
+  label: z.string().min(1),
+  attribute: attributeSchema,
+  /** Which character stat the motion values scale off. */
+  scaling: scalingSchema,
+  /**
+   * Per-skill motion values across Forte levels (index 0 = level 1).
+   * Empty for buff-only skills (e.g. Outro Skills) — no motion values exist.
+   */
+  motionValues: z.array(
+    z
+      .object({
+        name: z.string().min(1),
+        /** Ratio-of-scaling-stat part ("11.33%" -> 0.1133). */
+        values: z.array(z.number().nonnegative()).min(1),
+        /**
+         * Flat part for hybrid formulas ("500+11.33%" -> flat 500).
+         * Present only when nonzero; same length as `values`.
+         */
+        flatValues: z.array(z.number().nonnegative()).optional(),
+        /** Total hit count the value is spread over (default 1). */
+        hits: z.number().int().positive().default(1),
+        /**
+         * DMG-bonus bucket for this motion, from provider DamageList.Type.
+         * Healing motions still carry a bucket but always score 0 damage.
+         */
+        dmgType: motionBonusKindSchema,
+        /**
+         * Which stat this motion scales off, from provider DamageList.
+         * PropertyName — usually the skill's scaling, except mixed skills
+         * (Taoqi's Power Shift damage is DEF under an ATK-first entry).
+         */
+        scaling: scalingSchema,
+        /** True for healing motions (attributeName contains "Healing") — scores 0 damage. */
+        isHealing: z.boolean().default(false),
+      })
+      .refine((m) => m.flatValues === undefined || m.flatValues.length === m.values.length, {
+        message: 'flatValues must match values in length',
+      }),
+  ),
+});
+export type CharacterSkill = z.infer<typeof characterSkillSchema>;
+
+export const characterSchema = z.object({
+  id: slug,
+  name: z.string().min(1),
+  rarity: z.union([z.literal(4), z.literal(5)]),
+  attribute: attributeSchema,
+  weaponType: weaponTypeSchema,
+  /** Level curve incl. ascension steps (duplicate levels = ascension tiers). */
+  baseStats: z
+    .array(
+      z.object({
+        level: z.number().int().min(1).max(90),
+        hp: z.number().nonnegative(),
+        atk: z.number().nonnegative(),
+        def: z.number().nonnegative(),
+      }),
+    )
+    .min(1),
+  /** Combat skills only (Inherent/Tune Break passives are skipped by sync). */
+  skills: z.array(characterSkillSchema).min(1),
+  forteNodes: z.array(
+    z.object({
+      id: z.string().min(1),
+      title: z.string().min(1),
+      stat: statKeySchema,
+      value: z.number(),
+    }),
+  ),
+  resonanceChain: z
+    .array(
+      z.object({
+        rank: z.number().int().min(1).max(6),
+        name: z.string().min(1),
+        description: z.string().min(1),
+        effect: statEffectSchema,
+      }),
+    )
+    .length(6),
+  source: sourceSchema,
+});
+export type CharacterData = z.infer<typeof characterSchema>;
+
+// --- Weapons ----------------------------------------------------------------
+
+export const weaponSchema = z.object({
+  id: slug,
+  name: z.string().min(1),
+  weaponType: weaponTypeSchema,
+  rarity: z.number().int().min(1).max(5),
+  atkByLevel: z.array(levelPointSchema).min(1),
+  /** Absent on weapons with no secondary stat (low rarity). */
+  secondaryStat: z
+    .object({
+      stat: statKeySchema,
+      byLevel: z.array(levelPointSchema).min(1),
+    })
+    .nullable(),
+  passive: z.object({
+    name: z.string().min(1),
+    /** Provider description with markup stripped. */
+    description: z.string().min(1),
+    /** Raw per-rank parameter arrays (one entry per refinement rank). */
+    paramsByRank: z.array(z.array(z.string())),
+    effect: statEffectSchema,
+  }),
+  source: sourceSchema,
+});
+export type WeaponData = z.infer<typeof weaponSchema>;
+
+// --- Sonata sets --------------------------------------------------------------
+
+export const sonataSetSchema = z.object({
+  id: slug,
+  name: z.string().min(1),
+  /** Piece thresholds are per-set data, never hardcoded (reference doc §3). */
+  bonuses: z
+    .array(
+      z.object({
+        pieceCount: z.number().int().positive(),
+        effect: statEffectSchema,
+      }),
+    )
+    .min(1),
+  source: sourceSchema,
+});
+export type SonataSetData = z.infer<typeof sonataSetSchema>;
+
+// --- Echo definitions (static side) -------------------------------------------
+/**
+ * What an Echo *can* be. Per-copy rolls live in `OwnedEcho`.
+ * Sourced from encore.moe `/echo/<id>` detail records: cost from
+ * `Handbook.Intensity`, pools from `Handbook.Descrtption1`, sonatas from
+ * `FetterGroup`. Records without Handbook data are skipped by the sync
+ * (reported, never guessed); cost-tier pool rules live in `placeholders.ts`.
+ */
+export const echoDefSchema = z.object({
+  id: slug,
+  name: z.string().min(1),
+  /**
+   * Echo element. The six character attributes plus Physical, which exists
+   * only on a handful of 1-cost echoes (their skills deal physical DMG).
+   * Display only — no character attribute maps to it.
+   */
+  element: z.union([attributeSchema, z.literal('Physical')]),
+  sonataIds: z.array(z.string().min(1)).min(1),
+  cost: z.union([z.literal(1), z.literal(3), z.literal(4)]),
+  allowedMainStats: z.array(statKeySchema).min(1),
+  /** Active echo-skill text (slot-1 use). Display only in v1. */
+  skillDescription: z.string().min(1).optional(),
+  skillCooldown: z.number().nonnegative().optional(),
+  /** Per-rank skill parameters (one array per rank), display only. */
+  skillRanks: z.array(z.array(z.string())).optional(),
+  source: sourceSchema,
+});
+export type EchoDefData = z.infer<typeof echoDefSchema>;
+
+// --- User data (IndexedDB rows) -------------------------------------------------
+/**
+ * `origin` convention: `"manual"` for hand entry, `"import:<tool>"` for
+ * bulk imports (e.g. `"import:wuwa-inventory-kamera"`). Free-form string so
+ * future importers never require a schema change.
+ */
+export const ownedEchoSchema = z
+  .object({
+    id: z.string().min(1),
+    /** Display name for manual entries (synced defs carry their own names). */
+    label: z.string().min(1).optional(),
+    echoDefId: z.string().min(1),
+    sonataId: z.string().min(1),
+    cost: z.union([z.literal(1), z.literal(3), z.literal(4)]),
+    level: z.number().int().min(0).max(25),
+    rarity: z.number().int().min(1).max(5),
+    mainStat: z.object({ stat: statKeySchema, value: z.number() }),
+    /** 3/4-cost Echoes carry a fixed flat-ATK secondary (reference doc §2). */
+    secondMainStat: z
+      .object({ stat: statKeySchema, value: z.number() })
+      .optional(),
+    /** Fixed once rolled — the optimizer only chooses *which* Echo (doc §2). */
+    substats: z
+      .array(
+        z.object({
+          stat: statKeySchema,
+          value: z.number(),
+          rolls: z.number().int().positive().optional(),
+        }),
+      )
+      .max(5),
+    equippedTo: z.string().min(1).nullable().default(null),
+    origin: z.string().min(1),
+  })
+  .refine((e) => new Set(e.substats.map((s) => s.stat)).size === e.substats.length, {
+    message: 'duplicate substats on one Echo',
+  });
+export type OwnedEcho = z.infer<typeof ownedEchoSchema>;
+
+export const rosterEntrySchema = z.object({
+  characterId: z.string().min(1),
+  level: z.number().int().min(1).max(90),
+  /** Ascension tier: selects the post-ascension curve entry at `level`. */
+  ascension: z.number().int().min(0).max(6),
+  resonanceChain: z.number().int().min(0).max(6),
+  /** Skill id -> Forte level. No max cap: unsourced — TODO once verified. */
+  forteLevels: z.record(z.string(), z.number().int().min(1)),
+  weaponId: z.string().min(1),
+  weaponLevel: z.number().int().min(1).max(90),
+  weaponRank: z.number().int().min(1).max(5),
+});
+export type RosterEntry = z.infer<typeof rosterEntrySchema>;
+
+/**
+ * Scoring objective as data (reference doc §7). Fully serializable — safe
+ * for the worker boundary, Dexie rows, and share links. Evaluated by
+ * `domain/objectives.ts`; the data layer never interprets it.
+ */
+
+/** One sequenced rotation action, without the session-local block id. */
+export const rotationBlockSpecSchema = z.object({
+  /** Empty only for non-motion status actions. */
+  skillId: z.string(),
+  motionName: z.string(),
+  forteLevel: z.number().int().min(1),
+  activeBuffIds: z.array(z.string()),
+  /** Optional non-motion damage source. Omitted means a normal kit motion. */
+  damageKind: z.enum(['ability', 'negativeStatus']).optional(),
+  statusType: z.literal('aeroErosion').optional(),
+  /** Current Aero Erosion stacks used by a Negative Status hit. */
+  statusStacks: z.number().int().min(1).max(9).optional(),
+  /** Target stacks used by Cartethyia's Wind's Indelible Imprint. */
+  targetStatusStacks: z.number().int().min(0).max(9).optional(),
+  /** Fleurdelys Conviction used by S1's Crit DMG thresholds. */
+  conviction: z.number().int().min(0).max(120).optional(),
+});
+export type RotationBlockSpec = z.infer<typeof rotationBlockSpecSchema>;
+
+/** Calculator-local buff, as data (ids are stable once saved in a spec). */
+export const rotationBuffSpecSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  source: z.string().min(1),
+  mods: z.array(
+    z.object({
+      stat: statKeySchema,
+      value: z.number(),
+    }),
+  ),
+});
+export type RotationBuffSpec = z.infer<typeof rotationBuffSpecSchema>;
+
+export const objectiveSpecSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('expected-damage'),
+    skillId: z.string().min(1),
+    motionName: z.string().min(1),
+    forteLevel: z.number().int().min(1),
+    crit: z.enum(['expected', 'crit', 'nonCrit']),
+  }),
+  z.object({
+    kind: z.literal('max-stat'),
+    stat: statKeySchema,
+  }),
+  z.object({
+    kind: z.literal('rotation-dpr'),
+    blocks: z.array(rotationBlockSpecSchema).min(1),
+    buffs: z.array(rotationBuffSpecSchema),
+    globalBuffIds: z.array(z.string()),
+    crit: z.enum(['expected', 'crit', 'nonCrit']),
+  }),
+]);
+export type ObjectiveSpec = z.infer<typeof objectiveSpecSchema>;
+
+export const buildSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    characterId: z.string().min(1),
+    weaponId: z.string().min(1),
+    echoIds: z.tuple([
+      z.string().min(1),
+      z.string().min(1),
+      z.string().min(1),
+      z.string().min(1),
+      z.string().min(1),
+    ]),
+    objectiveId: z.string().min(1),
+    /** Full spec when saved from the optimizer — makes builds re-runnable. */
+    objective: objectiveSpecSchema.optional(),
+    score: z.number().optional(),
+    notes: z.string().optional(),
+    updatedAt: z.string().datetime({ offset: true }),
+  })
+  .refine((b) => new Set(b.echoIds).size === b.echoIds.length, {
+    message: 'the same Echo cannot be equipped twice',
+  });
+export type Build = z.infer<typeof buildSchema>;
+
+export const teamSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    characterIds: z.tuple([
+      z.string().min(1),
+      z.string().min(1),
+      z.string().min(1),
+    ]),
+    /** Display-only in v1; drives rotation modeling in v2 (reference §5). */
+    outroBuffs: z
+      .array(
+        z.object({
+          fromCharacterId: z.string().min(1),
+          effect: statEffectSchema,
+          windowSeconds: z.number().positive().optional(),
+        }),
+      )
+      .optional(),
+  })
+  .refine((t) => new Set(t.characterIds).size === t.characterIds.length, {
+    message: 'a team cannot contain the same character twice',
+  });
+export type Team = z.infer<typeof teamSchema>;
+
+/** Row for the `gamedataCache` Dexie table (reference doc §8.2). */
+export const gameDataCacheRowSchema = z.object({
+  id: z.string().min(1),
+  fetchedAt: z.string().datetime({ offset: true }),
+  provider: z.literal('encore.moe'),
+  snapshotVersion: z.number().int().positive(),
+});
+export type GameDataCacheRow = z.infer<typeof gameDataCacheRowSchema>;
+
+// --- Snapshot file --------------------------------------------------------------
+
+export const snapshotSchema = z.object({
+  snapshotVersion: z.literal(SNAPSHOT_VERSION),
+  fetchedAt: z.string().datetime({ offset: true }),
+  provider: z.literal('encore.moe'),
+  characters: z.array(characterSchema).min(1),
+  weapons: z.array(weaponSchema).min(1),
+  sonataSets: z.array(sonataSetSchema).min(1),
+  echoDefs: z.array(echoDefSchema).default([]),
+});
+export type Snapshot = z.infer<typeof snapshotSchema>;

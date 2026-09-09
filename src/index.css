@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* Minimal base. Component styling lives in Tailwind classes, not here. */
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+}

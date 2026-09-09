@@ -1,0 +1,126 @@
+import 'fake-indexeddb/auto';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { OwnedEcho } from '../../data/schema.ts';
+import { db } from '../../state/db.ts';
+import { useInventoryStore } from '../../state/inventory.ts';
+import { InventoryPage } from './InventoryPage.tsx';
+
+beforeEach(async () => {
+  await db.ownedEchoes.clear();
+  useInventoryStore.setState({ echoes: [], loaded: false });
+});
+
+async function addEchoViaUi(user: ReturnType<typeof userEvent.setup>, nickname?: string): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /add echo/i }));
+  await user.selectOptions(screen.getByLabelText(/^echo$/i), 'hooscamp');
+  if (nickname) await user.type(screen.getByLabelText(/nickname/i), nickname);
+  await user.type(screen.getByLabelText(/main stat value/i), '30');
+  await user.click(screen.getByRole('button', { name: /^add echo$/i }));
+}
+
+describe('InventoryPage', () => {
+  it('shows an empty state with zero echoes', async () => {
+    render(<InventoryPage />);
+    expect(await screen.findByText(/no echoes yet/i)).toBeInTheDocument();
+  });
+
+  it('adds an echo through the form and persists it', async () => {
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+    await screen.findByText(/no echoes yet/i);
+
+    await addEchoViaUi(user, 'Page Echo');
+
+    expect(await screen.findByText('Page Echo')).toBeInTheDocument();
+    expect(screen.queryByText(/no echoes yet/i)).not.toBeInTheDocument();
+    const rows = await db.ownedEchoes.toArray();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ label: 'Page Echo', echoDefId: 'hooscamp', cost: 1 });
+  });
+
+  it('falls back to the def name without a nickname', async () => {
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+    await screen.findByText(/no echoes yet/i);
+
+    await addEchoViaUi(user);
+
+    expect(await screen.findByText('Hooscamp')).toBeInTheDocument();
+  });
+
+  it('edits a nickname', async () => {
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+    await addEchoViaUi(user, 'Page Echo');
+
+    const row = screen.getByText('Page Echo').closest('li')!;
+    await user.click(within(row).getByRole('button', { name: /edit/i }));
+    const nameField = screen.getByLabelText(/nickname/i);
+    await user.clear(nameField);
+    await user.type(nameField, 'Renamed');
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    await screen.findByText('Renamed');
+    expect(screen.queryByText('Page Echo')).not.toBeInTheDocument();
+    const rows = await db.ownedEchoes.toArray();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].label).toBe('Renamed');
+  });
+
+  it('deletes an echo and returns to the empty state', async () => {
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+    await addEchoViaUi(user, 'Page Echo');
+
+    const row = screen.getByText('Page Echo').closest('li')!;
+    await user.click(within(row).getByRole('button', { name: /delete/i }));
+
+    expect(await screen.findByText(/no echoes yet/i)).toBeInTheDocument();
+    expect(await db.ownedEchoes.count()).toBe(0);
+  });
+
+  it('shows errors and writes nothing when no Echo is picked', async () => {
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+    await screen.findByText(/no echoes yet/i);
+
+    await user.click(screen.getByRole('button', { name: /add echo/i }));
+    await user.click(screen.getByRole('button', { name: /^add echo$/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/pick an echo/i);
+    expect(await db.ownedEchoes.count()).toBe(0);
+  });
+
+  it('flags orphan rows and re-links them through edit', async () => {
+    const orphan: OwnedEcho = {
+      id: 'orphan-1',
+      label: 'Old Echo',
+      echoDefId: 'slugged-label',
+      sonataId: 'sierra-gale',
+      cost: 3,
+      level: 25,
+      rarity: 5,
+      mainStat: { stat: 'atkPct', value: 0.3 },
+      substats: [],
+      equippedTo: null,
+      origin: 'manual',
+    };
+    await db.ownedEchoes.add(orphan);
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+
+    expect(await screen.findByText(/re-linking — press edit/i)).toBeInTheDocument();
+    expect(screen.getByText(/needs re-link:/i)).toBeInTheDocument();
+
+    const row = screen.getByText('Old Echo').closest('li')!;
+    await user.click(within(row).getByRole('button', { name: /edit/i }));
+    await user.selectOptions(screen.getByLabelText(/^echo$/i), 'hooscamp');
+    await user.click(screen.getByRole('button', { name: /save/i }));
+
+    // Cost force-fixed to the def (1), banner clears.
+    expect(await db.ownedEchoes.get('orphan-1')).toMatchObject({ echoDefId: 'hooscamp', cost: 1 });
+    expect(screen.queryByText(/re-linking — press edit/i)).not.toBeInTheDocument();
+  });
+});
