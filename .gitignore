@@ -11,6 +11,16 @@ node_modules
 dist
 dist-ssr
 *.local
+coverage/
+
+# TypeScript incremental build info (currently redirected to node_modules,
+# kept here in case tsconfig paths change)
+*.tsbuildinfo
+
+# Env files (Vite loads .env*; never commit secrets)
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
