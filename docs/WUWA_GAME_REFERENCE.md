@@ -246,13 +246,57 @@ buffed/reworked in future patches.
 
 ### Negative Status damage
 
-Negative Status damage is not a normal ability motion. It uses the status
-level curve and status stack multiplier, still passes through target RES/DEF
-and target-side reductions, but does not use Crit or ordinary attribute/action
-DMG bonuses. The calculator exposes Negative Status DMG Amplify separately.
-Cartethyia's Aero Erosion actions are represented as explicit rotation events
-so sequence-node effects that depend on target stacks or rotation order can be
-resolved while the rotation is scored.
+Negative Status damage is not a normal ability motion. `Base DMG = Level
+Multiplier × 1.25078 × Stack Multiplier` (level table: 10→16, 50→229,
+80→2005, 90→3674). It still passes through target RES/DEF and target-side
+reductions, but does not use Crit or ordinary attribute/action DMG bonuses —
+only Negative Status DMG Amplify applies. The calculator exposes Negative
+Status DMG Amplify separately. Status actions are represented as explicit
+rotation events carrying a stack count, so sequence-node effects that depend
+on target stacks or rotation order can be resolved while the rotation is
+scored.
+
+The six statuses behave differently and need different modeling:
+
+- **Spectro Frazzle** — periodic DoT, loses 1 stack per tick, cap 10.
+  Published 1–10 stack table. Detonation blocks through the status
+  pipeline (Zani, Phoebe, Spectro Rover).
+- **Aero Erosion** — periodic DoT with its own decay timer, cap 6
+  (chain effects can extend it). Published 1–6 stack table (Cartethyia,
+  Ciaccona, Aero Rover).
+- **Havoc Bane** — deals NO damage. Enemy DEF −2% per stack (additive),
+  default cap 3. Modeled as a per-block target-stack input into the DEF
+  term; dealer damage (Chisa, Yangyang: Xuanling) comes from kit
+  consumption multipliers in per-character modules.
+- **Fusion Burst** — no DoT; detonates its full stack (cap 10) in one
+  AoE explosion. No published stack table (as of the Phase 0 spike), so
+  detonations throw rather than guess.
+- **Electro Flare** — periodic DoT losing half its stacks per tick, with
+  overflow converting to Electro Rage. No published stack table.
+- **Glacio Chafe** — damage on each inflict plus slow; freeze + clear at
+  10. No published stack table.
+
+Per-character application/consumption rules live in kit prose, not in
+synced motion values — model them in one hand-verified
+`src/domain/<character>.ts` module each (see `cartethyia.ts`), citing
+the inspected source. Kit effects that are timed stat buffs or team
+buffs stay manual rotation buffs; do not fabricate multipliers.
+
+### Tune Break / Tune Rupture / Tune Strain (3.x combat)
+
+Attacks build the enemy's Off-Tune Level; full gauge = Mistuned, and the
+active Resonator's Tune Break Skill deals DMG and clears it. Specialists
+inflict *Shifting* states; a Break on a Shifted target converts to a
+timed *Interfered* state (Rupture 8s, Strain 30s, Hack 8s). Tune Rupture
+detonates the mark for one large instance, then responders
+(Aemeath/Mornye/Lynae) fire extra instances on an 8s ICD. Tune Strain is
+a per-stack total-DMG amp scaling with Tune Break Boost. Tune Rupture
+DMG and Tune Break DMG formulas are unpublished (Phase 0 spikes G2/G3) —
+model response instances as labeled assumptions, never as verified
+formula. **Resonance Mode** (Aemeath, Denia, Lucilla, Lynae) switches a
+character between applying different statuses/dealing different damage
+types; treat it as a per-rotation calculator input, since switching
+resets kit resources.
 
 ## 7. Optimizer search — practical notes
 

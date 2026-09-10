@@ -1,12 +1,35 @@
 import { useState, type FormEvent } from 'react';
 import { statKeySchema, type CharacterData, type StatKey } from '../../data/schema.ts';
+import {
+  characterResonanceModes,
+  characterStatusBlocks,
+  characterTuneRuptureResponses,
+  characterUsesHavocBane,
+  characterUsesTuneStrain,
+  type ResonanceMode,
+} from '../../domain/characterMods.ts';
 import { resolveMotion } from '../../domain/damage.ts';
-import { maxAeroErosionStacks } from '../../domain/cartethyia.ts';
+import { maxStatusStacks, negativeStatusDef } from '../../domain/negativeStatus.ts';
 import type { ActionBlock, BlockResult, RotationBuff } from '../../domain/rotation.ts';
 import { isBlockStale } from '../../domain/rotation.ts';
 import { isPercentStat, parseDisplayValue, statLabel } from '../format.ts';
 
-const KIND_ORDER = ['basic', 'heavy', 'skill', 'liberation', 'intro', 'outro', 'forte', 'echo'] as const;
+type KitStatePatch = Partial<
+  Pick<
+    ActionBlock,
+    | 'targetHavocBaneStacks'
+    | 'blazesConsumed'
+    | 'nightfallBlazes'
+    | 'ringsConsumed'
+    | 'voiceFlux'
+    | 'wovenMyriad'
+    | 'tuneStrainStacks'
+    | 'tuneResponseStacks'
+    | 'tuneBreakMultiplier'
+  >
+>;
+
+const KIND_ORDER = ['basic', 'heavy', 'skill', 'liberation', 'intro', 'outro', 'forte', 'echo', 'tunebreak'] as const;
 const KIND_LABELS: Record<string, string> = {
   basic: 'Basic Attack',
   heavy: 'Heavy Attack',
@@ -16,6 +39,7 @@ const KIND_LABELS: Record<string, string> = {
   outro: 'Outro Skill',
   forte: 'Forte Circuit',
   echo: 'Echo Skill',
+  tunebreak: 'Tune Break',
 };
 
 const inputClass =
@@ -26,6 +50,8 @@ interface RotationTimelineProps {
   character: CharacterData;
   resonanceChain: number;
   forteLevels: Record<string, number>;
+  resonanceMode: ResonanceMode | null;
+  onSetResonanceMode: (mode: ResonanceMode | null) => void;
   blocks: ActionBlock[];
   buffs: RotationBuff[];
   globalBuffIds: string[];
@@ -37,13 +63,14 @@ interface RotationTimelineProps {
     skillId: string,
     motionName: string,
     forteLevel: number,
-    options?: Pick<ActionBlock, 'damageKind' | 'statusType' | 'statusStacks'>,
+    options?: Pick<ActionBlock, 'damageKind' | 'statusType' | 'statusStacks' | 'tuneResponseStacks' | 'tuneBreakMultiplier'>,
   ) => void;
   onRemoveBlock: (id: string) => void;
   onMoveBlock: (id: string, direction: -1 | 1) => void;
   onSetBlockForte: (id: string, forteLevel: number) => void;
   onSetBlockStatusStacks: (id: string, stacks: number) => void;
   onSetBlockConviction: (id: string, conviction: number) => void;
+  onSetBlockKitState: (id: string, patch: KitStatePatch) => void;
   onToggleBlockBuff: (blockId: string, buffId: string) => void;
   onToggleGlobalBuff: (id: string) => void;
   onAddBuff: (buff: Omit<RotationBuff, 'id'>) => void;
@@ -87,10 +114,20 @@ function motionScaling(
 
 export function RotationTimeline(props: RotationTimelineProps) {
   const {
-    character, resonanceChain, forteLevels, blocks, buffs, globalBuffIds, results, dpr, dps, rotationTime,
+    character, resonanceChain, forteLevels, resonanceMode, onSetResonanceMode, blocks, buffs, globalBuffIds, results, dpr, dps, rotationTime,
     onAddBlock, onRemoveBlock, onMoveBlock, onSetBlockForte, onSetBlockStatusStacks, onSetBlockConviction,
-    onToggleBlockBuff, onToggleGlobalBuff, onAddBuff, onRemoveBuff,
+    onSetBlockKitState, onToggleBlockBuff, onToggleGlobalBuff, onAddBuff, onRemoveBuff,
   } = props;
+  const statusOptions = characterStatusBlocks(character.id);
+  const baneCharacter = characterUsesHavocBane(character.id);
+  const strainCharacter = characterUsesTuneStrain(character.id);
+  const ruptureResponses = characterTuneRuptureResponses(character.id);
+  const resonanceModes = characterResonanceModes(character.id);
+  const RESONANCE_MODE_LABELS: Record<ResonanceMode, string> = {
+    tuneRupture: 'Tune Rupture',
+    fusionBurst: 'Fusion Burst',
+    tuneStrain: 'Tune Strain',
+  };
   const [buffError, setBuffError] = useState<string | null>(null);
   const [buffLabel, setBuffLabel] = useState('');
   const [buffSource, setBuffSource] = useState('');
@@ -149,7 +186,15 @@ export function RotationTimeline(props: RotationTimelineProps) {
               const stale = negativeStatus ? false : isBlockStale(character, block);
               const result = results.get(block.id);
               const skill = character.skills.find((s) => s.id === block.skillId);
-              const blockLabel = negativeStatus ? 'Aero Erosion DMG' : (skill?.label ?? block.skillId);
+              const statusLabel = block.statusType ? negativeStatusDef(block.statusType).label : null;
+              const tuneBreak = block.damageKind === 'tuneBreak';
+              const tuneRupture = block.damageKind === 'tuneRupture';
+              const specialKind = negativeStatus || tuneBreak || tuneRupture;
+              const blockLabel = specialKind
+                ? (result?.label ?? (statusLabel ? `${statusLabel} DMG` : block.motionName !== '' ? `${block.motionName} (Tune)` : 'Tune Break DMG'))
+                : (skill?.label ?? block.skillId);
+              const skillKind = skill?.kind;
+              const blockCap = maxStatusStacks(block.statusType ?? 'aeroErosion', character.id, resonanceChain);
               return (
                 <li key={block.id} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
@@ -161,7 +206,9 @@ export function RotationTimeline(props: RotationTimelineProps) {
                       <p className="truncate text-xs text-slate-400">
                         {negativeStatus
                           ? `${block.statusStacks ?? 1} stack${(block.statusStacks ?? 1) === 1 ? '' : 's'}`
-                          : block.motionName === '' ? 'No damage component' : block.motionName}
+                          : tuneBreak
+                            ? `coefficient ${block.tuneBreakMultiplier ?? '—'}`
+                            : block.motionName === '' ? 'No damage component' : block.motionName}
                         {result && !result.buffCarrier && ` · ${Math.round(result.damage).toLocaleString()} dmg · ${result.share.toFixed(1)}%`}
                       </p>
                     </div>
@@ -184,18 +231,75 @@ export function RotationTimeline(props: RotationTimelineProps) {
                     <details className="mt-1">
                       <summary className="cursor-pointer text-xs text-slate-400">
                         {negativeStatus
-                          ? `Aero Erosion · ${block.statusStacks ?? 1} stack${(block.statusStacks ?? 1) === 1 ? '' : 's'}`
-                          : `Forte ${block.forteLevel} · ${block.activeBuffIds.length} buff${block.activeBuffIds.length === 1 ? '' : 's'}`}
+                          ? `${statusLabel ?? 'Status'} · ${block.statusStacks ?? 1} stack${(block.statusStacks ?? 1) === 1 ? '' : 's'}`
+                          : tuneBreak
+                            ? `Tune Break ×${block.tuneBreakMultiplier ?? '—'}`
+                            : tuneRupture
+                              ? `${block.motionName} · ${block.tuneResponseStacks ?? 0} trail stacks`
+                              : `Forte ${block.forteLevel} · ${block.activeBuffIds.length} buff${block.activeBuffIds.length === 1 ? '' : 's'}`}
                       </summary>
                       <div className="mt-2 grid gap-2 md:grid-cols-2">
-                        {negativeStatus ? (
+                        {tuneBreak ? (
                           <div>
-                            <label htmlFor={`block-status-stacks-${block.id}`} className={labelClass}>Aero Erosion stacks</label>
+                            <label htmlFor={`block-break-mult-${block.id}`} className={labelClass}>Tune Break coefficient (unverified — your research)</label>
+                            <input
+                              id={`block-break-mult-${block.id}`}
+                              type="number"
+                              min={0}
+                              max={99}
+                              step="any"
+                              value={block.tuneBreakMultiplier ?? ''}
+                              onChange={(e) => {
+                                if (e.target.value.trim() === '') return;
+                                const num = Number(e.target.value);
+                                if (Number.isFinite(num)) onSetBlockKitState(block.id, { tuneBreakMultiplier: num });
+                              }}
+                              className={`${inputClass} mt-0.5`}
+                            />
+                          </div>
+                        ) : tuneRupture ? (
+                          <>
+                            <div>
+                              <label htmlFor={`block-forte-${block.id}`} className={labelClass}>Forte level</label>
+                              <input
+                                id={`block-forte-${block.id}`}
+                                type="number"
+                                min={1}
+                                max={10}
+                                value={block.forteLevel}
+                                onChange={(e) => {
+                                  if (e.target.value.trim() === '') return;
+                                  const num = Number(e.target.value);
+                                  if (Number.isInteger(num)) onSetBlockForte(block.id, num);
+                                }}
+                                className={`${inputClass} mt-0.5`}
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor={`block-response-stacks-${block.id}`} className={labelClass}>Trail stacks consumed</label>
+                              <input
+                                id={`block-response-stacks-${block.id}`}
+                                type="number"
+                                min={0}
+                                max={99}
+                                value={block.tuneResponseStacks ?? 0}
+                                onChange={(e) => {
+                                  if (e.target.value.trim() === '') return;
+                                  const num = Number(e.target.value);
+                                  if (Number.isInteger(num)) onSetBlockKitState(block.id, { tuneResponseStacks: num });
+                                }}
+                                className={`${inputClass} mt-0.5`}
+                              />
+                            </div>
+                          </>
+                        ) : negativeStatus ? (
+                          <div>
+                            <label htmlFor={`block-status-stacks-${block.id}`} className={labelClass}>{statusLabel ?? 'Status'} stacks</label>
                             <input
                               id={`block-status-stacks-${block.id}`}
                               type="number"
                               min={1}
-                              max={maxAeroErosionStacks(resonanceChain)}
+                              max={blockCap}
                               value={block.statusStacks ?? 1}
                               onChange={(e) => {
                                 if (e.target.value.trim() === '') return;
@@ -223,14 +327,14 @@ export function RotationTimeline(props: RotationTimelineProps) {
                             />
                           </div>
                         )}
-                        {!negativeStatus && character.id === 'cartethyia' && (
+                        {!specialKind && character.id === 'cartethyia' && (
                           <div>
                             <label htmlFor={`target-status-stacks-${block.id}`} className={labelClass}>Target Aero Erosion stacks</label>
                             <input
                               id={`target-status-stacks-${block.id}`}
                               type="number"
                               min={0}
-                              max={maxAeroErosionStacks(resonanceChain)}
+                              max={maxStatusStacks('aeroErosion', character.id, resonanceChain)}
                               value={block.targetStatusStacks ?? 0}
                               onChange={(e) => {
                                 if (e.target.value.trim() === '') return;
@@ -241,7 +345,115 @@ export function RotationTimeline(props: RotationTimelineProps) {
                             />
                           </div>
                         )}
-                        {!negativeStatus && character.id === 'cartethyia' && character.skills.find((s) => s.id === block.skillId)?.kind === 'forte' && (
+                        {!specialKind && strainCharacter && (
+                          <div>
+                            <label htmlFor={`tune-strain-stacks-${block.id}`} className={labelClass}>Tune Strain stacks on target</label>
+                            <input
+                              id={`tune-strain-stacks-${block.id}`}
+                              type="number"
+                              min={0}
+                              max={10}
+                              value={block.tuneStrainStacks ?? 0}
+                              onChange={(e) => {
+                                if (e.target.value.trim() === '') return;
+                                const num = Number(e.target.value);
+                                if (Number.isInteger(num)) onSetBlockKitState(block.id, { tuneStrainStacks: num });
+                              }}
+                              className={`${inputClass} mt-0.5`}
+                            />
+                          </div>
+                        )}
+                        {!specialKind && baneCharacter && (
+                          <div>
+                            <label htmlFor={`target-bane-stacks-${block.id}`} className={labelClass}>Target Havoc Bane stacks</label>
+                            <input
+                              id={`target-bane-stacks-${block.id}`}
+                              type="number"
+                              min={0}
+                              max={maxStatusStacks('havocBane', character.id, resonanceChain)}
+                              value={block.targetHavocBaneStacks ?? 0}
+                              onChange={(e) => {
+                                if (e.target.value.trim() === '') return;
+                                const num = Number(e.target.value);
+                                if (Number.isInteger(num)) onSetBlockKitState(block.id, { targetHavocBaneStacks: num });
+                              }}
+                              className={`${inputClass} mt-0.5`}
+                            />
+                          </div>
+                        )}
+                        {!specialKind && character.id === 'zani' && skillKind === 'liberation' && (
+                          <div>
+                            <label htmlFor={`blazes-consumed-${block.id}`} className={labelClass}>Blazes consumed (S3)</label>
+                            <input
+                              id={`blazes-consumed-${block.id}`}
+                              type="number"
+                              min={0}
+                              max={150}
+                              value={block.blazesConsumed ?? 0}
+                              onChange={(e) => {
+                                if (e.target.value.trim() === '') return;
+                                const num = Number(e.target.value);
+                                if (Number.isInteger(num)) onSetBlockKitState(block.id, { blazesConsumed: num });
+                              }}
+                              className={`${inputClass} mt-0.5`}
+                            />
+                          </div>
+                        )}
+                        {!specialKind && character.id === 'zani' && skillKind === 'forte' && (
+                          <div>
+                            <label htmlFor={`nightfall-blazes-${block.id}`} className={labelClass}>Blazes on Nightfall hit (S6)</label>
+                            <input
+                              id={`nightfall-blazes-${block.id}`}
+                              type="number"
+                              min={0}
+                              max={40}
+                              value={block.nightfallBlazes ?? 0}
+                              onChange={(e) => {
+                                if (e.target.value.trim() === '') return;
+                                const num = Number(e.target.value);
+                                if (Number.isInteger(num)) onSetBlockKitState(block.id, { nightfallBlazes: num });
+                              }}
+                              className={`${inputClass} mt-0.5`}
+                            />
+                          </div>
+                        )}
+                        {!specialKind && character.id === 'yangyang-xuanling' && (
+                          <label className="flex items-center gap-2 text-xs text-slate-300">
+                            <input
+                              type="checkbox"
+                              checked={block.voiceFlux ?? false}
+                              onChange={() => onSetBlockKitState(block.id, { voiceFlux: !(block.voiceFlux ?? false) })}
+                            />
+                            <span>Voice Flux active (S6 Heavy +40%)</span>
+                          </label>
+                        )}
+                        {!specialKind && character.id === 'chisa' && skillKind === 'forte' && (
+                          <div>
+                            <label className="flex items-center gap-2 text-xs text-slate-300">
+                              <input
+                                type="checkbox"
+                                checked={block.wovenMyriad ?? false}
+                                onChange={() => onSetBlockKitState(block.id, { wovenMyriad: !(block.wovenMyriad ?? false) })}
+                              />
+                              <span>Woven Myriad active (Liberation state)</span>
+                            </label>
+                            <label htmlFor={`rings-consumed-${block.id}`} className={`${labelClass} mt-2`}>Rings consumed (Eradication)</label>
+                            <input
+                              id={`rings-consumed-${block.id}`}
+                              type="number"
+                              min={0}
+                              max={99}
+                              value={block.ringsConsumed ?? 0}
+                              onChange={(e) => {
+                                if (e.target.value.trim() === '') return;
+                                const num = Number(e.target.value);
+                                if (Number.isInteger(num)) onSetBlockKitState(block.id, { ringsConsumed: num });
+                              }}
+                              className={`${inputClass} mt-0.5`}
+                            />
+                          </div>
+                        )}
+                        {!specialKind && character.id === 'cartethyia' && character.skills.find((s) => s.id === block.skillId)?.kind === 'forte' && (
                           <div>
                             <label htmlFor={`conviction-${block.id}`} className={labelClass}>Fleurdelys Conviction (S1)</label>
                             <input
@@ -290,6 +502,32 @@ export function RotationTimeline(props: RotationTimelineProps) {
 
       <section aria-label="Add actions">
         <h3 className="text-sm font-semibold">Add Actions</h3>
+        {resonanceModes.length > 0 && (
+          <div className="mt-2 rounded-md border border-slate-800 p-2">
+            <p className="text-xs font-medium text-slate-400">Resonance Mode</p>
+            <p className="mt-1 text-xs text-slate-500">
+              This kit scores differently per mode — pick the one this rotation runs.
+            </p>
+            <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" aria-label="Resonance Mode">
+              {resonanceModes.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={resonanceMode === mode}
+                  onClick={() => onSetResonanceMode(mode)}
+                  className={`rounded-md border px-2 py-1 text-xs hover:bg-slate-800 ${
+                    resonanceMode === mode
+                      ? 'border-sky-500 text-sky-200'
+                      : 'border-slate-700 text-slate-200'
+                  }`}
+                >
+                  {RESONANCE_MODE_LABELS[mode]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="mt-2 space-y-3">
           {kinds.map((kind) => (
             <div key={kind}>
@@ -325,30 +563,79 @@ export function RotationTimeline(props: RotationTimelineProps) {
             </div>
           ))}
         </div>
-        {character.id === 'cartethyia' && (
+        {statusOptions.map((status) => {
+          const def = negativeStatusDef(status);
+          const cap = maxStatusStacks(status, character.id, resonanceChain);
+          return (
+            <div key={status} className="mt-3 rounded-md border border-slate-800 p-2">
+              <p className="text-xs font-medium text-slate-400">Negative Status DMG</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {def.label} ignores {def.element}/action DMG bonuses and Crit. Its damage is resolved from the selected stack count.
+              </p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {Array.from({ length: cap }, (_, i) => i + 1).map((stacks) => (
+                  <button
+                    key={stacks}
+                    type="button"
+                    onClick={() => onAddBlock('', `${def.label} DMG`, 1, {
+                      damageKind: 'negativeStatus',
+                      statusType: status,
+                      statusStacks: stacks,
+                    })}
+                    className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                  >
+                    {def.label} ×{stacks}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {ruptureResponses.length > 0 && resonanceMode === 'tuneRupture' && (
           <div className="mt-3 rounded-md border border-slate-800 p-2">
-            <p className="text-xs font-medium text-slate-400">Negative Status DMG</p>
+            <p className="text-xs font-medium text-slate-400">Tune Rupture Response (provisional)</p>
             <p className="mt-1 text-xs text-slate-500">
-              Aero Erosion ignores Aero/action DMG bonuses and Crit. Its damage is resolved from the selected stack count.
+              Response instances use the snapshot MV with trail scaling, no base Crit, and no verified formula — tune the trail count per block.
             </p>
             <div className="mt-1 flex flex-wrap gap-1">
-              {Array.from({ length: maxAeroErosionStacks(resonanceChain) }, (_, i) => i + 1).map((stacks) => (
-                <button
-                  key={stacks}
-                  type="button"
-                  onClick={() => onAddBlock('', 'Aero Erosion DMG', 1, {
-                    damageKind: 'negativeStatus',
-                    statusType: 'aeroErosion',
-                    statusStacks: stacks,
-                  })}
-                  className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
-                >
-                  Aero Erosion ×{stacks}
-                </button>
-              ))}
+              {ruptureResponses.map((motionName) => {
+                const skill = character.skills.find((s) => s.motionValues.some((m) => m.name === motionName));
+                if (!skill) return null;
+                return (
+                  <button
+                    key={motionName}
+                    type="button"
+                    onClick={() => onAddBlock(skill.id, motionName, forteLevels[skill.id] ?? 10, {
+                      damageKind: 'tuneRupture',
+                      tuneResponseStacks: 0,
+                    })}
+                    className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                  >
+                    {motionName}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
+        <div className="mt-3 rounded-md border border-slate-800 p-2">
+          <p className="text-xs font-medium text-slate-400">Tune Break (provisional)</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Mistuned-target break hit: provisional base-10000 shape, no verified formula or coefficients — set the coefficient per block from your own research.
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => onAddBlock('', 'Tune Break DMG', 1, {
+                damageKind: 'tuneBreak',
+                tuneBreakMultiplier: 1,
+              })}
+              className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+            >
+              Tune Break ×1.0
+            </button>
+          </div>
+        </div>
       </section>
 
       <section aria-label="Buffs" className="rounded-lg border border-slate-800 bg-slate-900 p-3">

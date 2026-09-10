@@ -48,7 +48,8 @@ describe('EchoForm', () => {
     await user.click(screen.getByRole('button', { name: /^4$/ }));
     await user.type(screen.getByLabelText(/search echoes/i), 'chest mimic');
     const list = within(screen.getByLabelText(/^echo$/i) as HTMLElement);
-    expect(list.getAllByRole('option', { name: /Chest Mimic/ })).toHaveLength(2);
+    // Exactly one Chest Mimic: Phantom shiny variants are excluded by sync.
+    expect(list.getAllByRole('option', { name: /Chest Mimic/ })).toHaveLength(1);
     expect(list.queryByRole('option', { name: /Hooscamp/ })).not.toBeInTheDocument();
   });
 

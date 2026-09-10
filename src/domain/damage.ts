@@ -11,8 +11,22 @@ import {
   cartethyiaConvictionCritDmg,
   cartethyiaMotionMultiplier,
   cartethyiaStatusTargetMultiplier,
-  maxAeroErosionStacks,
 } from './cartethyia.ts';
+import { AEMEATH_S6_FIXED_CRIT } from './aemeath.ts';
+import {
+  characterResonanceModes,
+  characterSkillMods,
+  tuneResponseStackRate,
+  type ResonanceMode,
+} from './characterMods.ts';
+import {
+  havocBaneDefReduction,
+  maxStatusStacks,
+  negativeStatusDef,
+  negativeStatusLevelMultiplier,
+  statusStackMultiplier,
+  type NegativeStatusType,
+} from './negativeStatus.ts';
 
 /**
  * Domain layer: damage formula (reference doc §6, Fandom wiki Damage page).
@@ -96,6 +110,11 @@ export interface DefMultiplierInput {
   enemyDefOverride?: number;
   defIgnore: number;
   defReduction: number;
+  /**
+   * Percentage of enemy DEF removed (e.g. Havoc Bane stacks). Applies to
+   * the curved DEF after the flat reduction, before the ratio.
+   */
+  enemyDefPctReduction?: number;
 }
 
 /**
@@ -105,7 +124,8 @@ export interface DefMultiplierInput {
 export function computeDefMultiplier(input: DefMultiplierInput): number {
   const { attackerLevel, enemyLevel, enemyDefOverride, defIgnore, defReduction } = input;
   const enemyDef = enemyDefOverride ?? (8 * enemyLevel + 792);
-  const effectiveDef = Math.max(0, enemyDef - defReduction);
+  const pct = input.enemyDefPctReduction ?? 0;
+  const effectiveDef = Math.max(0, enemyDef - defReduction) * Math.max(0, 1 - pct);
   const numerator = 800 + 8 * attackerLevel;
   const ratio = numerator / (numerator + effectiveDef * (1 - defIgnore));
   return Math.min(ratio, 2);
@@ -137,10 +157,11 @@ export function computeDmgBonusPercent(
   sheet: StatSheet,
   attribute: Attribute,
   kind: DamageType | 'forte',
+  extra = 0,
 ): number {
   const attributeBonus = sheet[`dmgBonus:${attribute}`];
   const bucketBonus = kind === 'forte' ? 0 : sheet[`dmgBonus:${kind}`];
-  return 1 + attributeBonus + bucketBonus;
+  return 1 + attributeBonus + bucketBonus + extra;
 }
 
 /** DmgAmplifyTotal = 1 + (target + attacker). Signed — keep separate from the additive bucket. */
@@ -235,6 +256,16 @@ export interface DamageContext {
   /** Aero Erosion stacks currently on the target (Cartethyia passive/S6). */
   targetStatusStacks?: number;
   conviction?: number;
+  /** Havoc Bane stacks on the target — percentage DEF reduction. */
+  targetHavocBaneStacks?: number;
+  /** Kit-state inputs for per-character modules (Zani Blazes, Xuanling Voice Flux, Chisa rings/state). */
+  blazesConsumed?: number;
+  nightfallBlazes?: number;
+  ringsConsumed?: number;
+  voiceFlux?: boolean;
+  wovenMyriad?: boolean;
+  /** Tune Strain - Interfered stacks on the target (total-DMG amp). */
+  tuneStrainStacks?: number;
 }
 
 export interface DamageResult {
@@ -244,63 +275,72 @@ export interface DamageResult {
   bonuses: number;
 }
 
+/**
+ * Fixed-crit override for status damage that can critically hit with
+ * kit-specified values (e.g. Aemeath S6: 80% rate, 275% DMG). Applied as
+ * an expected value — status detonations have no per-hit crit roll input.
+ */
+export interface FixedStatusCrit {
+  rate: number;
+  dmg: number;
+}
+
 export interface NegativeStatusDamageContext {
   sheet: StatSheet;
-  status: 'aeroErosion';
+  status: NegativeStatusType;
   stacks: number;
   attackerLevel: number;
   enemy: EnemyProfile;
-  /** Cartethyia S2 raises the allowed cap from 6 to 9. */
+  /** Chain-gated cap extensions resolve via maxStatusStacks. */
   resonanceChain?: number;
   characterId?: string;
   /** Target stacks for Cartethyia's status-dependent incoming-damage bonus. */
   targetStatusStacks?: number;
-}
-
-/** Negative Status level multipliers currently needed by the calculator. */
-const NEGATIVE_STATUS_LEVEL_MULTIPLIERS: readonly [number, number][] = [
-  [1, 0],
-  [50, 229],
-  [80, 2005],
-  [90, 3674],
-];
-
-/** Resolve the status level curve without treating status damage as a skill MV. */
-export function negativeStatusLevelMultiplier(level: number): number {
-  if (!Number.isFinite(level) || level < 1) {
-    throw new Error(`attacker level must be at least 1, got ${level}`);
-  }
-  const clamped = Math.min(90, level);
-  for (let i = 1; i < NEGATIVE_STATUS_LEVEL_MULTIPLIERS.length; i += 1) {
-    const [lowerLevel, lowerValue] = NEGATIVE_STATUS_LEVEL_MULTIPLIERS[i - 1];
-    const [upperLevel, upperValue] = NEGATIVE_STATUS_LEVEL_MULTIPLIERS[i];
-    if (clamped <= upperLevel) {
-      const fraction = (clamped - lowerLevel) / (upperLevel - lowerLevel);
-      return lowerValue + (upperValue - lowerValue) * fraction;
-    }
-  }
-  return NEGATIVE_STATUS_LEVEL_MULTIPLIERS.at(-1)![1];
+  /** Havoc Bane stacks on the target — percentage DEF reduction. */
+  targetHavocBaneStacks?: number;
+  critOverride?: FixedStatusCrit;
 }
 
 /** Base damage for one Negative Status detonation. */
-export function computeNegativeStatusBaseDamage(attackerLevel: number, stacks: number): number {
-  return negativeStatusLevelMultiplier(attackerLevel) * 1.25078 * aeroErosionMultiplier(stacks);
+export function computeNegativeStatusBaseDamage(
+  status: NegativeStatusType,
+  attackerLevel: number,
+  stacks: number,
+): number {
+  // Aero Erosion resolves through the Cartethyia module so S2's 7–9
+  // extension applies; every other status uses its published table.
+  const stackMult = status === 'aeroErosion'
+    ? aeroErosionMultiplier(stacks)
+    : statusStackMultiplier(status, stacks);
+  return negativeStatusLevelMultiplier(attackerLevel) * 1.25078 * stackMult;
+}
+
+/** Expected-value multiplier for fixed-crit status damage. */
+export function computeFixedStatusCritMultiplier(crit: FixedStatusCrit): number {
+  const rate = Math.min(1, Math.max(0, crit.rate));
+  return rate * crit.dmg + (1 - rate) * 1;
 }
 
 /**
- * Negative Status damage has its own rules: no Crit, no attribute/action DMG
- * bonus, and only Negative Status DMG Amplify from the stat sheet. It still
- * uses the target's RES/DEF and target-side reductions.
+ * Negative Status damage has its own rules: no Crit (unless a kit grants
+ * fixed-crit via critOverride), no attribute/action DMG bonus, and only
+ * Negative Status DMG Amplify from the stat sheet. It still uses the
+ * target's RES/DEF and target-side reductions — including Elemental
+ * Reduction, which the wiki flags as unconfirmed for status damage but
+ * which stays in the pipeline pending contrary evidence (Phase 0, G5).
  */
 export function computeNegativeStatusDamage(ctx: NegativeStatusDamageContext): DamageResult {
-  if (ctx.status !== 'aeroErosion') throw new Error(`unsupported negative status ${ctx.status}`);
-  const maxStacks = maxAeroErosionStacks(ctx.resonanceChain ?? 0);
+  const def = negativeStatusDef(ctx.status);
+  if (!def.dealsDamage) {
+    throw new Error(`${def.label} deals no damage — model it as enemy DEF reduction, not a detonation`);
+  }
+  const maxStacks = maxStatusStacks(ctx.status, ctx.characterId, ctx.resonanceChain ?? 0);
   if (ctx.stacks > maxStacks) {
-    throw new Error(`Aero Erosion supports at most ${maxStacks} stacks at S${ctx.resonanceChain ?? 0}`);
+    throw new Error(`${def.label} supports at most ${maxStacks} stacks at S${ctx.resonanceChain ?? 0}`);
   }
 
-  const baseDamage = computeNegativeStatusBaseDamage(ctx.attackerLevel, ctx.stacks);
-  const resTotal = ctx.enemy.baseResistance.Aero + ctx.sheet.resistancePenetration;
+  const baseDamage = computeNegativeStatusBaseDamage(ctx.status, ctx.attackerLevel, ctx.stacks);
+  const resTotal = ctx.enemy.baseResistance[def.element] + ctx.sheet.resistancePenetration;
   const resistances =
     computeResMultiplier(resTotal) *
     computeDefMultiplier({
@@ -309,10 +349,12 @@ export function computeNegativeStatusDamage(ctx: NegativeStatusDamageContext): D
       enemyDefOverride: ctx.enemy.enemyDefOverride,
       defIgnore: ctx.sheet.defIgnore,
       defReduction: ctx.sheet.defReduction,
+      enemyDefPctReduction: havocBaneDefReduction(ctx.targetHavocBaneStacks ?? 0),
     }) *
     computeDmgReductionTotal(ctx.enemy.dmgReductionBase, ctx.enemy.dmgReductionAdditional) *
     computeElemReductionTotal(ctx.enemy.elemReductionBase, ctx.enemy.elemReductionAdditional);
-  const bonuses = 1 + ctx.sheet.negativeStatusAmplify;
+  const bonuses = (1 + ctx.sheet.negativeStatusAmplify) *
+    (ctx.critOverride ? computeFixedStatusCritMultiplier(ctx.critOverride) : 1);
   const fleurdelysMultiplier = ctx.characterId === 'cartethyia' && (ctx.resonanceChain ?? 0) >= 6 ? 1.4 : 1;
   const targetMultiplier = ctx.characterId === 'cartethyia' && ctx.targetStatusStacks && ctx.targetStatusStacks > 0
     ? cartethyiaStatusTargetMultiplier(ctx.targetStatusStacks)
@@ -355,7 +397,22 @@ export function computeDamage(ctx: DamageContext): DamageResult {
     motion.flat + (ctx.flatDamage ?? 0),
     ctx.flatBonusPercent ?? 0,
   );
-  const baseDamage = rawBaseDamage * cartethyiaMotionMultiplier(
+  const kitMods = characterSkillMods(
+    ctx.characterId,
+    ctx.resonanceChain ?? 0,
+    skill,
+    motion.name,
+    motion.dmgType,
+    ctx.forteLevel,
+    {
+      blazesConsumed: ctx.blazesConsumed,
+      nightfallBlazes: ctx.nightfallBlazes,
+      ringsConsumed: ctx.ringsConsumed,
+      voiceFlux: ctx.voiceFlux,
+      wovenMyriad: ctx.wovenMyriad,
+    },
+  );
+  const baseDamage = rawBaseDamage * kitMods.motionMultiplier * cartethyiaMotionMultiplier(
     ctx.characterId,
     ctx.resonanceChain ?? 0,
     skill,
@@ -372,14 +429,16 @@ export function computeDamage(ctx: DamageContext): DamageResult {
       enemyDefOverride: enemy.enemyDefOverride,
       defIgnore: sheet.defIgnore,
       defReduction: sheet.defReduction,
+      enemyDefPctReduction: havocBaneDefReduction(ctx.targetHavocBaneStacks ?? 0),
     }) *
     computeDmgReductionTotal(enemy.dmgReductionBase, enemy.dmgReductionAdditional) *
     computeElemReductionTotal(enemy.elemReductionBase, enemy.elemReductionAdditional);
 
   const kind = motion.dmgType;
   const bonuses =
-    computeDmgBonusPercent(sheet, skill.attribute, kind) *
-    computeDmgAmplifyTotal(sheet.amplify, enemy.amplifyTarget) *
+    computeDmgBonusPercent(sheet, skill.attribute, kind, kitMods.dmgBonusExtra) *
+    computeDmgAmplifyTotal(sheet.amplify + kitMods.amplifyExtra, enemy.amplifyTarget) *
+    computeTuneStrainMultiplier(sheet.tuneBreakBoost, ctx.tuneStrainStacks ?? 0) *
     computeSpecialDmgPercent(sheet.specialBase, sheet.specialBonus) *
     computeCritMultiplier(
       sheet.critRate,
@@ -391,6 +450,135 @@ export function computeDamage(ctx: DamageContext): DamageResult {
       ),
       ctx.crit,
     );
+
+  return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
+}
+
+/**
+ * Tune Strain total-DMG multiplier: +0.12% per Tune Break Boost point per
+ * Interfered stack (Mornye / Qingxiao / Luuk Herssen kit entries on the
+ * inspected Tune_Break wiki page). Applies to the attacker's ability
+ * damage only — status-detonation interaction is unmodeled.
+ */
+export function computeTuneStrainMultiplier(tuneBreakBoost: number, strainStacks: number): number {
+  if (!Number.isInteger(strainStacks) || strainStacks < 0) {
+    throw new Error(`Tune Strain stacks must be a non-negative integer, got ${strainStacks}`);
+  }
+  return 1 + 0.0012 * tuneBreakBoost * strainStacks;
+}
+
+export interface TuneBreakDamageInput {
+  /** User-supplied break coefficient — no verified default exists (G3). */
+  multiplier: number;
+  tuneBreakBoost: number;
+  attackerLevel: number;
+  enemy: EnemyProfile;
+  /** Elemental RES of the break hit (character attribute by assumption). */
+  enemyRes: number;
+  resistancePenetration: number;
+}
+
+/**
+ * Tune Break hit on a Mistuned target. PROVISIONAL (Phase 0, G3): shape
+ * follows an unverified community simulator
+ * (base 10000 × coeff × boost × RES × DEF, no crit/level/ATK scaling) —
+ * the coefficient always comes from the caller, never from a default.
+ */
+export function computeTuneBreakDamage(input: TuneBreakDamageInput): DamageResult {
+  if (!(input.multiplier >= 0)) {
+    throw new Error(`Tune Break multiplier must be non-negative, got ${input.multiplier}`);
+  }
+  const baseDamage = 10000 * input.multiplier;
+  const boost = (100 + input.tuneBreakBoost) / 100;
+  const resistances =
+    computeResMultiplier(input.enemyRes + input.resistancePenetration) *
+    computeDefMultiplier({
+      attackerLevel: input.attackerLevel,
+      enemyLevel: input.enemy.level,
+      enemyDefOverride: input.enemy.enemyDefOverride,
+      defIgnore: 0,
+      defReduction: 0,
+    }) *
+    computeDmgReductionTotal(input.enemy.dmgReductionBase, input.enemy.dmgReductionAdditional) *
+    computeElemReductionTotal(input.enemy.elemReductionBase, input.enemy.elemReductionAdditional);
+  const bonuses = boost;
+  return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
+}
+
+export interface TuneRuptureDamageContext {
+  sheet: StatSheet;
+  baseAtk: { character: number; weapon: number };
+  baseHp: { character: number };
+  baseDef: { character: number };
+  attackerLevel: number;
+  skill: CharacterSkill;
+  motionName: string;
+  forteLevel: number;
+  enemy: EnemyProfile;
+  characterId?: string;
+  resonanceChain?: number;
+  /** Trail (or equivalent) stacks consumed by this response. */
+  tuneResponseStacks?: number;
+  /** Response blocks require the matching Resonance Mode (validated here). */
+  resonanceMode?: ResonanceMode;
+}
+
+/**
+ * Tune Rupture response instance (e.g. Aemeath's Starburst). PROVISIONAL
+ * (Phase 0, G2): ATK-scaled snapshot MV with trail scaling, attribute
+ * bucket only, and no base crit — the snapshot ships real MVs (why they
+ * exist at all), while base crit is ruled out by kits that explicitly
+ * grant fixed crit (Aemeath S6). Per-character trail rates come from
+ * tuneResponseStackRate; unverified characters throw.
+ */
+export function computeTuneRuptureDamage(ctx: TuneRuptureDamageContext): DamageResult {
+  const motion = resolveMotion(ctx.skill, ctx.motionName, ctx.forteLevel);
+  if (motion.isHealing) {
+    return { damage: 0, baseDamage: 0, resistances: 1, bonuses: 1 };
+  }
+  const modes = ctx.characterId !== undefined ? characterResonanceModes(ctx.characterId) : [];
+  if (modes.length > 0 && ctx.resonanceMode !== 'tuneRupture') {
+    throw new Error(
+      `${ctx.characterId} Tune Rupture response needs Resonance Mode tuneRupture, got ${JSON.stringify(ctx.resonanceMode)}`,
+    );
+  }
+  const rate = tuneResponseStackRate(ctx.characterId);
+  if (rate === null) {
+    throw new Error(`no verified Tune Rupture trail rate for ${JSON.stringify(ctx.characterId)}`);
+  }
+  const stacks = ctx.tuneResponseStacks ?? 0;
+  if (!Number.isInteger(stacks) || stacks < 0) {
+    throw new Error(`Tune Rupture response stacks must be a non-negative integer, got ${stacks}`);
+  }
+
+  const abilityStat = computeAbilityStat(
+    motion.scaling,
+    {
+      atkCharacter: ctx.baseAtk.character,
+      atkWeapon: ctx.baseAtk.weapon,
+      hpCharacter: ctx.baseHp.character,
+      defCharacter: ctx.baseDef.character,
+    },
+    ctx.sheet,
+  );
+  const baseDamage = computeBaseAbilityDamage(abilityStat, motion.ratio) * (1 + rate * stacks);
+  const resTotal = ctx.enemy.baseResistance[ctx.skill.attribute] + ctx.sheet.resistancePenetration;
+  const resistances =
+    computeResMultiplier(resTotal) *
+    computeDefMultiplier({
+      attackerLevel: ctx.attackerLevel,
+      enemyLevel: ctx.enemy.level,
+      enemyDefOverride: ctx.enemy.enemyDefOverride,
+      defIgnore: ctx.sheet.defIgnore,
+      defReduction: ctx.sheet.defReduction,
+    }) *
+    computeDmgReductionTotal(ctx.enemy.dmgReductionBase, ctx.enemy.dmgReductionAdditional) *
+    computeElemReductionTotal(ctx.enemy.elemReductionBase, ctx.enemy.elemReductionAdditional);
+  const fixedCrit =
+    ctx.characterId === 'aemeath' && (ctx.resonanceChain ?? 0) >= 6 ? AEMEATH_S6_FIXED_CRIT : null;
+  const bonuses =
+    computeDmgBonusPercent(ctx.sheet, ctx.skill.attribute, 'forte') *
+    (fixedCrit ? computeFixedStatusCritMultiplier(fixedCrit) : 1);
 
   return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
 }

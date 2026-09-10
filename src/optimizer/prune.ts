@@ -1,4 +1,4 @@
-import type { Attribute, DamageType, OwnedEcho, StatKey } from '../data/schema.ts';
+import type { Attribute, OwnedEcho, SkillKind, StatKey } from '../data/schema.ts';
 import type { ObjectiveSpec } from '../domain/objectives.ts';
 
 /**
@@ -19,7 +19,7 @@ import type { ObjectiveSpec } from '../domain/objectives.ts';
 export function relevantStatsForObjective(
   spec: ObjectiveSpec,
   attribute: Attribute,
-  kind: DamageType | 'forte',
+  kind: SkillKind,
   extraKeys: StatKey[],
   scaling: 'ATK' | 'HP' | 'DEF' = 'ATK',
 ): StatKey[] {
@@ -71,7 +71,9 @@ export function relevantStatsForObjective(
   keys.add('critRate');
   keys.add('critDmg');
   keys.add(`dmgBonus:${attribute}`);
-  if (kind === 'forte') {
+  if (kind === 'forte' || kind === 'tunebreak') {
+    // Tune Break skills carry no bonus bucket — fall back to the same
+    // conservative attribute-only set as unknown (`forte`) buckets.
     for (const bucket of ['basic', 'heavy', 'skill', 'liberation', 'intro'] as const) {
       keys.add(`dmgBonus:${bucket}`);
     }

@@ -73,12 +73,13 @@ describe('isScalingAttribute', () => {
 });
 
 describe('name mappings', () => {
-  it('maps skill types, skipping passives', () => {
+  it('maps skill types, skipping inherent passives', () => {
     expect(skillKindFromType('Normal Attack')).toBe('basic');
     expect(skillKindFromType('Resonance Liberation')).toBe('liberation');
     expect(skillKindFromType('Forte Circuit')).toBe('forte');
+    expect(skillKindFromType('Tune Break')).toBe('tunebreak');
     expect(skillKindFromType('Inherent Skill')).toBeNull();
-    expect(skillKindFromType('Tune Break')).toBeNull();
+    expect(skillKindFromType('Something New')).toBeNull();
   });
 
   it('maps property names with percent disambiguation', () => {
@@ -176,6 +177,8 @@ describe('resolveMotionBonusKind', () => {
   it('falls back to the parent skill kind with no usable entries', () => {
     expect(resolveMotionBonusKind('Resonance Liberation', '100%', [])).toBe('liberation');
     expect(resolveMotionBonusKind('Forte Circuit', '100%', [{ type: 'Mystery', rateLevelOne: '100%' }])).toBe('forte');
+    // Tune Break skills carry no bonus bucket — attribute-only fallback.
+    expect(resolveMotionBonusKind('Tune Break', '100%', [])).toBe('forte');
   });
 
   it('extracts percent terms for hit matching', () => {
@@ -279,6 +282,7 @@ describe('statKeysFromMainStatToken', () => {
     expect(statKeysFromMainStatToken('Aero DMG Bonus')).toEqual(['dmgBonus:Aero']);
     expect(statKeysFromMainStatToken('Havoc DMG Bonus')).toEqual(['dmgBonus:Havoc']);
     expect(statKeysFromMainStatToken('Physical DMG Bonus')).toEqual(['dmgBonus:physical']);
+    expect(statKeysFromMainStatToken('Tune Break Boost')).toEqual(['tuneBreakBoost']);
   });
 
   it('maps flat/percent-ambiguous tokens to both variants', () => {
@@ -289,7 +293,6 @@ describe('statKeysFromMainStatToken', () => {
   });
 
   it('returns null for unknown tokens', () => {
-    expect(statKeysFromMainStatToken('Tune Break Boost')).toBeNull();
     expect(statKeysFromMainStatToken('')).toBeNull();
   });
 });

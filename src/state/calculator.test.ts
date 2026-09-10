@@ -161,6 +161,50 @@ describe('calculator store', () => {
     expect(s.blocks[0].activeBuffIds).toEqual([]);
   });
 
+  it('sets Resonance Mode and resets it on character switch and resetAll', () => {
+    freshState();
+    useCalculatorStore.getState().setResonanceMode('tuneRupture');
+    expect(useCalculatorStore.getState().resonanceMode).toBe('tuneRupture');
+    useCalculatorStore.getState().setCharacterId('aemeath');
+    expect(useCalculatorStore.getState().resonanceMode).toBeNull();
+    useCalculatorStore.getState().setResonanceMode('fusionBurst');
+    useCalculatorStore.getState().setCharacterId('aemeath');
+    expect(useCalculatorStore.getState().resonanceMode).toBe('fusionBurst');
+    useCalculatorStore.getState().resetAll();
+    expect(useCalculatorStore.getState().resonanceMode).toBeNull();
+  });
+
+  it('clamps kit-state inputs per field and keeps booleans', () => {
+    freshState();
+    const row = useCalculatorStore.getState().addBlock({ skillId: 'x', motionName: 'y', forteLevel: 1, activeBuffIds: [] });
+    useCalculatorStore.getState().setBlockKitState(row.id, {
+      targetHavocBaneStacks: 12,
+      blazesConsumed: 200,
+      nightfallBlazes: -5,
+      ringsConsumed: 150,
+      voiceFlux: true,
+      wovenMyriad: true,
+    });
+    const b = useCalculatorStore.getState().blocks[0];
+    expect(b.targetHavocBaneStacks).toBe(9);
+    expect(b.blazesConsumed).toBe(150);
+    expect(b.nightfallBlazes).toBe(0);
+    expect(b.ringsConsumed).toBe(99);
+    expect(b.voiceFlux).toBe(true);
+    expect(b.wovenMyriad).toBe(true);
+    useCalculatorStore.getState().setBlockKitState(row.id, {
+      tuneStrainStacks: 99,
+      tuneResponseStacks: -4,
+      tuneBreakMultiplier: 1.7334,
+    });
+    const t = useCalculatorStore.getState().blocks[0];
+    expect(t.tuneStrainStacks).toBe(10);
+    expect(t.tuneResponseStacks).toBe(0);
+    expect(t.tuneBreakMultiplier).toBeCloseTo(1.7334, 10);
+    useCalculatorStore.getState().setBlockKitState('missing', { blazesConsumed: 10 });
+    expect(useCalculatorStore.getState().blocks).toHaveLength(1);
+  });
+
   it('resetAll clears rotation state too', () => {
     freshState();
     useCalculatorStore.getState().addBlock({ skillId: 's1', motionName: 'M1', forteLevel: 10, activeBuffIds: [] });

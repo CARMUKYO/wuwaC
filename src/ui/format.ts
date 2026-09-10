@@ -6,7 +6,7 @@ import type { Attribute, DamageType, StatKey } from '../data/schema.ts';
  * no game math lives here.
  */
 
-const FLAT_STATS: ReadonlySet<StatKey> = new Set(['hp', 'atk', 'def']);
+const FLAT_STATS: ReadonlySet<StatKey> = new Set(['hp', 'atk', 'def', 'tuneBreakBoost']);
 
 /** False for hp/atk/def (flat entry), true for every ratio-style stat. */
 export function isPercentStat(stat: StatKey): boolean {
@@ -75,6 +75,8 @@ export function statLabel(stat: StatKey): string {
       return 'DMG Amplify';
     case 'negativeStatusAmplify':
       return 'Negative Status DMG Amplify';
+    case 'tuneBreakBoost':
+      return 'Tune Break Boost';
     case 'defIgnore':
       return 'DEF Ignore';
     case 'defReduction':

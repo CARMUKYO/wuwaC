@@ -133,6 +133,7 @@ export function CalculatorPage() {
         globalBuffIds: calc.globalBuffIds,
         rotationTime: calc.rotationTime,
         crit: calc.crit,
+        resonanceMode: calc.resonanceMode ?? undefined,
       });
       return { result, error: null as string | null };
     } catch (err) {
@@ -142,7 +143,7 @@ export function CalculatorPage() {
   }, [
     character?.id, weapon?.id, rosterEntry, enemyProfile, pickedKey,
     calc.blocks, calc.buffs,
-    calc.globalBuffIds, calc.rotationTime, calc.crit,
+    calc.globalBuffIds, calc.rotationTime, calc.crit, calc.resonanceMode,
   ]);
 
   const resultsById = useMemo(
@@ -399,6 +400,8 @@ export function CalculatorPage() {
               character={character}
               resonanceChain={calc.resonanceChain}
               forteLevels={calc.forteLevels}
+              resonanceMode={calc.resonanceMode}
+              onSetResonanceMode={calc.setResonanceMode}
               blocks={calc.blocks}
               buffs={calc.buffs}
               globalBuffIds={calc.globalBuffIds}
@@ -413,6 +416,7 @@ export function CalculatorPage() {
               onSetBlockForte={calc.setBlockForte}
               onSetBlockStatusStacks={calc.setBlockStatusStacks}
               onSetBlockConviction={calc.setBlockConviction}
+              onSetBlockKitState={calc.setBlockKitState}
               onToggleBlockBuff={calc.toggleBlockBuff}
               onToggleGlobalBuff={calc.toggleGlobalBuff}
               onAddBuff={(buff) => calc.addBuff(buff)}
@@ -434,6 +438,7 @@ export function CalculatorPage() {
                 echoes={echoes}
                 sonataSets={snapshot.sonataSets}
                 enemy={enemyProfile}
+                resonanceMode={calc.resonanceMode ?? undefined}
                 blocks={calc.blocks}
                 buffs={calc.buffs}
                 globalBuffIds={calc.globalBuffIds}

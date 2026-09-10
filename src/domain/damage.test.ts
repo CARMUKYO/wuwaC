@@ -7,8 +7,12 @@ import {
   computeBaseDamage,
   computeCritMultiplier,
   computeDamage,
+  computeFixedStatusCritMultiplier,
   computeNegativeStatusBaseDamage,
   computeNegativeStatusDamage,
+  computeTuneBreakDamage,
+  computeTuneRuptureDamage,
+  computeTuneStrainMultiplier,
   computeDefMultiplier,
   computeDmgAmplifyTotal,
   computeDmgBonusPercent,
@@ -405,7 +409,7 @@ describe('Cartethyia sequence and Negative Status damage', () => {
     });
     const expectedBase = 3674 * 1.25078 * 0.36;
     const expectedResistances = 0.9 * (1520 / 3032);
-    expect(computeNegativeStatusBaseDamage(90, 1)).toBeCloseTo(expectedBase, 8);
+    expect(computeNegativeStatusBaseDamage('aeroErosion', 90, 1)).toBeCloseTo(expectedBase, 8);
     expect(result.baseDamage).toBeCloseTo(expectedBase, 8);
     expect(result.bonuses).toBeCloseTo(1.2, 8);
     expect(result.damage).toBeCloseTo(expectedBase * expectedResistances * 1.2, 8);
@@ -478,5 +482,177 @@ describe('Cartethyia sequence and Negative Status damage', () => {
     // Fleurdelys bonus.
     expect(bladeBase.damage).toBeGreaterThan(0);
     expect(bladeS6.damage / bladeBase.damage).toBeCloseTo(1.4, 10);
+  });
+});
+
+describe('generalized Negative Status damage', () => {
+  it('scores a 10-stack Frazzle detonation through the Spectro resistance term', () => {
+    const sheet = emptySheet();
+    sheet.negativeStatusAmplify = 0.2;
+    const result = computeNegativeStatusDamage({
+      sheet,
+      status: 'spectroFrazzle',
+      stacks: 10,
+      attackerLevel: 90,
+      enemy: standardMob(90),
+    });
+    const expectedBase = 3674 * 1.25078 * 1.995;
+    const expectedResistances = 0.9 * (1520 / 3032);
+    expect(computeNegativeStatusBaseDamage('spectroFrazzle', 90, 10)).toBeCloseTo(expectedBase, 8);
+    expect(result.baseDamage).toBeCloseTo(expectedBase, 8);
+    expect(result.bonuses).toBeCloseTo(1.2, 8);
+    expect(result.damage).toBeCloseTo(expectedBase * expectedResistances * 1.2, 8);
+  });
+
+  it('rejects Havoc Bane detonations and table-less statuses', () => {
+    const args = {
+      sheet: emptySheet(),
+      attackerLevel: 90,
+      enemy: standardMob(90),
+    };
+    expect(() => computeNegativeStatusDamage({ ...args, status: 'havocBane', stacks: 3 }))
+      .toThrow(/no damage/);
+    expect(() => computeNegativeStatusDamage({ ...args, status: 'fusionBurst', stacks: 10 }))
+      .toThrow(/no published stack-multiplier table/);
+    expect(() => computeNegativeStatusDamage({ ...args, status: 'spectroFrazzle', stacks: 11 }))
+      .toThrow(/at most 10/);
+  });
+
+  it('applies fixed-crit overrides as an expected value', () => {
+    // Aemeath S6 shape: 80% rate, 275% DMG → 0.8 × 2.75 + 0.2 × 1 = 2.4.
+    expect(computeFixedStatusCritMultiplier({ rate: 0.8, dmg: 2.75 })).toBeCloseTo(2.4, 10);
+    const sheet = emptySheet();
+    const plain = computeNegativeStatusDamage({
+      sheet,
+      status: 'spectroFrazzle',
+      stacks: 1,
+      attackerLevel: 90,
+      enemy: standardMob(90),
+    });
+    const fixed = computeNegativeStatusDamage({
+      sheet,
+      status: 'spectroFrazzle',
+      stacks: 1,
+      attackerLevel: 90,
+      enemy: standardMob(90),
+      critOverride: { rate: 0.8, dmg: 2.75 },
+    });
+    expect(fixed.bonuses).toBeCloseTo(2.4, 10);
+    expect(fixed.damage / plain.damage).toBeCloseTo(2.4, 10);
+  });
+
+  it('reduces enemy DEF by a percentage via enemyDefPctReduction', () => {
+    // Attacker 90 vs enemy 90, halved enemy DEF: 1520 / (1520 + 756).
+    expect(
+      computeDefMultiplier({ attackerLevel: 90, enemyLevel: 90, defIgnore: 0, defReduction: 0, enemyDefPctReduction: 0.5 }),
+    ).toBeCloseTo(1520 / 2276, 10);
+  });
+
+  it('scales ability damage with Tune Strain stacks and Break Boost', () => {
+    // +0.12% total DMG per boost point per stack: 100 points × 10 stacks → ×2.2.
+    expect(computeTuneStrainMultiplier(100, 10)).toBeCloseTo(2.2, 10);
+    expect(computeTuneStrainMultiplier(0, 10)).toBe(1);
+    expect(computeTuneStrainMultiplier(100, 0)).toBe(1);
+    expect(() => computeTuneStrainMultiplier(100, -1)).toThrow();
+    expect(() => computeTuneStrainMultiplier(100, 1.5)).toThrow();
+
+    const sheet = emptySheet();
+    sheet.tuneBreakBoost = 100;
+    const clean = computeDamage({
+      sheet,
+      baseAtk: { character: 100, weapon: 0 },
+      baseHp: { character: 100 },
+      baseDef: { character: 100 },
+      attackerLevel: 90,
+      skill: jiyan.skills.find((s) => s.kind === 'basic')!,
+      motionName: 'Stage 1 DMG',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'nonCrit' as const,
+    });
+    const strained = computeDamage({
+      sheet,
+      baseAtk: { character: 100, weapon: 0 },
+      baseHp: { character: 100 },
+      baseDef: { character: 100 },
+      attackerLevel: 90,
+      skill: jiyan.skills.find((s) => s.kind === 'basic')!,
+      motionName: 'Stage 1 DMG',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'nonCrit' as const,
+      tuneStrainStacks: 10,
+    });
+    expect(strained.damage / clean.damage).toBeCloseTo(2.2, 10);
+  });
+
+  it('scores Tune Break hits with the provisional base-10000 shape', () => {
+    const result = computeTuneBreakDamage({
+      multiplier: 1,
+      tuneBreakBoost: 50,
+      attackerLevel: 90,
+      enemy: standardMob(90),
+      enemyRes: 0.1,
+      resistancePenetration: 0,
+    });
+    expect(result.baseDamage).toBe(10000);
+    expect(result.bonuses).toBeCloseTo(1.5, 10);
+    expect(result.damage).toBeCloseTo(10000 * 1.5 * 0.9 * (1520 / 3032), 6);
+    expect(() => computeTuneBreakDamage({
+      multiplier: -1,
+      tuneBreakBoost: 0,
+      attackerLevel: 90,
+      enemy: standardMob(90),
+      enemyRes: 0,
+      resistancePenetration: 0,
+    })).toThrow();
+  });
+
+  it('scores Tune Rupture responses without base crit, with trail scaling and S6 fixed crit', () => {
+    const aemeath = snapshot.characters.find((c) => c.id === 'aemeath')!;
+    const forte = aemeath.skills.find((s) => s.kind === 'forte')!;
+    const base = {
+      sheet: emptySheet(),
+      baseAtk: { character: 100, weapon: 0 },
+      baseHp: { character: 100 },
+      baseDef: { character: 100 },
+      attackerLevel: 90,
+      skill: forte,
+      motionName: 'Tune Rupture Response - Starburst DMG',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      characterId: 'aemeath',
+      resonanceChain: 0,
+      resonanceMode: 'tuneRupture' as const,
+    };
+    const plain = computeTuneRuptureDamage(base);
+    // 100 ATK × 3.0 MV, attribute bucket 1, no crit: 300 × 0.9 × 1520/3032.
+    expect(plain.damage).toBeCloseTo(300 * 0.9 * (1520 / 3032), 6);
+    const trailed = computeTuneRuptureDamage({ ...base, tuneResponseStacks: 10 });
+    expect(trailed.damage / plain.damage).toBeCloseTo(1.4, 10);
+    const s6 = computeTuneRuptureDamage({ ...base, resonanceChain: 6 });
+    expect(s6.damage / plain.damage).toBeCloseTo(2.4, 10);
+    expect(() => computeTuneRuptureDamage({ ...base, resonanceMode: 'fusionBurst' as const })).toThrow(/tuneRupture/);
+    expect(() => computeTuneRuptureDamage({ ...base, characterId: 'jiyan' })).toThrow(/trail rate/);
+  });
+
+  it('routes Havoc Bane stacks into the DEF term of ability damage', () => {
+    const sheet = emptySheet();
+    const common = {
+      sheet,
+      baseAtk: { character: 100, weapon: 0 },
+      baseHp: { character: 100 },
+      baseDef: { character: 100 },
+      attackerLevel: 90,
+      skill: jiyan.skills.find((s) => s.kind === 'basic')!,
+      motionName: 'Stage 1 DMG',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'nonCrit' as const,
+    };
+    const clean = computeDamage(common);
+    const baned = computeDamage({ ...common, targetHavocBaneStacks: 3 });
+    // Only the DEF term changes: 1512 × 0.94 = 1421.28 effective DEF.
+    expect(baned.damage / clean.damage).toBeCloseTo((1520 / 2941.28) / (1520 / 3032), 8);
   });
 });

@@ -13,7 +13,7 @@ import { z } from 'zod';
  */
 
 /** Increment on any breaking change to the snapshot file layout. */
-export const SNAPSHOT_VERSION = 2;
+export const SNAPSHOT_VERSION = 3;
 
 const slug = z
   .string()
@@ -49,6 +49,14 @@ export const damageTypeSchema = z.enum([
   'echo',
 ]);
 export type DamageType = z.infer<typeof damageTypeSchema>;
+
+/**
+ * Skill kinds. `tunebreak` = Tune Break skills (3.x Off-Tune mechanic):
+ * no scored motions expected — they render as buff carriers. `forte` =
+ * Forte Circuit fallback for unknown per-hit bonus buckets.
+ */
+export const skillKindSchema = z.union([damageTypeSchema, z.literal('forte'), z.literal('tunebreak')]);
+export type SkillKind = z.infer<typeof skillKindSchema>;
 
 /**
  * Every aggregatable stat. Flat record keys — aggregation is pure addition,
@@ -87,6 +95,12 @@ export const statKeySchema = z.enum([
   'amplify',
   /** Amplification that applies to Negative Status damage only. */
   'negativeStatusAmplify',
+  /**
+   * Tune Break Boost points (3.x). Raw points, not percent — Tune Strain
+   * grants +0.12% total DMG per point per stack. No mapped echo/weapon
+   * source in the snapshot yet; set via manual buffs.
+   */
+  'tuneBreakBoost',
   /** Attacker-side DEF ignore (ratio) and flat DEF reduction (pre-ratio). */
   'defIgnore',
   'defReduction',
@@ -156,9 +170,15 @@ export type MotionBonusKind = z.infer<typeof motionBonusKindSchema>;
 
 export const characterSkillSchema = z.object({
   id: z.string().min(1),
-  kind: z.union([damageTypeSchema, z.literal('forte')]),
+  kind: skillKindSchema,
   /** Human-readable label, e.g. "Lone Lance (Normal Attack)". */
   label: z.string().min(1),
+  /**
+   * Stripped provider kit prose (SkillDescribe). Present when non-empty —
+   * the ground truth for hand-modeled kit mechanics (stack/mode rules).
+   * Absent means the provider shipped no prose, never "no mechanics".
+   */
+  description: z.string().min(1).optional(),
   attribute: attributeSchema,
   /** Which character stat the motion values scale off. */
   scaling: scalingSchema,
@@ -217,8 +237,19 @@ export const characterSchema = z.object({
       }),
     )
     .min(1),
-  /** Combat skills only (Inherent/Tune Break passives are skipped by sync). */
+  /** Combat skills, including Tune Break skills (buff carriers, no motions). */
   skills: z.array(characterSkillSchema).min(1),
+  /**
+   * Inherent-skill kit prose (mode/stack rules live here). The ubiquitous
+   * cooking passive is excluded by sync; an empty array means none found.
+   */
+  inherentSkills: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      description: z.string().min(1),
+    }),
+  ),
   forteNodes: z.array(
     z.object({
       id: z.string().min(1),
@@ -382,14 +413,39 @@ export const rotationBlockSpecSchema = z.object({
   forteLevel: z.number().int().min(1),
   activeBuffIds: z.array(z.string()),
   /** Optional non-motion damage source. Omitted means a normal kit motion. */
-  damageKind: z.enum(['ability', 'negativeStatus']).optional(),
-  statusType: z.literal('aeroErosion').optional(),
-  /** Current Aero Erosion stacks used by a Negative Status hit. */
-  statusStacks: z.number().int().min(1).max(9).optional(),
+  damageKind: z.enum(['ability', 'negativeStatus', 'tuneRupture', 'tuneBreak']).optional(),
+  // Keep in sync with NEGATIVE_STATUSES in src/domain/negativeStatus.ts
+  // (duplicated here because the data layer must not import the domain).
+  statusType: z
+    .enum(['aeroErosion', 'spectroFrazzle', 'havocBane', 'fusionBurst', 'electroFlare', 'glacioChafe'])
+    .optional(),
+  /** Current status stacks used by a Negative Status detonation hit. */
+  statusStacks: z.number().int().min(1).max(10).optional(),
   /** Target stacks used by Cartethyia's Wind's Indelible Imprint. */
   targetStatusStacks: z.number().int().min(0).max(9).optional(),
+  /** Havoc Bane stacks on the target — percentage enemy DEF reduction. */
+  targetHavocBaneStacks: z.number().int().min(0).max(9).optional(),
   /** Fleurdelys Conviction used by S1's Crit DMG thresholds. */
   conviction: z.number().int().min(0).max(120).optional(),
+  /** Cumulative Blazes consumed — Zani S3 scales The Last Stand off it. */
+  blazesConsumed: z.number().int().min(0).max(150).optional(),
+  /** Blazes consumed by this Nightfall hit — Zani S6 scales off it. */
+  nightfallBlazes: z.number().int().min(0).max(40).optional(),
+  /** Rings of Chainsaw consumed for this Eradication hit (Chisa). */
+  ringsConsumed: z.number().int().min(0).max(99).optional(),
+  /** Voice Flux active — Xuanling S6 Heavy bonus. */
+  voiceFlux: z.boolean().optional(),
+  /** Woven Myriad - Convergence active — Chisa liberation state. */
+  wovenMyriad: z.boolean().optional(),
+  /** Tune Strain - Interfered stacks on the target (total-DMG amp). */
+  tuneStrainStacks: z.number().int().min(0).max(10).optional(),
+  /** Trail (or equivalent) stacks consumed by a Tune Rupture response. */
+  tuneResponseStacks: z.number().int().min(0).max(99).optional(),
+  /**
+   * Tune Break coefficient for a tuneBreak block. No verified default
+   * exists (G3) — the user supplies it from their own research.
+   */
+  tuneBreakMultiplier: z.number().min(0).max(99).optional(),
 });
 export type RotationBlockSpec = z.infer<typeof rotationBlockSpecSchema>;
 

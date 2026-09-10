@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadBundledSnapshot } from '../data/index.ts';
 import { ownedEchoSchema, type OwnedEcho, type RosterEntry } from '../data/schema.ts';
+import type { ResonanceMode } from './characterMods.ts';
 import { buildEnemyProfile } from './enemy.ts';
 import { calculateRotation, isBlockStale, scoreRotationBlocks, type ActionBlock, type RotationBuff, type RotationInput } from './rotation.ts';
 import { emptySheet } from './stats.ts';
@@ -170,5 +171,122 @@ describe('Cartethyia status rotation rules', () => {
       ],
     });
     expect(after.blocks[1].damage / before.blocks[0].damage).toBeCloseTo(1.2, 10);
+  });
+});
+
+describe('generalized status blocks', () => {
+  const zani = snapshot.characters.find((c) => c.id === 'zani')!;
+  const input = {
+    skills: zani.skills,
+    characterId: 'zani',
+    resonanceChain: 0,
+    attackerLevel: 90,
+    enemy: buildEnemyProfile('mob', 90, 0.1, 'Spectro'),
+    buffs: [],
+    globalBuffIds: [],
+    crit: 'expected' as const,
+  };
+  const bases = {
+    baseAtk: { character: 100, weapon: 0 },
+    baseHp: { character: 100 },
+    baseDef: { character: 100 },
+  };
+
+  it('scores Frazzle detonation blocks with status labels', () => {
+    const { dpr, blocks } = scoreRotationBlocks(emptySheet(), bases, {
+      ...input,
+      blocks: [{ skillId: '', motionName: 'Spectro Frazzle DMG', forteLevel: 1, activeBuffIds: [], damageKind: 'negativeStatus', statusType: 'spectroFrazzle', statusStacks: 10 }],
+    });
+    expect(blocks[0].label).toBe('Spectro Frazzle DMG');
+    expect(blocks[0].damage).toBeGreaterThan(0);
+    expect(dpr).toBe(blocks[0].damage);
+  });
+
+  it('rejects Havoc Bane detonation blocks and missing status types', () => {
+    expect(() => scoreRotationBlocks(emptySheet(), bases, {
+      ...input,
+      blocks: [{ skillId: '', motionName: 'Havoc Bane DMG', forteLevel: 1, activeBuffIds: [], damageKind: 'negativeStatus', statusType: 'havocBane', statusStacks: 3 }],
+    })).toThrow(/no damage/);
+    expect(() => scoreRotationBlocks(emptySheet(), bases, {
+      ...input,
+      blocks: [{ skillId: '', motionName: 'Status DMG', forteLevel: 1, activeBuffIds: [], damageKind: 'negativeStatus' }],
+    })).toThrow(/needs a statusType/);
+  });
+
+  it('requires a Resonance Mode for dual-mode kits and rejects unknown modes', () => {
+    const aemeath = snapshot.characters.find((c) => c.id === 'aemeath')!;
+    const liberation = aemeath.skills.find((s) => s.kind === 'liberation')!;
+    const scored = (resonanceMode?: ResonanceMode) =>
+      scoreRotationBlocks(emptySheet(), bases, {
+        skills: aemeath.skills,
+        characterId: 'aemeath',
+        resonanceChain: 0,
+        attackerLevel: 90,
+        enemy: buildEnemyProfile('mob', 90, 0.1, 'Fusion'),
+        blocks: [{ skillId: liberation.id, motionName: 'Heavenfall Edict: Finale DMG', forteLevel: 10, activeBuffIds: [] }],
+        buffs: [],
+        globalBuffIds: [],
+        crit: 'nonCrit',
+        ...(resonanceMode === undefined ? {} : { resonanceMode }),
+      });
+    expect(() => scored()).toThrow(/Resonance Modes/);
+    expect(() => scored('nope' as unknown as ResonanceMode)).toThrow(/Resonance Modes/);
+    const rupture = scored('tuneRupture');
+    const burst = scored('fusionBurst');
+    expect(rupture.blocks[0].damage).toBeGreaterThan(0);
+    expect(rupture.blocks[0].damage).toBe(burst.blocks[0].damage);
+  });
+
+  it('scores Tune Rupture and Tune Break blocks end to end', () => {
+    const aemeath = snapshot.characters.find((c) => c.id === 'aemeath')!;
+    const forte = aemeath.skills.find((s) => s.kind === 'forte')!;
+    const input = {
+      skills: aemeath.skills,
+      characterId: 'aemeath',
+      attribute: 'Fusion' as const,
+      resonanceChain: 0,
+      attackerLevel: 90,
+      enemy: buildEnemyProfile('mob', 90, 0.1, 'Fusion'),
+      buffs: [],
+      globalBuffIds: [],
+      crit: 'nonCrit' as const,
+      resonanceMode: 'tuneRupture' as const,
+    };
+    const rupture = scoreRotationBlocks(emptySheet(), bases, {
+      ...input,
+      blocks: [{ skillId: forte.id, motionName: 'Tune Rupture Response - Starburst DMG', forteLevel: 1, activeBuffIds: [], damageKind: 'tuneRupture', tuneResponseStacks: 10 }],
+    });
+    expect(rupture.blocks[0].label).toContain('Tune Rupture');
+    expect(rupture.blocks[0].damage).toBeGreaterThan(0);
+    // Burst mode rejects rupture blocks.
+    expect(() => scoreRotationBlocks(emptySheet(), bases, {
+      ...input,
+      resonanceMode: 'fusionBurst' as const,
+      blocks: [{ skillId: forte.id, motionName: 'Tune Rupture Response - Starburst DMG', forteLevel: 1, activeBuffIds: [], damageKind: 'tuneRupture' }],
+    })).toThrow(/tuneRupture/);
+    // Break blocks need an explicit coefficient and score the provisional shape.
+    const broke = scoreRotationBlocks(emptySheet(), bases, {
+      ...input,
+      blocks: [{ skillId: '', motionName: 'Tune Break DMG', forteLevel: 1, activeBuffIds: [], damageKind: 'tuneBreak', tuneBreakMultiplier: 1 }],
+    });
+    expect(broke.blocks[0].label).toBe('Tune Break DMG');
+    expect(broke.blocks[0].damage).toBeCloseTo(10000 * 0.9 * (1520 / 3032), 6);
+    expect(() => scoreRotationBlocks(emptySheet(), bases, {
+      ...input,
+      blocks: [{ skillId: '', motionName: 'Tune Break DMG', forteLevel: 1, activeBuffIds: [], damageKind: 'tuneBreak' }],
+    })).toThrow(/tuneBreakMultiplier/);
+  });
+
+  it('routes target Bane stacks into ability-block DEF terms', () => {
+    const liberation = zani.skills.find((s) => s.kind === 'liberation')!;
+    const clean = scoreRotationBlocks(emptySheet(), bases, {
+      ...input,
+      blocks: [{ skillId: liberation.id, motionName: 'Rekindle DMG', forteLevel: 10, activeBuffIds: [] }],
+    });
+    const baned = scoreRotationBlocks(emptySheet(), bases, {
+      ...input,
+      blocks: [{ skillId: liberation.id, motionName: 'Rekindle DMG', forteLevel: 10, activeBuffIds: [], targetHavocBaneStacks: 3 }],
+    });
+    expect(baned.blocks[0].damage / clean.blocks[0].damage).toBeCloseTo((1520 / 2941.28) / (1520 / 3032), 8);
   });
 });

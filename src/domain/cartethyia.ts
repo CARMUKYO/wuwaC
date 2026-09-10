@@ -1,38 +1,30 @@
 import type { CharacterSkill } from '../data/schema.ts';
+import { maxStatusStacks, negativeStatusDef } from './negativeStatus.ts';
 
 /** The status used by Cartethyia's kit. */
 export const CARTETHYIA_STATUS = 'aeroErosion' as const;
 
-/** Base cap, plus Cartethyia S2's three-stack increase. */
+/**
+ * Base cap, plus Cartethyia S2's three-stack increase (verified against
+ * the full S2 chain text — the committed snapshot truncates it).
+ */
 export function maxAeroErosionStacks(resonanceChain: number): number {
-  return resonanceChain >= 2 ? 9 : 6;
+  return maxStatusStacks(CARTETHYIA_STATUS, 'cartethyia', resonanceChain);
 }
 
 /**
- * Aero Erosion's status-damage multiplier by stack count.
- *
- * The first six values are the game's Negative Status table. S2 can raise
- * Aero Erosion's cap by three, so the final three entries continue the
- * provider's 0.899-ish per-stack progression.
+ * S2-only extension past the published 1–6 table: continues the game's
+ * 0.899-ish per-stack progression for stacks 7–9.
  */
-const AERO_EROSION_MULTIPLIERS: readonly number[] = [
-  0,
-  0.360,
-  0.899,
-  1.799,
-  2.698,
-  3.597,
-  4.497,
-  5.396,
-  6.296,
-  7.195,
-];
+const AERO_EROSION_S2_EXTENSION: readonly number[] = [5.396, 6.296, 7.195];
 
 export function aeroErosionMultiplier(stacks: number): number {
-  if (!Number.isInteger(stacks) || stacks < 1 || stacks >= AERO_EROSION_MULTIPLIERS.length) {
+  const base = negativeStatusDef(CARTETHYIA_STATUS).stackMultipliers!;
+  const table = [...base, ...AERO_EROSION_S2_EXTENSION];
+  if (!Number.isInteger(stacks) || stacks < 1 || stacks > table.length) {
     throw new Error(`Aero Erosion stacks must be an integer from 1 to 9, got ${stacks}`);
   }
-  return AERO_EROSION_MULTIPLIERS[stacks];
+  return table[stacks - 1];
 }
 
 /**
@@ -47,7 +39,12 @@ export function cartethyiaStatusTargetMultiplier(targetStacks: number): number {
   return 1.3 + 0.1 * Math.min(Math.max(targetStacks - 3, 0), 3);
 }
 
-/** S1: +25% Crit DMG at each 30 Conviction threshold, up to four stacks. */
+/**
+ * S1: +25% Crit DMG at each 30 Conviction threshold, up to four stacks
+ * (verified against the full S1 chain text — the snapshot truncates it
+ * after the Zeal clause). The 15s per-threshold duration is the caller's
+ * responsibility: pass the Conviction value at the moment of the block.
+ */
 export function cartethyiaConvictionCritDmg(
   characterId: string | undefined,
   resonanceChain: number,

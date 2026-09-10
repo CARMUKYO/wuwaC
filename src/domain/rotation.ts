@@ -1,4 +1,5 @@
 import type {
+  Attribute,
   CharacterData,
   CharacterSkill,
   OwnedEcho,
@@ -12,9 +13,13 @@ import type {
 import {
   computeDamage,
   computeNegativeStatusDamage,
+  computeTuneBreakDamage,
+  computeTuneRuptureDamage,
   type CritMode,
   type EnemyProfile,
 } from './damage.ts';
+import { negativeStatusDef } from './negativeStatus.ts';
+import { characterResonanceModes, type ResonanceMode } from './characterMods.ts';
 import { computeStats, type StatSheet } from './stats.ts';
 
 /**
@@ -50,6 +55,8 @@ export interface RotationInput {
   /** Single global rotation time in seconds (Phase 1 decision). */
   rotationTime: number;
   crit: CritMode;
+  /** Required when the character has Resonance Modes (dual-mode kits). */
+  resonanceMode?: ResonanceMode;
 }
 
 export interface BlockResult {
@@ -109,7 +116,7 @@ export interface CharacterBases {
 }
 
 export function calculateRotation(input: RotationInput): RotationResult {
-  const { character, weapon, roster, echoes, sonataSets, enemy, blocks, buffs, globalBuffIds, rotationTime, crit } = input;
+  const { character, weapon, roster, echoes, sonataSets, enemy, blocks, buffs, globalBuffIds, rotationTime, crit, resonanceMode } = input;
   if (!Number.isFinite(rotationTime) || rotationTime <= 0) {
     throw new Error(`rotation time must be a positive number of seconds, got ${rotationTime}`);
   }
@@ -121,6 +128,7 @@ export function calculateRotation(input: RotationInput): RotationResult {
   const scored = scoreRotationBlocks(baseSheet, { baseAtk, baseHp, baseDef }, {
     skills: character.skills,
     characterId: character.id,
+    attribute: character.attribute,
     resonanceChain: roster.resonanceChain,
     attackerLevel: roster.level,
     enemy,
@@ -128,6 +136,7 @@ export function calculateRotation(input: RotationInput): RotationResult {
     buffs,
     globalBuffIds,
     crit,
+    resonanceMode,
   });
   warnings.push(...scored.warnings);
 
@@ -151,6 +160,8 @@ export interface ScoredBlock {
 export interface ScoreRotationInput {
   skills: CharacterSkill[];
   characterId?: string;
+  /** Character attribute — Tune Break RES term (unpublished element, assumption). */
+  attribute?: Attribute;
   resonanceChain?: number;
   attackerLevel: number;
   enemy: EnemyProfile;
@@ -158,6 +169,8 @@ export interface ScoreRotationInput {
   buffs: RotationBuffSpec[];
   globalBuffIds: string[];
   crit: CritMode;
+  /** Required when the character has Resonance Modes (dual-mode kits). */
+  resonanceMode?: ResonanceMode;
 }
 
 /**
@@ -170,7 +183,15 @@ export function scoreRotationBlocks(
   bases: CharacterBases,
   input: ScoreRotationInput,
 ): { dpr: number; blocks: ScoredBlock[]; warnings: string[] } {
-  const { skills, characterId, resonanceChain = 0, attackerLevel, enemy, blocks, buffs, globalBuffIds, crit } = input;
+  const { skills, characterId, attribute, resonanceChain = 0, attackerLevel, enemy, blocks, buffs, globalBuffIds, crit, resonanceMode } = input;
+  // Dual-mode kits score differently per mode — the rotation must declare
+  // which one it runs. Surfaces inline in the calculator (never a crash).
+  const modes = characterId !== undefined ? characterResonanceModes(characterId) : [];
+  if (modes.length > 0 && (resonanceMode === undefined || !modes.includes(resonanceMode))) {
+    throw new Error(
+      `${characterId} has Resonance Modes (${modes.join(' / ')}) — select one before scoring`,
+    );
+  }
   const warnings: string[] = [];
   const buffsById = new Map(buffs.map((b) => [b.id, b]));
   const globalSheet = applyBuffs(baseSheet, buffsById, globalBuffIds, warnings);
@@ -183,19 +204,20 @@ export function scoreRotationBlocks(
 
     const sheet = applyBuffs(globalSheet, buffsById, block.activeBuffIds, warnings);
     if (block.damageKind === 'negativeStatus') {
-      if (block.statusType !== 'aeroErosion') {
-        throw new Error(`unsupported negative status ${JSON.stringify(block.statusType)}`);
+      if (block.statusType === undefined) {
+        throw new Error('negativeStatus block needs a statusType');
       }
       const stacks = block.statusStacks ?? 1;
       const result = computeNegativeStatusDamage({
         sheet,
-        status: 'aeroErosion',
+        status: block.statusType,
         stacks,
         attackerLevel,
         enemy,
         resonanceChain,
         characterId,
         targetStatusStacks: block.targetStatusStacks,
+        targetHavocBaneStacks: block.targetHavocBaneStacks,
       });
       // A status-damage block is also the explicit point at which the
       // rotation says the status was inflicted. This lets S4's all-attribute
@@ -204,7 +226,32 @@ export function scoreRotationBlocks(
       return {
         skillId: block.skillId,
         motionName: block.motionName,
-        label: 'Aero Erosion DMG',
+        label: `${negativeStatusDef(block.statusType).label} DMG`,
+        damage: result.damage,
+        share: 0,
+        buffCarrier: false,
+      };
+    }
+
+    if (block.damageKind === 'tuneBreak') {
+      if (block.tuneBreakMultiplier === undefined) {
+        throw new Error('tuneBreak block needs an explicit tuneBreakMultiplier — no verified default exists (G3)');
+      }
+      if (attribute === undefined) {
+        throw new Error('tuneBreak block needs the character attribute for its RES term');
+      }
+      const result = computeTuneBreakDamage({
+        multiplier: block.tuneBreakMultiplier,
+        tuneBreakBoost: sheet.tuneBreakBoost,
+        attackerLevel,
+        enemy,
+        enemyRes: enemy.baseResistance[attribute],
+        resistancePenetration: sheet.resistancePenetration,
+      });
+      return {
+        skillId: block.skillId,
+        motionName: block.motionName,
+        label: 'Tune Break DMG',
         damage: result.damage,
         share: 0,
         buffCarrier: false,
@@ -213,6 +260,31 @@ export function scoreRotationBlocks(
 
     const skill = skills.find((s) => s.id === block.skillId);
     if (!skill) throw new Error(`unknown skill: ${JSON.stringify(block.skillId)}`);
+    if (block.damageKind === 'tuneRupture') {
+      const result = computeTuneRuptureDamage({
+        sheet,
+        baseAtk: bases.baseAtk,
+        baseHp: bases.baseHp,
+        baseDef: bases.baseDef,
+        attackerLevel,
+        skill,
+        motionName: block.motionName,
+        forteLevel: block.forteLevel,
+        enemy,
+        characterId,
+        resonanceChain,
+        tuneResponseStacks: block.tuneResponseStacks,
+        resonanceMode,
+      });
+      return {
+        skillId: block.skillId,
+        motionName: block.motionName,
+        label: `${skill.label} (Tune Rupture)`,
+        damage: result.damage,
+        share: 0,
+        buffCarrier: false,
+      };
+    }
     if (skill.motionValues.length === 0) {
       return { skillId: skill.id, motionName: block.motionName, label: skill.label, damage: 0, share: 0, buffCarrier: true };
     }
@@ -236,7 +308,14 @@ export function scoreRotationBlocks(
       characterId,
       resonanceChain,
       targetStatusStacks: block.targetStatusStacks,
+      targetHavocBaneStacks: block.targetHavocBaneStacks,
       conviction: block.conviction,
+      blazesConsumed: block.blazesConsumed,
+      nightfallBlazes: block.nightfallBlazes,
+      ringsConsumed: block.ringsConsumed,
+      voiceFlux: block.voiceFlux,
+      wovenMyriad: block.wovenMyriad,
+      tuneStrainStacks: block.tuneStrainStacks,
     });
     return { skillId: skill.id, motionName: block.motionName, label: skill.label, damage, share: 0, buffCarrier: false };
   });

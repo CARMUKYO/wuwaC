@@ -8,6 +8,7 @@ import type {
   SonataSetData,
   WeaponData,
 } from '../../data/schema.ts';
+import type { ResonanceMode } from '../../domain/characterMods.ts';
 import type { CritMode, EnemyProfile } from '../../domain/damage.ts';
 import { runOptimization, type OptimizationHandle } from '../../optimizer/worker.ts';
 import type { OptimizeRequest, SearchData, SearchResult } from '../../optimizer/search.ts';
@@ -34,6 +35,7 @@ interface RotationOptimizerProps {
   buffs: RotationBuffSpec[];
   globalBuffIds: string[];
   crit: CritMode;
+  resonanceMode?: ResonanceMode;
   /** DPR of the currently picked 5 echoes (null when ungated). */
   currentDpr: number | null;
   rotationTime: number;
@@ -48,7 +50,7 @@ interface RotationOptimizerProps {
 export function RotationOptimizer(props: RotationOptimizerProps) {
   const {
     character, weapon, roster, echoes, sonataSets, enemy,
-    blocks, buffs, globalBuffIds, crit, currentDpr, rotationTime, onApply,
+    blocks, buffs, globalBuffIds, crit, resonanceMode, currentDpr, rotationTime, onApply,
   } = props;
   const saveBuild = useLibraryStore((s) => s.saveBuild);
 
@@ -74,7 +76,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
       setStatus({ kind: 'error', message: 'Top N must be a whole number from 1 to 50.' });
       return;
     }
-    const data: SearchData = { character, weapon, roster, echoes, sonataSets, enemy };
+    const data: SearchData = { character, weapon, roster, echoes, sonataSets, enemy, resonanceMode };
     const request: OptimizeRequest = {
       costBudget: budget === '10' ? 10 : 12,
       sonataLock: { mode: 'none' },

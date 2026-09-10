@@ -1,6 +1,8 @@
 import { create } from 'zustand';
+import type { ResonanceMode } from '../domain/characterMods.ts';
 import type { CritMode } from '../domain/damage.ts';
 import { DEFAULT_ENEMY_LEVEL, DEFAULT_ENEMY_RES } from '../domain/enemy.ts';
+import { maxStatusStacks } from '../domain/negativeStatus.ts';
 import type { ActionBlock, RotationBuff } from '../domain/rotation.ts';
 import type { RosterEntry } from '../data/schema.ts';
 
@@ -81,11 +83,31 @@ interface CalculatorState {
   setBlockForte: (id: string, forteLevel: number) => void;
   setBlockStatusStacks: (id: string, stacks: number) => void;
   setBlockConviction: (id: string, conviction: number) => void;
+  setBlockKitState: (
+    id: string,
+    patch: Partial<
+      Pick<
+        ActionBlock,
+        | 'targetHavocBaneStacks'
+        | 'blazesConsumed'
+        | 'nightfallBlazes'
+        | 'ringsConsumed'
+        | 'voiceFlux'
+        | 'wovenMyriad'
+        | 'tuneStrainStacks'
+        | 'tuneResponseStacks'
+        | 'tuneBreakMultiplier'
+      >
+    >,
+  ) => void;
   toggleBlockBuff: (blockId: string, buffId: string) => void;
   addBuff: (buff: Omit<RotationBuff, 'id'>) => RotationBuff;
   removeBuff: (id: string) => void;
   toggleGlobalBuff: (id: string) => void;
   setCrit: (crit: CritMode) => void;
+  /** Active Resonance Mode for dual-mode kits; null until the user picks one. */
+  resonanceMode: ResonanceMode | null;
+  setResonanceMode: (mode: ResonanceMode | null) => void;
 }
 
 export const useCalculatorStore = create<CalculatorState>()((set) => ({
@@ -107,6 +129,7 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
   buffs: [],
   globalBuffIds: [],
   crit: 'expected',
+  resonanceMode: null,
 
   setCharacterId: (id) =>
     set((s) => ({
@@ -114,8 +137,11 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       // Skill ids differ per character — stale forte levels would silently
       // score the wrong motions in Phase 2, so drop them on switch.
       forteLevels: id === s.characterId ? s.forteLevels : {},
+      // Modes belong to one kit — a stale mode would score the wrong kit.
+      resonanceMode: id === s.characterId ? s.resonanceMode : null,
       rosterSourceId: '',
     })),
+  setResonanceMode: (mode) => set({ resonanceMode: mode }),
   setLevel: (level) =>
     set((s) => ({ level: clampInt(level, 1, 90, s.level) })),
   setAscension: (ascension) =>
@@ -179,7 +205,8 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
         if (b.id !== id) return b;
         if (!Number.isInteger(stacks)) return b;
         if (b.damageKind === 'negativeStatus') {
-          return { ...b, statusStacks: Math.min(9, Math.max(1, stacks)) };
+          const cap = maxStatusStacks(b.statusType ?? 'aeroErosion');
+          return { ...b, statusStacks: Math.min(cap, Math.max(1, stacks)) };
         }
         return { ...b, targetStatusStacks: Math.min(9, Math.max(0, stacks)) };
       }),
@@ -191,6 +218,37 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
           ? { ...b, conviction: Math.min(120, Math.max(0, conviction)) }
           : b,
       ),
+    })),
+  setBlockKitState: (id, patch) =>
+    set((s) => ({
+      blocks: s.blocks.map((b) => {
+        if (b.id !== id) return b;
+        const next = { ...b };
+        if (patch.targetHavocBaneStacks !== undefined && Number.isInteger(patch.targetHavocBaneStacks)) {
+          next.targetHavocBaneStacks = Math.min(9, Math.max(0, patch.targetHavocBaneStacks));
+        }
+        if (patch.blazesConsumed !== undefined && Number.isInteger(patch.blazesConsumed)) {
+          next.blazesConsumed = Math.min(150, Math.max(0, patch.blazesConsumed));
+        }
+        if (patch.nightfallBlazes !== undefined && Number.isInteger(patch.nightfallBlazes)) {
+          next.nightfallBlazes = Math.min(40, Math.max(0, patch.nightfallBlazes));
+        }
+        if (patch.ringsConsumed !== undefined && Number.isInteger(patch.ringsConsumed)) {
+          next.ringsConsumed = Math.min(99, Math.max(0, patch.ringsConsumed));
+        }
+        if (typeof patch.voiceFlux === 'boolean') next.voiceFlux = patch.voiceFlux;
+        if (typeof patch.wovenMyriad === 'boolean') next.wovenMyriad = patch.wovenMyriad;
+        if (patch.tuneStrainStacks !== undefined && Number.isInteger(patch.tuneStrainStacks)) {
+          next.tuneStrainStacks = Math.min(10, Math.max(0, patch.tuneStrainStacks));
+        }
+        if (patch.tuneResponseStacks !== undefined && Number.isInteger(patch.tuneResponseStacks)) {
+          next.tuneResponseStacks = Math.min(99, Math.max(0, patch.tuneResponseStacks));
+        }
+        if (patch.tuneBreakMultiplier !== undefined && Number.isFinite(patch.tuneBreakMultiplier)) {
+          next.tuneBreakMultiplier = Math.min(99, Math.max(0, patch.tuneBreakMultiplier));
+        }
+        return next;
+      }),
     })),
   toggleBlockBuff: (blockId, buffId) =>
     set((s) => ({
@@ -255,5 +313,6 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       buffs: [],
       globalBuffIds: [],
       crit: 'expected',
+      resonanceMode: null,
     }),
 }));

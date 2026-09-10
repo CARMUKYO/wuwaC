@@ -100,6 +100,7 @@ const rawSkill = z.looseObject({
   SkillId: z.number(),
   SkillType: z.string(),
   SkillName: z.string(),
+  SkillDescribe: z.string().optional(),
   SkillAttributes: z.array(rawSkillAttribute),
   DamageList: z.array(rawDamageEntry),
 });
@@ -194,9 +195,24 @@ function normalizeCharacter(raw: unknown, fetchedAt: string): {
   let skippedSkills = 0;
   let skippedAttributes = 0;
   const skills: CharacterData['skills'] = [];
+  const inherentSkills: CharacterData['inherentSkills'] = [];
   for (const s of c.Skills) {
     const kind = skillKindFromType(s.SkillType);
     if (kind === null) {
+      // Inherent Skills carry the mode/stack rules hand modules are built
+      // from — capture the prose, but they are not scored skills.
+      if (s.SkillType === 'Inherent Skill') {
+        const prose = stripHtml(s.SkillDescribe ?? '');
+        if (s.SkillName === 'Skillful Cooking') {
+          // Ubiquitous cooking passive, identical on every character.
+        } else if (s.SkillName === '') {
+          warn(`${name}: inherent skill with empty name (id ${s.SkillId}), dropped`);
+        } else if (prose === '') {
+          warn(`${name}.${s.SkillName}: inherent skill has no prose, dropped`);
+        } else {
+          inherentSkills.push({ id: String(s.SkillId), name: s.SkillName, description: prose });
+        }
+      }
       skippedSkills += 1;
       continue;
     }
@@ -271,6 +287,7 @@ function normalizeCharacter(raw: unknown, fetchedAt: string): {
       }
       motionValues.splice(0, motionValues.length, ...motionValues.filter((m) => m.values.length === keepLength));
     }
+    const skillProse = stripHtml(s.SkillDescribe ?? '');
     skills.push({
       id: String(s.SkillId),
       kind,
@@ -278,6 +295,7 @@ function normalizeCharacter(raw: unknown, fetchedAt: string): {
       attribute,
       scaling,
       motionValues,
+      ...(skillProse !== '' ? { description: skillProse } : {}),
     });
   }
 
@@ -306,7 +324,7 @@ function normalizeCharacter(raw: unknown, fetchedAt: string): {
     effect: { kind: 'custom', note: 'Unstructured kit effect — see description.' } as const,
   }));
 
-  console.log(`  ${name}: ${skills.length} skills, ${forteNodes.length} forte nodes, 6 chain ranks (${skippedSkills} passive skills, ${skippedAttributes} metadata attributes skipped)`);
+  console.log(`  ${name}: ${skills.length} skills (+${inherentSkills.length} inherent), ${forteNodes.length} forte nodes, 6 chain ranks (${skippedSkills} passive skills, ${skippedAttributes} metadata attributes skipped)`);
   return {
     character: {
       id,
@@ -316,6 +334,7 @@ function normalizeCharacter(raw: unknown, fetchedAt: string): {
       weaponType: c.WeaponTypeName as CharacterData['weaponType'],
       baseStats,
       skills,
+      inherentSkills,
       forteNodes,
       resonanceChain,
       source: { provider: 'encore.moe', fetchedAt, apiId: c.Id },

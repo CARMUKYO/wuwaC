@@ -1,6 +1,7 @@
+import type { ResonanceMode } from './characterMods.ts';
 import { computeDamage, type EnemyProfile } from './damage.ts';
 import { scoreRotationBlocks } from './rotation.ts';
-import type { CharacterSkill, ObjectiveSpec } from '../data/schema.ts';
+import type { Attribute, CharacterSkill, ObjectiveSpec } from '../data/schema.ts';
 import type { StatSheet } from './stats.ts';
 
 /**
@@ -25,6 +26,10 @@ export interface ScoreContext {
   baseDef: { character: number };
   attackerLevel: number;
   enemy: EnemyProfile;
+  /** Character attribute — Tune Break RES term (unpublished element, assumption). */
+  attribute?: Attribute;
+  /** Required when the character has Resonance Modes (dual-mode kits). */
+  resonanceMode?: ResonanceMode;
 }
 
 export type ObjectiveFn = (sheet: StatSheet, ctx: ScoreContext) => number;
@@ -74,6 +79,7 @@ export function scoreSheet(spec: ObjectiveSpec, sheet: StatSheet, ctx: ScoreCont
       return scoreRotationBlocks(sheet, { baseAtk: ctx.baseAtk, baseHp: ctx.baseHp, baseDef: ctx.baseDef }, {
         skills: ctx.skills,
         characterId: ctx.characterId,
+        attribute: ctx.attribute,
         resonanceChain: ctx.resonanceChain,
         attackerLevel: ctx.attackerLevel,
         enemy: ctx.enemy,
@@ -81,6 +87,7 @@ export function scoreSheet(spec: ObjectiveSpec, sheet: StatSheet, ctx: ScoreCont
         buffs: spec.buffs,
         globalBuffIds: spec.globalBuffIds,
         crit: spec.crit,
+        resonanceMode: ctx.resonanceMode,
       }).dpr;
     }
     default:

@@ -7,6 +7,7 @@ import type {
   StatKey,
   WeaponData,
 } from '../data/schema.ts';
+import type { ResonanceMode } from '../domain/characterMods.ts';
 import type { EnemyProfile } from '../domain/damage.ts';
 import type { ObjectiveSpec } from '../domain/objectives.ts';
 import type { StatSheet } from '../domain/stats.ts';
@@ -43,6 +44,8 @@ export interface SearchData {
   echoes: OwnedEcho[];
   sonataSets: SonataSetData[];
   enemy: EnemyProfile;
+  /** Required when the character has Resonance Modes (dual-mode kits). */
+  resonanceMode?: ResonanceMode;
 }
 
 export interface RankedBuild {
@@ -137,12 +140,14 @@ export function searchExhaustive(
       skill,
       skills: character.skills,
       characterId: character.id,
+      attribute: character.attribute,
       resonanceChain: roster.resonanceChain,
       baseAtk,
       baseHp,
       baseDef,
       attackerLevel: roster.level,
       enemy,
+      resonanceMode: data.resonanceMode,
     });
     insertBounded(top, {
       echoIds: combo.map((e) => e.id).sort(),

@@ -100,3 +100,15 @@ Assumption (reversible, stated per planning rules): full 6-status + Tune + dual-
 - https://api-v2.encore.moe/api/en/character/1507
 - https://api-v2.encore.moe/api/en/character/1210
 - https://api-v2.encore.moe/api/en/character/1104
+
+## Execution Log (2026-09-09, approved → executed same session)
+
+- Phase 0 spikes closed: G5 verified against live encore prose (Cartethyia S1 conviction-crit confirmed in full chain text; snapshot truncation noted in code). G1 EMPTY for Fusion/Electro/Glacio (no published tables anywhere found). G2/G3 EMPTY on wiki; community simulator `jhlee33957-maker/ww-dps-simulator-2` (`simulator/damage_formula.py`, inspected, UNVERIFIED) gave the provisional Tune Break shape (base 10000, no crit/level) and corroborated additive Bane (stacks × 0.02). G4 noted as non-blocking (mode = rotation input). G6 half-resolved in Phase 6: Lucilla modes are Glacio Chafe ↔ Echo (encore character 1109).
+- Phase 1: `src/domain/negativeStatus.ts` (6-status tables, caps registry, Bane helper, level curve with L10 anchor fix); generalized `computeNegativeStatusDamage`; Bane → DEF term; fixed-crit hook.
+- Phase 2: `zani.ts`, `xuanling.ts`, `chisa.ts`, `characterMods.ts` dispatcher + capabilities; block-spec kit-state fields; capability-driven RotationTimeline.
+- Phase 3: schema v3 (`SkillKind` + `tunebreak`, skill `description?`, `inherentSkills`); snapshot regenerated live (58 chars, 58 Tune Break skills, 118 inherent entries, 408/408 skills with prose, 185 echoes with phantoms/unreleased gone). Backup: `/tmp/snapshot.v2.backup.json`. Incidental: EchoForm test 2→1 Chest Mimic (phantom exclusion working as intended). Note: `tsx` cannot run in this sandbox (IPC socket EPERM) — sync verified runnable via plain `node scripts/sync-gamedata.ts`.
+- Phase 4: `aemeath.ts` (S2/S3/S6); `RESONANCE_MODES` registry (Aemeath, Denia, Lynae); `resonanceMode` required for mode characters, plumbed rotation → objectives → optimizer SearchData → UI radio selector.
+- Phase 5: `tuneBreakBoost` StatKey (+ token mapping, flat-points form entry); `tuneRupture`/`tuneBreak` block kinds; strain amp in ability pipeline; provisional rupture/break scorers with explicit labels; strain/response/break UI inputs.
+- Phase 6: Erosion blocks for Ciaccona + Rover:Aero; Lucilla registered NOWHERE (justified deviation: modes verified but nothing in scoring consumes them yet — register with Chafe table or lucilla.ts). Electro/Glacio detonations correctly throw (G1 empty).
+- Deferred follow-ups (out of plan scope): Hiyuki S-rank ability module, Xuanling S1 summon + Chisa S1 fixed-DMG motions (no snapshot motion data), per-element RES-penetration stat (Chisa S2), Hack-state modeling.
+- Final gates: 326/326 tests, `tsc -b` clean, `eslint` clean. Changes left UNCOMMITTED for your review — say the word and I will commit (per-phase commits available since the repo now exists).

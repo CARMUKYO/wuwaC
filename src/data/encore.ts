@@ -104,20 +104,22 @@ export function parseAttribute(name: string): Attribute {
   return found as Attribute;
 }
 
-const SKILL_KINDS: Record<string, DamageType | 'forte'> = {
+const SKILL_KINDS: Record<string, DamageType | 'forte' | 'tunebreak'> = {
   'Normal Attack': 'basic',
   'Resonance Skill': 'skill',
   'Resonance Liberation': 'liberation',
   'Intro Skill': 'intro',
   'Outro Skill': 'outro',
   'Forte Circuit': 'forte',
+  'Tune Break': 'tunebreak',
 };
 
 /**
  * API skill type -> optimizer skill kind.
- * Returns null for Inherent/Tune Break passives (skipped by sync, counted).
+ * Returns null for Inherent Skill passives only (skipped by sync, counted,
+ * but captured as inherentSkills prose). Tune Break maps to `tunebreak`.
  */
-export function skillKindFromType(skillType: string): DamageType | 'forte' | null {
+export function skillKindFromType(skillType: string): DamageType | 'forte' | 'tunebreak' | null {
   return SKILL_KINDS[skillType] ?? null;
 }
 
@@ -254,7 +256,10 @@ export function resolveMotionBonusKind(
   levelOneText: string,
   damageEntries: DamageListEntry[],
 ): DamageType | 'forte' {
-  const fallback = skillKindFromType(skillType) ?? 'forte';
+  const kind = skillKindFromType(skillType);
+  // Tune Break skills carry no bonus bucket; their motions (none expected)
+  // score attribute-only, like the unknown-type fallback.
+  const fallback = kind === null || kind === 'tunebreak' ? 'forte' : kind;
   const known: { kind: DamageType | 'forte'; rate: number | null }[] = [];
   for (const e of damageEntries) {
     const kind = bonusKindFromDamageType(e.type);
@@ -482,6 +487,8 @@ export function statKeysFromMainStatToken(token: string): StatKey[] | null {
       return ['energyRegen'];
     case 'Healing Bonus':
       return ['healingBonus'];
+    case 'Tune Break Boost':
+      return ['tuneBreakBoost'];
     default: {
       const element = /^(Glacio|Fusion|Electro|Aero|Spectro|Havoc) DMG Bonus$/.exec(token);
       if (element) return [`dmgBonus:${element[1] as Attribute}`];
