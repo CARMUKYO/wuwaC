@@ -8,7 +8,7 @@ import type {
 } from '../../data/schema.ts';
 import { filterByName } from '../filter.ts';
 import { statLabel, toDisplayValue } from '../format.ts';
-import { InitialsBadge } from '../components/InitialsBadge.tsx';
+import { GameIcon } from '../components/GameIcon.tsx';
 
 type Tab = 'characters' | 'weapons' | 'echoes' | 'sonatas';
 
@@ -29,7 +29,7 @@ function CharacterDetail({ character }: { character: CharacterData }) {
   return (
     <article>
       <div className="flex items-center gap-2">
-        <InitialsBadge name={character.name} />
+        <GameIcon name={character.name} iconUrl={character.iconUrl} size="lg" />
         <div>
           <h3 className="text-base font-semibold">{character.name}</h3>
           <p className="text-xs text-slate-400">
@@ -77,7 +77,10 @@ function WeaponDetail({ weapon }: { weapon: WeaponData }) {
   const atk = weapon.atkByLevel;
   return (
     <article>
-      <h3 className="text-base font-semibold">{weapon.name}</h3>
+      <div className="flex items-center gap-2">
+        <GameIcon name={weapon.name} iconUrl={weapon.iconUrl} size="lg" />
+        <h3 className="text-base font-semibold">{weapon.name}</h3>
+      </div>
       <p className="text-xs text-slate-400">
         {'★'.repeat(weapon.rarity)} · {weapon.weaponType}
       </p>
@@ -99,7 +102,7 @@ function EchoDetail({ echo, sonataNameOf }: { echo: EchoDefData; sonataNameOf: (
   return (
     <article>
       <div className="flex items-center gap-2">
-        <InitialsBadge name={echo.name} />
+        <GameIcon name={echo.name} iconUrl={echo.iconUrl} size="lg" />
         <div>
           <h3 className="text-base font-semibold">{echo.name}</h3>
           <p className="text-xs text-slate-400">
@@ -177,7 +180,8 @@ export function DatabasePage() {
         <List
           empty={rows.length === 0}
           rows={rows.map((c) => (
-            <button key={c.id} type="button" onClick={() => setSelectedId(c.id)} className="block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-800">
+            <button key={c.id} type="button" onClick={() => setSelectedId(c.id)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-800">
+              <GameIcon name={c.name} iconUrl={c.iconUrl} size="sm" />
               {c.name}
             </button>
           ))}
@@ -190,7 +194,8 @@ export function DatabasePage() {
         <List
           empty={rows.length === 0}
           rows={rows.map((w) => (
-            <button key={w.id} type="button" onClick={() => setSelectedId(w.id)} className="block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-800">
+            <button key={w.id} type="button" onClick={() => setSelectedId(w.id)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-800">
+              <GameIcon name={w.name} iconUrl={w.iconUrl} size="sm" />
               {w.name}
             </button>
           ))}
@@ -203,7 +208,8 @@ export function DatabasePage() {
         <List
           empty={rows.length === 0}
           rows={rows.map((e) => (
-            <button key={e.id} type="button" onClick={() => setSelectedId(e.id)} className="block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-800">
+            <button key={e.id} type="button" onClick={() => setSelectedId(e.id)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-800">
+              <GameIcon name={e.name} iconUrl={e.iconUrl} size="sm" />
               {e.name}
             </button>
           ))}

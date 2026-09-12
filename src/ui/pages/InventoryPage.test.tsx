@@ -93,6 +93,67 @@ describe('InventoryPage', () => {
     expect(await db.ownedEchoes.count()).toBe(0);
   });
 
+  it('filters the list by sonata set and restores with all sets', async () => {
+    const lingering: OwnedEcho = {
+      id: 'echo-lingering',
+      label: 'Lingering One',
+      echoDefId: 'hooscamp',
+      sonataId: 'lingering-tunes',
+      cost: 1,
+      level: 25,
+      rarity: 5,
+      mainStat: { stat: 'atkPct', value: 0.3 },
+      substats: [],
+      equippedTo: null,
+      origin: 'manual',
+    };
+    const thunder: OwnedEcho = {
+      ...lingering,
+      id: 'echo-thunder',
+      label: 'Thunder One',
+      echoDefId: 'tempest-mephis',
+      sonataId: 'void-thunder',
+      cost: 4,
+    };
+    await db.ownedEchoes.bulkAdd([lingering, thunder]);
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+
+    expect(await screen.findByText('Lingering One')).toBeInTheDocument();
+    expect(screen.getByText('Thunder One')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/sonata set/i), 'lingering-tunes');
+    expect(screen.getByText('Lingering One')).toBeInTheDocument();
+    expect(screen.queryByText('Thunder One')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /echo inventory/i })).toHaveTextContent('(1/2)');
+
+    await user.selectOptions(screen.getByLabelText(/sonata set/i), '');
+    expect(screen.getByText('Lingering One')).toBeInTheDocument();
+    expect(screen.getByText('Thunder One')).toBeInTheDocument();
+  });
+
+  it('shows an empty-filter state when no echo matches the sonata set', async () => {
+    await db.ownedEchoes.add({
+      id: 'echo-lingering',
+      label: 'Lingering One',
+      echoDefId: 'hooscamp',
+      sonataId: 'lingering-tunes',
+      cost: 1,
+      level: 25,
+      rarity: 5,
+      mainStat: { stat: 'atkPct', value: 0.3 },
+      substats: [],
+      equippedTo: null,
+      origin: 'manual',
+    });
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+
+    await screen.findByText('Lingering One');
+    await user.selectOptions(screen.getByLabelText(/sonata set/i), 'void-thunder');
+    expect(await screen.findByText(/no echoes with this sonata set/i)).toBeInTheDocument();
+  });
+
   it('flags orphan rows and re-links them through edit', async () => {
     const orphan: OwnedEcho = {
       id: 'orphan-1',

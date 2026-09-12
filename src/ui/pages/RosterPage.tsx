@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { loadBundledSnapshot } from '../../data/index.ts';
 import type { RosterEntry } from '../../data/schema.ts';
 import { useRosterStore } from '../../state/roster.ts';
+import { GameIcon } from '../components/GameIcon.tsx';
 import { SliderField } from '../components/SliderField.tsx';
 
 function defaultsFor(characterId: string): RosterEntry {
@@ -103,7 +104,10 @@ export function RosterPage() {
               return (
                 <li key={entry.characterId} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">{name}</h3>
+                    <div className="flex items-center gap-2">
+                      <GameIcon name={name} iconUrl={character?.iconUrl} />
+                      <h3 className="text-sm font-semibold">{name}</h3>
+                    </div>
                     <button
                       type="button"
                       onClick={() => void remove(entry.characterId)}
@@ -139,7 +143,10 @@ export function RosterPage() {
                     />
                     <div>
                       <label className="block text-xs text-slate-300">
-                        Weapon
+                        <span className="flex items-center gap-1.5">
+                          <GameIcon name={storedWeapon?.name ?? 'Weapon'} iconUrl={storedWeapon?.iconUrl} size="sm" />
+                          Weapon
+                        </span>
                         <select
                           aria-label={`Weapon for ${name}`}
                           value={entry.weaponId}

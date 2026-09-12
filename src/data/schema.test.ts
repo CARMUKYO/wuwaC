@@ -74,6 +74,17 @@ describe('user-data schemas', () => {
     ).toThrow(/same character twice/);
   });
 
+  it('accepts icon urls but rejects non-urls', () => {
+    const char = loadBundledSnapshot().characters[0];
+    const { iconUrl: _DROPPED, ...bare } = char;
+    expect(_DROPPED).toBeDefined();
+    expect(characterSchema.parse(bare).iconUrl).toBeUndefined();
+    expect(
+      characterSchema.parse({ ...bare, iconUrl: 'https://example.com/jiyan.webp' }).iconUrl,
+    ).toBe('https://example.com/jiyan.webp');
+    expect(() => characterSchema.parse({ ...bare, iconUrl: 'not a url' })).toThrow();
+  });
+
   it('rejects out-of-range chain ranks', () => {
     const char = loadBundledSnapshot().characters[0];
     expect(() => characterSchema.parse({ ...char, rarity: 3 })).toThrow();

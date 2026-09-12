@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { loadBundledSnapshot } from '../../data/index.ts';
+import { TEAM_BUFFS } from '../../data/teamBuffs.ts';
 import { teamSonataCoverage } from '../../domain/teams.ts';
 import { useInventoryStore } from '../../state/inventory.ts';
 import { useTeamStore } from '../../state/teamStore.ts';
+import { GameIcon } from '../components/GameIcon.tsx';
+import { statLabel, toDisplayValue } from '../format.ts';
 
 const inputClass =
   'w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
@@ -58,8 +61,8 @@ export function TeamsPage() {
     <section>
       <h2 className="text-xl font-semibold">Team Builder</h2>
       <p className="mt-1 text-xs text-slate-500">
-        v1 scope: 3-character teams with Sonata coverage from equipped Echoes.
-        Outro-skill rotation modeling is an explicit v2 milestone.
+        3-character teams with Sonata coverage from equipped Echoes plus each
+        member&apos;s transcribed Outro / team buffs — importable in the calculator.
       </p>
 
       {error && (
@@ -136,22 +139,45 @@ export function TeamsPage() {
                     </button>
                   </div>
                   <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    {coverage.members.map((member) => (
-                      <div key={member.characterId} className="rounded-md bg-slate-950 p-2">
-                        <p className="text-xs font-medium">{characterName(member.characterId)}</p>
-                        {member.pieces.length === 0 ? (
-                          <p className="text-xs text-slate-500">No echoes equipped</p>
-                        ) : (
-                          <ul className="mt-1 text-xs text-slate-300">
-                            {member.pieces.map((piece) => (
-                              <li key={piece.sonataId}>
-                                {piece.sonataName} ×{piece.count}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
+                    {coverage.members.map((member) => {
+                      const provided = TEAM_BUFFS.filter((e) => e.characterId === member.characterId);
+                      return (
+                        <div key={member.characterId} className="rounded-md bg-slate-950 p-2">
+                          <div className="flex items-center gap-1.5">
+                            <GameIcon
+                              name={characterName(member.characterId)}
+                              iconUrl={snapshot.characters.find((c) => c.id === member.characterId)?.iconUrl}
+                              size="sm"
+                            />
+                            <p className="text-xs font-medium">{characterName(member.characterId)}</p>
+                          </div>
+                          {member.pieces.length === 0 ? (
+                            <p className="text-xs text-slate-500">No echoes equipped</p>
+                          ) : (
+                            <ul className="mt-1 text-xs text-slate-300">
+                              {member.pieces.map((piece) => (
+                                <li key={piece.sonataId}>
+                                  {piece.sonataName} ×{piece.count}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {provided.length === 0 ? (
+                            <p className="mt-1 text-xs text-slate-500">No transcribed team buffs</p>
+                          ) : (
+                            <ul className="mt-1 space-y-0.5 text-xs text-slate-300">
+                              {provided.map((entry) => (
+                                <li key={`${entry.skillId}-${entry.label}`} title={entry.assumption}>
+                                  {entry.label}
+                                  {entry.windowSeconds !== undefined && ` · ${entry.windowSeconds}s`}
+                                  {` (${entry.mods.map((m) => `${statLabel(m.stat)} ${toDisplayValue(m.stat, m.value)}`).join(', ')})`}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   {coverage.combined.length > 0 && (
                     <p className="mt-2 text-xs text-slate-400">

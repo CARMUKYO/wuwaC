@@ -74,6 +74,21 @@ describe('TeamsPage', () => {
     expect(await screen.findAllByText(/Sierra Gale ×2/)).toHaveLength(2);
   });
 
+  it('shows each member’s transcribed team buffs', async () => {
+    const user = userEvent.setup();
+    render(<TeamsPage />);
+    await user.type(screen.getByLabelText(/team name/i), 'Buffs');
+    await user.type(screen.getByLabelText(/member 1/i), 'lynae');
+    await user.type(screen.getByLabelText(/member 2/i), 'verina');
+    await user.type(screen.getByLabelText(/member 3/i), 'chixia');
+    await user.click(screen.getByRole('button', { name: /create team/i }));
+
+    expect(await screen.findByText(/Lynae Outro \(incoming\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Lynae Liberation \(team\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Verina Outro \(team\)/)).toBeInTheDocument();
+    expect(screen.getByText(/No transcribed team buffs/)).toBeInTheDocument();
+  });
+
   it('deletes a team', async () => {
     const user = userEvent.setup();
     render(<TeamsPage />);

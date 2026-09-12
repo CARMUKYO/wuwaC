@@ -223,6 +223,11 @@ export type CharacterSkill = z.infer<typeof characterSkillSchema>;
 export const characterSchema = z.object({
   id: slug,
   name: z.string().min(1),
+  /**
+   * Remote portrait URL (provider CDN). Display only, never bundled —
+   * the UI falls back to initials when absent or unreachable (offline).
+   */
+  iconUrl: z.string().url().optional(),
   rarity: z.union([z.literal(4), z.literal(5)]),
   attribute: attributeSchema,
   weaponType: weaponTypeSchema,
@@ -277,6 +282,8 @@ export type CharacterData = z.infer<typeof characterSchema>;
 export const weaponSchema = z.object({
   id: slug,
   name: z.string().min(1),
+  /** Remote icon URL (provider CDN). Display only — UI falls back to initials. */
+  iconUrl: z.string().url().optional(),
   weaponType: weaponTypeSchema,
   rarity: z.number().int().min(1).max(5),
   atkByLevel: z.array(levelPointSchema).min(1),
@@ -328,6 +335,8 @@ export type SonataSetData = z.infer<typeof sonataSetSchema>;
 export const echoDefSchema = z.object({
   id: slug,
   name: z.string().min(1),
+  /** Remote icon URL (provider CDN, small variant). Display only — UI falls back to initials. */
+  iconUrl: z.string().url().optional(),
   /**
    * Echo element. The six character attributes plus Physical, which exists
    * only on a handful of 1-cost echoes (their skills deal physical DMG).

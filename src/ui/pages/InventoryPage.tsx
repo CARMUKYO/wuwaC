@@ -39,18 +39,27 @@ export function InventoryPage() {
   const removeEcho = useInventoryStore((s) => s.removeEcho);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<OwnedEcho | null>(null);
+  const [sonataFilter, setSonataFilter] = useState('');
 
   useEffect(() => {
     if (!loaded) void load();
   }, [loaded, load]);
 
-  const flagged = echoes.filter((e) => echoDefIssues(e, loadBundledSnapshot().echoDefs).length > 0);
+  const snapshot = loadBundledSnapshot();
+  const flagged = echoes.filter((e) => echoDefIssues(e, snapshot.echoDefs).length > 0);
+  const visible = sonataFilter === '' ? echoes : echoes.filter((e) => e.sonataId === sonataFilter);
+  const countBySonata = new Map<string, number>();
+  for (const echo of echoes) {
+    countBySonata.set(echo.sonataId, (countBySonata.get(echo.sonataId) ?? 0) + 1);
+  }
 
   return (
     <section>
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">
-          Echo Inventory{loaded && echoes.length > 0 && ` (${echoes.length})`}
+          Echo Inventory
+          {loaded && echoes.length > 0 && sonataFilter === '' && ` (${echoes.length})`}
+          {loaded && echoes.length > 0 && sonataFilter !== '' && ` (${visible.length}/${echoes.length})`}
         </h2>
         {!adding && editing === null && (
           <div className="flex gap-2">
@@ -121,6 +130,27 @@ export function InventoryPage() {
         </div>
       )}
 
+      {loaded && echoes.length > 0 && (
+        <div className="mt-4 flex items-center gap-2">
+          <label htmlFor="inventory-sonata-filter" className="text-xs font-medium text-slate-300">
+            Sonata set
+          </label>
+          <select
+            id="inventory-sonata-filter"
+            value={sonataFilter}
+            onChange={(e) => setSonataFilter(e.target.value)}
+            className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
+          >
+            <option value="">All sets</option>
+            {snapshot.sonataSets.map((set) => (
+              <option key={set.id} value={set.id}>
+                {`${set.name} (${countBySonata.get(set.id) ?? 0})`}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="mt-4">
         {!loaded ? (
           <p className="text-slate-400">Loading…</p>
@@ -128,8 +158,12 @@ export function InventoryPage() {
           <p className="text-slate-400">
             No echoes yet — add your first Echo above to start building your gear box.
           </p>
+        ) : visible.length === 0 ? (
+          <p className="text-slate-400">
+            No echoes with this Sonata set — pick All sets to see the full inventory.
+          </p>
         ) : (
-          <EchoList echoes={echoes} onEdit={setEditing} onDelete={(id) => void removeEcho(id)} />
+          <EchoList echoes={visible} onEdit={setEditing} onDelete={(id) => void removeEcho(id)} />
         )}
       </div>
     </section>

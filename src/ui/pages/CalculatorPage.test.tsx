@@ -7,6 +7,7 @@ import { useCalculatorStore } from '../../state/calculator.ts';
 import { useInventoryStore } from '../../state/inventory.ts';
 import { useLibraryStore } from '../../state/library.ts';
 import { useRosterStore } from '../../state/roster.ts';
+import { useTeamStore } from '../../state/teamStore.ts';
 import type { OptimizeRequest } from '../../optimizer/search.ts';
 import { CalculatorPage } from './CalculatorPage.tsx';
 
@@ -63,6 +64,7 @@ beforeEach(() => {
   useRosterStore.setState({ entries: [], loaded: true });
   useInventoryStore.setState({ echoes: [], loaded: true });
   useLibraryStore.setState({ builds: [], loaded: true });
+  useTeamStore.setState({ teams: [], loaded: true });
   calls.length = 0;
   canned.builds[0].echoIds = [];
 });
@@ -292,5 +294,27 @@ describe('CalculatorPage', () => {
 
     expect(screen.getByText(/can't use thunderbolt — pick a broadblade/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/rotation results/i)).not.toBeInTheDocument();
+  });
+
+  it('imports team buffs as enabled global buffs without duplicating', async () => {
+    setupScorable();
+    useTeamStore.setState({
+      teams: [{ id: 'team-1', name: 'Lynae team', characterIds: ['lynae', 'verina', 'sanhua'] }],
+      loaded: true,
+    });
+    const user = userEvent.setup();
+    render(<CalculatorPage />);
+
+    await user.selectOptions(screen.getByLabelText(/import outro/i), 'team-1');
+    await user.click(screen.getByRole('button', { name: /import team buffs/i }));
+
+    const labels = useCalculatorStore.getState().buffs.map((b) => b.label);
+    expect(labels).toContain('Lynae Outro (incoming) · 14s');
+    expect(labels).toContain('Lynae Liberation (team) · 30s');
+    const state = useCalculatorStore.getState();
+    expect(state.globalBuffIds).toHaveLength(state.buffs.length);
+
+    await user.click(screen.getByRole('button', { name: /import team buffs/i }));
+    expect(useCalculatorStore.getState().buffs.map((b) => b.label)).toEqual(labels);
   });
 });

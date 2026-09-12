@@ -1,11 +1,13 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { findEchoDef, loadBundledSnapshot } from '../../data/index.ts';
 import type { CritMode } from '../../domain/damage.ts';
 import { buildEnemyProfile } from '../../domain/enemy.ts';
 import { calculateRotation, type BlockResult } from '../../domain/rotation.ts';
+import { resolveTeamBuffs } from '../../domain/teamBuffs.ts';
 import { useCalculatorStore } from '../../state/calculator.ts';
 import { useInventoryStore } from '../../state/inventory.ts';
 import { useRosterStore } from '../../state/roster.ts';
+import { useTeamStore } from '../../state/teamStore.ts';
 import { EnemyConfig } from '../components/EnemyConfig.tsx';
 import { RotationOptimizer } from '../components/RotationOptimizer.tsx';
 import { RotationTimeline } from '../components/RotationTimeline.tsx';
@@ -33,6 +35,11 @@ export function CalculatorPage() {
   const echoes = useInventoryStore((s) => s.echoes);
   const inventoryLoaded = useInventoryStore((s) => s.loaded);
   const loadInventory = useInventoryStore((s) => s.load);
+  const teams = useTeamStore((s) => s.teams);
+  const teamsLoaded = useTeamStore((s) => s.loaded);
+  const loadTeams = useTeamStore((s) => s.load);
+  const [importTeamId, setImportTeamId] = useState('');
+  const [teamWarnings, setTeamWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     if (!rosterLoaded) void loadRoster();
@@ -40,6 +47,24 @@ export function CalculatorPage() {
   useEffect(() => {
     if (!inventoryLoaded) void loadInventory();
   }, [inventoryLoaded, loadInventory]);
+  useEffect(() => {
+    if (!teamsLoaded) void loadTeams();
+  }, [teamsLoaded, loadTeams]);
+
+  const handleImportTeamBuffs = (): void => {
+    const pickedTeam = teams.find((t) => t.id === importTeamId);
+    if (!pickedTeam) return;
+    const resolved = resolveTeamBuffs(
+      pickedTeam,
+      (id) => snapshot.characters.find((c) => c.id === id)?.name ?? null,
+    );
+    setTeamWarnings(resolved.warnings);
+    for (const buff of resolved.buffs) {
+      if (calc.buffs.some((existing) => existing.label === buff.label)) continue;
+      const row = calc.addBuff(buff);
+      calc.toggleGlobalBuff(row.id);
+    }
+  };
 
   const character = snapshot.characters.find((c) => c.id === calc.characterId);
   const weapon = snapshot.weapons.find((w) => w.id === calc.weaponId);
@@ -395,6 +420,39 @@ export function CalculatorPage() {
               Pick 5 distinct echoes above to score the rotation — blocks and buffs stay editable meanwhile.
             </p>
           )}
+          {teams.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
+              <div className="min-w-48 flex-1">
+                <label htmlFor="calc-team-import" className={labelClass}>
+                  Import Outro / team buffs from a team
+                </label>
+                <select
+                  id="calc-team-import"
+                  value={importTeamId}
+                  onChange={(e) => setImportTeamId(e.target.value)}
+                  className={`${selectClass} mt-0.5`}
+                >
+                  <option value="">Pick a team…</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={handleImportTeamBuffs}
+                disabled={importTeamId === ''}
+                className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+              >
+                Import team buffs
+              </button>
+            </div>
+          )}
+          {teamWarnings.length > 0 && (
+            <p className="mt-2 text-xs text-amber-300">
+              Team import: {teamWarnings.join(' ')}
+            </p>
+          )}
           <div className="mt-2">
             <RotationTimeline
               character={character}
@@ -409,6 +467,7 @@ export function CalculatorPage() {
               dpr={scoring?.result?.dpr ?? null}
               dps={scoring?.result?.dps ?? null}
               rotationTime={calc.rotationTime}
+              weaponRank={calc.weaponRank}
               onAddBlock={(skillId, motionName, forteLevel, options) =>
                 calc.addBlock({ skillId, motionName, forteLevel, activeBuffIds: [], ...options })}
               onRemoveBlock={calc.removeBlock}

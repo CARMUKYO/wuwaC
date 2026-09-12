@@ -2,7 +2,7 @@ import { findEchoDef, loadBundledSnapshot } from '../../data/index.ts';
 import type { OwnedEcho } from '../../data/schema.ts';
 import { echoDefIssues } from '../../state/inventory.ts';
 import { statLabel, toDisplayValue } from '../format.ts';
-import { InitialsBadge } from './InitialsBadge.tsx';
+import { GameIcon } from './GameIcon.tsx';
 
 interface EchoListProps {
   echoes: OwnedEcho[];
@@ -27,12 +27,13 @@ export function EchoList({ echoes, onEdit, onDelete }: EchoListProps) {
     <ul className="space-y-2">
       {echoes.map((echo) => {
         const issues = echoDefIssues(echo, defs);
+        const def = findEchoDef(loadBundledSnapshot(), echo.echoDefId);
         return (
         <li
           key={echo.id}
           className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2"
         >
-          <InitialsBadge name={displayName(echo)} />
+          <GameIcon name={displayName(echo)} iconUrl={def?.iconUrl} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{displayName(echo)}</p>
             <p className="truncate text-xs text-slate-400">

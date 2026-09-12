@@ -4,6 +4,7 @@ import { ownedEchoSchema, type OwnedEcho, type RosterEntry } from '../data/schem
 import type { ResonanceMode } from './characterMods.ts';
 import { buildEnemyProfile } from './enemy.ts';
 import { calculateRotation, isBlockStale, scoreRotationBlocks, type ActionBlock, type RotationBuff, type RotationInput } from './rotation.ts';
+import { resolveTeamBuffs } from './teamBuffs.ts';
 import { emptySheet } from './stats.ts';
 
 const snapshot = loadBundledSnapshot();
@@ -96,6 +97,36 @@ describe('calculateRotation', () => {
     const global = calculateRotation(baseInput([block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG')], [buff], ['amp']));
     expect(global.blocks[0].damage / plain.blocks[0].damage).toBeCloseTo(1.2, 10);
     expect(global.blocks[1].damage / plain.blocks[1].damage).toBeCloseTo(1.2, 10);
+  });
+
+  it('scales DPR by the resolved Lynae team buffs, and toggle-off restores baseline (hand-computed)', () => {
+    // Lynae Outro (15% all-DMG amp) + Liberation (24% team DMG) both land
+    // on sheet.amplify for Jiyan's Basic blocks (the 25% Liberation-bucket
+    // mod does not apply to Basic hits), so DmgAmplifyTotal goes 1.0 -> 1.39.
+    const lynae = resolveTeamBuffs(
+      { id: 't', name: 'T', characterIds: ['lynae', 'verina', 'sanhua'] },
+      (id) => snapshot.characters.find((c) => c.id === id)?.name ?? null,
+    );
+    expect(lynae.warnings).toEqual([]);
+    const teamBuffs: RotationBuff[] = lynae.buffs
+      .filter((b) => b.label.startsWith('Lynae'))
+      .map((b, i) => ({ ...b, id: `lynae-${i}` }));
+    expect(teamBuffs).toHaveLength(2);
+
+    const plain = calculateRotation(baseInput([block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG')]));
+    const buffed = calculateRotation(
+      baseInput(
+        [block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG')],
+        teamBuffs,
+        teamBuffs.map((b) => b.id),
+      ),
+    );
+    expect(buffed.dpr / plain.dpr).toBeCloseTo(1.39, 10);
+
+    const toggledOff = calculateRotation(
+      baseInput([block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG')], teamBuffs, []),
+    );
+    expect(toggledOff.dpr).toBe(plain.dpr);
   });
 
   it('scores buff-only outros as zero-damage carriers', () => {

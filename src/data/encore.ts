@@ -446,7 +446,14 @@ export function echoSkipReasonForName(name: string): string | null {
  * COST_FROM_RARITY table. Cross-checked during sync against every
  * Handbook-derived cost (Hooscamp Rarity 0 = 1-cost, Hoochief Rarity 1 =
  * 3-cost); mismatches keep the Handbook value and warn loudly.
- * Rarity 3+ has no verified mapping — returns null so the caller skips
+ * Rarity 3 = 4-cost (Calamity/Reminiscence class): verified against the
+ * 2026-09-12 provider detail records for Reminiscence: Fleurdelys,
+ * Threnodian - Leviathan, Denia, and Threnodian - Voidborne Construct
+ * (all Rarity 3, no Handbook data), which share MainProp.RandGroupId 501
+ * with the Rarity-2 4-cost echo Reminiscence: Fenrico, while the 3-cost
+ * Reminiscence: Kronaclaw (Rarity 1) uses RandGroupId 502. The sync also
+ * cross-checks RandGroupId against the resolved cost and warns loudly.
+ * Rarity 4+ has no verified mapping — returns null so the caller skips
  * instead of guessing.
  */
 export function echoCostFromRarity(rarity: number): 1 | 3 | 4 | null {
@@ -456,6 +463,8 @@ export function echoCostFromRarity(rarity: number): 1 | 3 | 4 | null {
     case 1:
       return 3;
     case 2:
+      return 4;
+    case 3:
       return 4;
     default:
       return null;

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { loadBundledSnapshot } from '../../data/index.ts';
 import { serializeBuilds, useLibraryStore } from '../../state/library.ts';
 import { decodeBuildLink, encodeBuildLink } from '../../state/share.ts';
+import { GameIcon } from '../components/GameIcon.tsx';
 
 const inputClass =
   'w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
@@ -138,12 +139,18 @@ export function BuildsPage() {
             {builds.map((build) => (
               <li key={build.id} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium">{build.name}</p>
-                    <p className="text-xs text-slate-400">
-                      {characterName(build.characterId)}
-                      {build.score !== undefined && ` · score ${build.score.toFixed(1)}`}
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <GameIcon
+                      name={characterName(build.characterId)}
+                      iconUrl={snapshot.characters.find((c) => c.id === build.characterId)?.iconUrl}
+                    />
+                    <div>
+                      <p className="text-sm font-medium">{build.name}</p>
+                      <p className="text-xs text-slate-400">
+                        {characterName(build.characterId)}
+                        {build.score !== undefined && ` · score ${build.score.toFixed(1)}`}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex gap-1">
                     <button

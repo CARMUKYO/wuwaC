@@ -240,8 +240,15 @@ describe('echoCostFromRarity', () => {
     expect(echoCostFromRarity(2)).toBe(4);
   });
 
+  it('maps Rarity 3 to cost 4 (Reminiscence Calamity-class echoes)', () => {
+    // Fleurdelys / Leviathan / Denia / Voidborne Construct: provider Rarity
+    // 3 with no Handbook data, sharing RandGroupId 501 with the 4-cost
+    // Reminiscence: Fenrico (verified 2026-09-12).
+    expect(echoCostFromRarity(3)).toBe(4);
+  });
+
   it('returns null for unverified rarities', () => {
-    expect(echoCostFromRarity(3)).toBeNull();
+    expect(echoCostFromRarity(4)).toBeNull();
     expect(echoCostFromRarity(99)).toBeNull();
   });
 });

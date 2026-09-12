@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { BUFF_PRESETS, resolvePresetMods, type BuffPreset } from '../../data/buffPresets.ts';
 import { statKeySchema, type CharacterData, type StatKey } from '../../data/schema.ts';
 import {
   characterResonanceModes,
@@ -12,7 +13,7 @@ import { resolveMotion } from '../../domain/damage.ts';
 import { maxStatusStacks, negativeStatusDef } from '../../domain/negativeStatus.ts';
 import type { ActionBlock, BlockResult, RotationBuff } from '../../domain/rotation.ts';
 import { isBlockStale } from '../../domain/rotation.ts';
-import { isPercentStat, parseDisplayValue, statLabel } from '../format.ts';
+import { isPercentStat, parseDisplayValue, statLabel, toDisplayValue } from '../format.ts';
 
 type KitStatePatch = Partial<
   Pick<
@@ -59,6 +60,8 @@ interface RotationTimelineProps {
   dpr: number | null;
   dps: number | null;
   rotationTime: number;
+  /** Equipped weapon rank (1-5) for resolving weapon preset series. Defaults to 5. */
+  weaponRank?: number;
   onAddBlock: (
     skillId: string,
     motionName: string,
@@ -115,6 +118,7 @@ function motionScaling(
 export function RotationTimeline(props: RotationTimelineProps) {
   const {
     character, resonanceChain, forteLevels, resonanceMode, onSetResonanceMode, blocks, buffs, globalBuffIds, results, dpr, dps, rotationTime,
+    weaponRank = 5,
     onAddBlock, onRemoveBlock, onMoveBlock, onSetBlockForte, onSetBlockStatusStacks, onSetBlockConviction,
     onSetBlockKitState, onToggleBlockBuff, onToggleGlobalBuff, onAddBuff, onRemoveBuff,
   } = props;
@@ -133,8 +137,22 @@ export function RotationTimeline(props: RotationTimelineProps) {
   const [buffSource, setBuffSource] = useState('');
   const [buffStat, setBuffStat] = useState<StatKey>('atkPct');
   const [buffValue, setBuffValue] = useState('');
+  const [buffStat2, setBuffStat2] = useState<StatKey>('dmgBonus:basic');
+  const [buffValue2, setBuffValue2] = useState('');
+  const [presetId, setPresetId] = useState('');
 
   const kinds = KIND_ORDER.filter((kind) => character.skills.some((s) => s.kind === kind));
+
+  type ParsedMod = { ok: true; mod: { stat: StatKey; value: number } | null } | { ok: false };
+  const parseBuffMod = (stat: StatKey, text: string): ParsedMod => {
+    if (text.trim() === '') return { ok: true, mod: null };
+    try {
+      return { ok: true, mod: { stat, value: parseDisplayValue(stat, text) } };
+    } catch {
+      setBuffError(`Buff value is not a valid ${isPercentStat(stat) ? 'percent' : 'number'}.`);
+      return { ok: false };
+    }
+  };
 
   const handleAddBuff = (event: FormEvent): void => {
     event.preventDefault();
@@ -143,18 +161,34 @@ export function RotationTimeline(props: RotationTimelineProps) {
       setBuffError('Buff name is required.');
       return;
     }
-    let value = 0;
-    try {
-      value = parseDisplayValue(buffStat, buffValue);
-    } catch {
-      setBuffError(`Buff value is not a valid ${isPercentStat(buffStat) ? 'percent' : 'number'}.`);
+    setBuffError(null);
+    const first = parseBuffMod(buffStat, buffValue);
+    if (!first.ok || first.mod === null) {
+      if (first.ok) setBuffError('Buff value is required.');
       return;
     }
-    setBuffError(null);
-    onAddBuff({ label, source: buffSource.trim() === '' ? 'Custom' : buffSource.trim(), mods: [{ stat: buffStat, value }] });
+    const second = parseBuffMod(buffStat2, buffValue2);
+    if (!second.ok) return;
+    const mods = second.mod === null ? [first.mod] : [first.mod, second.mod];
+    onAddBuff({ label, source: buffSource.trim() === '' ? 'Custom' : buffSource.trim(), mods });
     setBuffLabel('');
     setBuffSource('');
     setBuffValue('');
+    setBuffValue2('');
+  };
+
+  const selectedPreset: BuffPreset | undefined = BUFF_PRESETS.find((p) => p.id === presetId);
+
+  const handleAddPreset = (): void => {
+    if (!selectedPreset) return;
+    const mods = resolvePresetMods(selectedPreset, { weaponRank, attribute: character.attribute });
+    const targetSuffix = selectedPreset.target === 'wielder' ? '' : ` (${selectedPreset.target})`;
+    onAddBuff({
+      label: `${selectedPreset.label}${targetSuffix}`,
+      source: `${selectedPreset.source} preset`,
+      mods,
+    });
+    setPresetId('');
   };
 
   return (
@@ -642,7 +676,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
         <h3 className="text-sm font-semibold">Buffs</h3>
         {buffs.length === 0 ? (
           <p className="mt-1 text-xs text-slate-500">
-            No buffs yet — game-text buffs stay manual (never parsed from prose), so add them with their verified numbers.
+            No buffs yet — pick a preset below or add a custom buff with its verified numbers.
           </p>
         ) : (
           <ul className="mt-2 space-y-1">
@@ -655,7 +689,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                     onChange={() => onToggleGlobalBuff(buff.id)}
                   />
                   <span className="truncate">
-                    [{buff.source}] {buff.label} ({buff.mods.map((m) => `${statLabel(m.stat)}`).join(', ')}) — full uptime
+                    [{buff.source}] {buff.label} ({buff.mods.map((m) => `${statLabel(m.stat)} ${toDisplayValue(m.stat, m.value)}`).join(', ')}) — full uptime
                   </span>
                 </label>
                 <button type="button" onClick={() => onRemoveBuff(buff.id)} className="shrink-0 rounded-md px-2 py-1 text-red-300 hover:bg-slate-800">
@@ -664,6 +698,29 @@ export function RotationTimeline(props: RotationTimelineProps) {
               </li>
             ))}
           </ul>
+        )}
+        <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
+          <div>
+            <label htmlFor="buff-preset" className={labelClass}>Preset (Echo / Sonata / Weapon)</label>
+            <select id="buff-preset" value={presetId} onChange={(e) => setPresetId(e.target.value)} className={`${inputClass} mt-0.5`}>
+              <option value="">Pick a preset…</option>
+              {(['Echo', 'Sonata', 'Weapon'] as const).map((source) => (
+                <optgroup key={source} label={source}>
+                  {BUFF_PRESETS.filter((p) => p.source === source).map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button type="button" onClick={handleAddPreset} disabled={presetId === ''} className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40">
+              Add preset
+            </button>
+          </div>
+        </div>
+        {selectedPreset?.assumption && (
+          <p className="mt-1 text-xs text-slate-500">{selectedPreset.label}: {selectedPreset.assumption}</p>
         )}
         <form onSubmit={handleAddBuff} className="mt-3 grid gap-2 md:grid-cols-4">
           <div>
@@ -685,6 +742,18 @@ export function RotationTimeline(props: RotationTimelineProps) {
           <div>
             <label htmlFor="buff-value" className={labelClass}>Value{isPercentStat(buffStat) ? ' (%)' : ''}</label>
             <input id="buff-value" type="text" inputMode="decimal" value={buffValue} onChange={(e) => setBuffValue(e.target.value)} className={`${inputClass} mt-0.5`} />
+          </div>
+          <div>
+            <label htmlFor="buff-stat-2" className={labelClass}>Second stat (optional)</label>
+            <select id="buff-stat-2" value={buffStat2} onChange={(e) => setBuffStat2(e.target.value as StatKey)} className={`${inputClass} mt-0.5`}>
+              {statKeySchema.options.map((stat) => (
+                <option key={stat} value={stat}>{statLabel(stat)}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="buff-value-2" className={labelClass}>Second value{isPercentStat(buffStat2) ? ' (%)' : ''}</label>
+            <input id="buff-value-2" type="text" inputMode="decimal" value={buffValue2} onChange={(e) => setBuffValue2(e.target.value)} className={`${inputClass} mt-0.5`} />
           </div>
         </form>
         {buffError && <div role="alert" className="mt-2 text-xs text-red-300">{buffError}</div>}

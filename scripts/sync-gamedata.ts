@@ -16,7 +16,8 @@
  * Partial syncs carry untouched categories over from the committed
  * snapshot, so `--echoes` never empties characters/weapons.
  * Echo coverage: cost prefers Handbook intensity with a detail-Rarity
- * fallback ({0:1, 1:3, 2:4}, cross-checked); pools prefer Handbook tokens
+ * fallback ({0:1, 1:3, 2:4, 3:4}, cross-checked against Handbook costs
+ * and RandGroupId pool families); pools prefer Handbook tokens
  * with a cost-tier fallback. Fallback records are logged, never silent.
  * Excluded up front (skipped before the detail fetch): `Phantom: ...`
  * shiny variants and unreleased `MonsterInfo_<id>_Name` placeholders —
@@ -154,7 +155,15 @@ function numberFromRaw(raw: unknown, what: string): { value: number; isPercent: 
   throw new Error(`${what}: cannot parse curve value ${JSON.stringify(raw)}`);
 }
 
-function normalizeCharacter(raw: unknown, fetchedAt: string): {
+/**
+ * Keep only usable remote icon URLs. Anything else becomes `undefined` so
+ * the snapshot schema (url-validated) never rejects a record over artwork.
+ */
+function cleanIconUrl(value: unknown): string | undefined {
+  return typeof value === 'string' && /^https?:\/\//.test(value) ? value : undefined;
+}
+
+function normalizeCharacter(raw: unknown, fetchedAt: string, iconUrl?: string): {
   character: CharacterData;
   /** Rover-variant disambiguator ("MaleM"/"FemaleM"); undefined otherwise. */
   roleBody: string | undefined;
@@ -329,6 +338,7 @@ function normalizeCharacter(raw: unknown, fetchedAt: string): {
     character: {
       id,
       name,
+      ...(iconUrl ? { iconUrl } : {}),
       rarity: c.QualityId as 4 | 5,
       attribute,
       weaponType: c.WeaponTypeName as CharacterData['weaponType'],
@@ -343,7 +353,7 @@ function normalizeCharacter(raw: unknown, fetchedAt: string): {
   };
 }
 
-function normalizeWeapon(raw: unknown, fetchedAt: string, apiId: number): WeaponData {
+function normalizeWeapon(raw: unknown, fetchedAt: string, apiId: number, iconUrl?: string): WeaponData {
   const w = rawWeaponDetail.parse(raw);
   const id = slugify(w.WeaponName);
   const atkCurve = curveValues(w.Properties[0], `${w.WeaponName}.ATK`).map((e) => {
@@ -378,6 +388,7 @@ function normalizeWeapon(raw: unknown, fetchedAt: string, apiId: number): Weapon
   return {
     id,
     name: w.WeaponName,
+    ...(iconUrl ? { iconUrl } : {}),
     weaponType: w.WeaponTypeName as WeaponData['weaponType'],
     rarity: w.QualityId,
     atkByLevel: atkCurve,
@@ -409,6 +420,7 @@ const rawEchoDetail = z.looseObject({
   Element: z.looseObject({ Name: z.string() }),
   FetterGroup: z.array(z.number()),
   Rarity: z.number().optional(),
+  MainProp: z.looseObject({ RandGroupId: z.number() }).optional(),
   PhantomType: z.number().optional(),
   Handbook: z
     .looseObject({ Intensity: z.string(), Descrtption1: z.string() })
@@ -425,6 +437,8 @@ interface EchoListEntry {
   Id: number;
   Name: string;
   PhantomType?: number;
+  IconSmall?: string;
+  IconMiddle?: string;
 }
 
 /**
@@ -433,10 +447,11 @@ interface EchoListEntry {
  * pool token/sonata/element).
  * Anything structurally unexpected throws (unexpected failure, not a skip).
  *
- * Cost prefers Handbook intensity; detail Rarity ({0:1, 1:3, 2:4},
- * cross-checked against every Handbook-derived cost) fills the gap, and
- * Rarity 3+ still skips. Pools prefer Handbook tokens; without them the
- * cost-tier reference pool applies and the record is logged to `fallbacks`.
+ * Cost prefers Handbook intensity; detail Rarity ({0:1, 1:3, 2:4, 3:4},
+ * cross-checked against every Handbook-derived cost and against
+ * MainProp.RandGroupId pool families) fills the gap, and Rarity 4+ still
+ * skips. Pools prefer Handbook tokens; without them the cost-tier
+ * reference pool applies and the record is logged to `fallbacks`.
  */
 function normalizeEchoDef(
   entry: EchoListEntry,
@@ -470,6 +485,16 @@ function normalizeEchoDef(
     if (viaRarity !== null && viaRarity !== cost) {
       warn(`${entry.Name}: Handbook cost ${cost} vs Rarity cost ${viaRarity}, kept Handbook`);
     }
+  }
+  // Provider-internal corroboration: MainProp.RandGroupId identifies the
+  // main-stat pool family (501 = 4-cost pool, 502 = 3-cost pool, calibrated
+  // against Reminiscence: Fenrico and Kronaclaw on 2026-09-12). Unknown
+  // groups stay silent; mismatches on known groups warn loudly.
+  const randGroup = detail.MainProp?.RandGroupId;
+  if (randGroup === 501 && cost !== 4) {
+    warn(`${entry.Name}: RandGroupId 501 (4-cost pool) vs resolved cost ${cost}`);
+  } else if (randGroup === 502 && cost !== 3) {
+    warn(`${entry.Name}: RandGroupId 502 (3-cost pool) vs resolved cost ${cost}`);
   }
   const handbook = detail.Handbook;
   const tokens = handbook ? [...handbook.Descrtption1.matchAll(/\[([^\]]+)\]/g)].map((m) => m[1].trim()) : [];
@@ -516,9 +541,11 @@ function normalizeEchoDef(
   }
   const skillDesc = detail.Skill?.DescriptionEx ?? detail.Skill?.SimplyDescription;
   const skillDescription = skillDesc ? stripHtml(skillDesc) : undefined;
+  const iconUrl = cleanIconUrl(entry.IconSmall) ?? cleanIconUrl(entry.IconMiddle);
   return {
     id,
     name: entry.Name,
+    ...(iconUrl ? { iconUrl } : {}),
     element,
     sonataIds,
     cost,
@@ -609,7 +636,7 @@ async function main(): Promise<void> {
   const characters: CharacterData[] = [];
   if (flags.chars) {
     console.log('characters…');
-    const charList = z.looseObject({ roleList: z.array(z.looseObject({ Id: z.number(), Name: z.string() })) }).parse(await getJson('/character'));
+    const charList = z.looseObject({ roleList: z.array(z.looseObject({ Id: z.number(), Name: z.string(), RoleHeadIcon: z.string().optional() })) }).parse(await getJson('/character'));
     const seenSlugs = new Map<string, number>(); // slug -> index in characters
     for (const entry of charList.roleList) {
       if (!wanted(entry.Name)) continue;
@@ -617,6 +644,7 @@ async function main(): Promise<void> {
         const { character, roleBody } = normalizeCharacter(
           await fetchDetail(`/character/${entry.Id}`),
           fetchedAt,
+          cleanIconUrl(entry.RoleHeadIcon),
         );
         if (roleBody !== undefined && roleBody !== 'MaleM' && /rover/i.test(character.name)) {
           skips.push({ name: character.name, reason: `female Rover variant (${roleBody})` });
@@ -644,11 +672,11 @@ async function main(): Promise<void> {
   const weapons: WeaponData[] = [];
   if (flags.weapons) {
     console.log('weapons…');
-    const weaponList = z.looseObject({ weapons: z.array(z.looseObject({ Id: z.number(), Name: z.string() })) }).parse(await getJson('/weapon'));
+    const weaponList = z.looseObject({ weapons: z.array(z.looseObject({ Id: z.number(), Name: z.string(), Icon: z.string().optional() })) }).parse(await getJson('/weapon'));
     for (const entry of weaponList.weapons) {
       if (!wanted(entry.Name)) continue;
       try {
-        weapons.push(normalizeWeapon(await fetchDetail(`/weapon/${entry.Id}`), fetchedAt, entry.Id));
+        weapons.push(normalizeWeapon(await fetchDetail(`/weapon/${entry.Id}`), fetchedAt, entry.Id, cleanIconUrl(entry.Icon)));
       } catch (err) {
         failures.push({ name: entry.Name, error: err instanceof Error ? err.message : String(err) });
       }
@@ -663,7 +691,7 @@ async function main(): Promise<void> {
     sonataSets = normalizeSonataSets(echoListRaw, fetchedAt);
 
     console.log('echo defs…');
-    const echoList = z.looseObject({ Echo: z.array(z.looseObject({ Id: z.number(), Name: z.string(), PhantomType: z.number().optional() })) }).parse(echoListRaw);
+    const echoList = z.looseObject({ Echo: z.array(z.looseObject({ Id: z.number(), Name: z.string(), PhantomType: z.number().optional(), IconSmall: z.string().optional(), IconMiddle: z.string().optional() })) }).parse(echoListRaw);
     const groupIdToSonata = new Map<number, string>();
     for (const set of sonataSets) groupIdToSonata.set(set.source.apiId, set.id);
     const takenSlugs = new Set<string>();
