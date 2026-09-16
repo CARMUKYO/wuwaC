@@ -159,6 +159,7 @@ export function CalculatorPage() {
         rotationTime: calc.rotationTime,
         crit: calc.crit,
         resonanceMode: calc.resonanceMode ?? undefined,
+        mainEchoId: combo[0].id,
       });
       return { result, error: null as string | null };
     } catch (err) {
@@ -485,6 +486,11 @@ export function CalculatorPage() {
               <p className="mt-2 text-xs text-amber-300">
                 {scoring?.result?.warnings.length} unmodeled effect{(scoring?.result?.warnings.length ?? 0) === 1 ? '' : 's'} —
                 conditional/custom kit text that never touches the numbers.
+              </p>
+            )}
+            {(scoring?.result?.appliedAssumptions.length ?? 0) > 0 && (
+              <p className="mt-2 text-xs text-slate-500" title={(scoring?.result?.appliedAssumptions ?? []).join('\n')}>
+                Assumes: {(scoring?.result?.appliedAssumptions ?? []).join('; ')}
               </p>
             )}
           </div>

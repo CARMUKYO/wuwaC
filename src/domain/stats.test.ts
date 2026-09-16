@@ -168,7 +168,7 @@ describe('computeStats', () => {
   ];
 
   it('aggregates base + weapon + forte + echoes + 2pc sonata', () => {
-    const { sheet, baseAtk, baseHp, baseDef, warnings } = computeStats({
+    const { sheet, baseAtk, baseHp, baseDef, warnings, appliedAssumptions } = computeStats({
       character: jiyan,
       weapon: verdant,
       roster,
@@ -192,10 +192,13 @@ describe('computeStats', () => {
     // critDmg: base 150% + weapon secondary 10.80% = 160.80%.
     expect(sheet.critDmg).toBeCloseTo(1.608, 10);
     // 2pc Sierra Gale (distinct defs): Aero +10%. 5pc not triggered, no warning.
-    expect(sheet['dmgBonus:Aero']).toBeCloseTo(0.1, 10);
-    // Only the unstructured weapon passive warns.
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toMatch(/weapon passive/);
+    // Verdant Summit R1 auto-applies: Aero +12% (character bucket) + Heavy 2x24%.
+    expect(sheet['dmgBonus:Aero']).toBeCloseTo(0.22, 10);
+    expect(sheet['dmgBonus:heavy']).toBeCloseTo(0.48, 10);
+    // The transcribed weapon passive applies instead of warning.
+    expect(warnings).toHaveLength(0);
+    expect(appliedAssumptions).toHaveLength(1);
+    expect(appliedAssumptions[0]).toMatch(/Verdant Summit R1/);
   });
 
   it('counts duplicate Echo definitions once toward sonata pieces', () => {
@@ -208,7 +211,66 @@ describe('computeStats', () => {
       sonataSets: [sierra],
     });
     // Still 2 distinct pieces: 2pc holds, 5pc stays silent.
-    expect(sheet['dmgBonus:Aero']).toBeCloseTo(0.1, 10);
-    expect(warnings).toHaveLength(1);
+    expect(sheet['dmgBonus:Aero']).toBeCloseTo(0.22, 10);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('auto-applies a transcribed 5pc bonus at exactly 5 distinct pieces', () => {
+    const plain = snapshot.weapons.find((w) => w.id === 'beguiling-melody')!;
+    const five = ['d1', 'd2', 'd3', 'd4', 'd5'].map((def, i) => ({
+      ...echoes[0],
+      id: `sierra-${i}`,
+      echoDefId: def,
+      mainStat: { stat: 'atk' as const, value: 0 },
+      substats: [],
+    }));
+    const { sheet, appliedAssumptions } = computeStats({
+      character: jiyan,
+      weapon: plain,
+      roster: { ...roster, weaponId: plain.id },
+      echoes: five,
+      sonataSets: [sierra],
+    });
+    // 2pc +10% and transcribed 5pc +30% stack; the untranscribed weapon warns instead.
+    expect(sheet['dmgBonus:Aero']).toBeCloseTo(0.4, 10);
+    expect(appliedAssumptions).toHaveLength(1);
+    expect(appliedAssumptions[0]).toMatch(/Sierra Gale 5pc/);
+  });
+
+  it('resolves the wielded weapon preset at the roster rank (Verdant R5)', () => {
+    const { sheet, appliedAssumptions } = computeStats({
+      character: jiyan,
+      weapon: verdant,
+      roster: { ...roster, weaponRank: 5 },
+      echoes,
+      sonataSets: [sierra],
+    });
+    expect(sheet['dmgBonus:Aero']).toBeCloseTo(0.34, 10);
+    expect(sheet['dmgBonus:heavy']).toBeCloseTo(0.96, 10);
+    expect(appliedAssumptions[0]).toMatch(/Verdant Summit R5/);
+  });
+
+  it('applies the slot-1 echo bonus only via mainEcho, honoring character gates', () => {
+    const lorelei: OwnedEcho = { ...echoes[0], id: 'main', echoDefId: 'lorelei' };
+    const plain = snapshot.weapons.find((w) => w.id === 'beguiling-melody')!;
+    const base = {
+      character: jiyan,
+      weapon: plain,
+      roster: { ...roster, weaponId: plain.id },
+      echoes: [lorelei, echoes[1]],
+      sonataSets: [sierra],
+    };
+    const without = computeStats(base);
+    expect(without.sheet['dmgBonus:Havoc']).toBe(0);
+    expect(without.sheet['dmgBonus:basic']).toBe(0);
+    const withMain = computeStats({ ...base, mainEcho: lorelei });
+    expect(withMain.sheet['dmgBonus:Havoc']).toBeCloseTo(0.12, 10);
+    expect(withMain.sheet['dmgBonus:basic']).toBeCloseTo(0.12, 10);
+    expect(withMain.appliedAssumptions[0]).toMatch(/Lorelei/);
+    // Sigillum is Aemeath-only: Jiyan holding it in slot 1 gains nothing.
+    const sigillum: OwnedEcho = { ...echoes[0], id: 'sig', echoDefId: 'sigillum' };
+    const gated = computeStats({ ...base, mainEcho: sigillum });
+    expect(gated.sheet['dmgBonus:liberation']).toBe(0);
+    expect(gated.appliedAssumptions).toHaveLength(0);
   });
 });

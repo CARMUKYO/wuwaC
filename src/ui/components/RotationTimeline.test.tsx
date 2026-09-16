@@ -41,33 +41,47 @@ function renderTimeline(overrides: { weaponRank?: number; onAddBuff?: (buff: Omi
 }
 
 describe('RotationTimeline buff presets', () => {
-  it('adds a sonata preset with its transcribed mods', async () => {
+  it('adds a manual sonata preset with its transcribed mods (Moonlit incoming)', async () => {
     const user = userEvent.setup();
     const { onAddBuff } = renderTimeline();
 
-    await user.selectOptions(screen.getByLabelText(/preset \(echo \/ sonata \/ weapon\)/i), 'sonata-sierra-gale-5pc');
-    expect(await screen.findByText(/after intro skill/i)).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText(/preset \(echo \/ sonata \/ weapon\)/i), 'sonata-moonlit-clouds-5pc');
+    expect(await screen.findByText(/next resonator for 15s/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /add preset/i }));
 
     expect(onAddBuff).toHaveBeenCalledOnce();
     expect(onAddBuff).toHaveBeenCalledWith({
-      label: 'Sierra Gale 5pc',
+      label: 'Moonlit Clouds 5pc (incoming)',
       source: 'Sonata preset',
-      mods: [{ stat: 'dmgBonus:Aero', value: 0.3 }],
+      mods: [{ stat: 'atkPct', value: 0.225 }],
     });
   });
 
-  it('resolves weapon presets at the equipped rank (Autumntrace R1)', async () => {
+  it('hides auto-applied presets from the picker (Sierra Gale 5pc)', async () => {
+    const user = userEvent.setup();
+    renderTimeline();
+
+    const options = Array.from(
+      (screen.getByLabelText(/preset \(echo \/ sonata \/ weapon\)/i) as HTMLSelectElement).options,
+    ).map((o) => o.value);
+    expect(options).not.toContain('sonata-sierra-gale-5pc');
+    expect(options).not.toContain('weapon-autumntrace');
+    expect(options).toContain('sonata-moonlit-clouds-5pc');
+    await user.selectOptions(screen.getByLabelText(/preset \(echo \/ sonata \/ weapon\)/i), 'sonata-moonlit-clouds-5pc');
+    expect(screen.getByRole('button', { name: /add preset/i })).toBeEnabled();
+  });
+
+  it('resolves manual weapon presets at the equipped rank (Static Mist Outro R1)', async () => {
     const user = userEvent.setup();
     const { onAddBuff } = renderTimeline({ weaponRank: 1 });
 
-    await user.selectOptions(screen.getByLabelText(/preset \(echo \/ sonata \/ weapon\)/i), 'weapon-autumntrace');
+    await user.selectOptions(screen.getByLabelText(/preset \(echo \/ sonata \/ weapon\)/i), 'weapon-static-mist-outro');
     await user.click(screen.getByRole('button', { name: /add preset/i }));
 
     expect(onAddBuff).toHaveBeenCalledWith({
-      label: 'Autumntrace',
+      label: 'Static Mist (Outro, incoming)',
       source: 'Weapon preset',
-      mods: [{ stat: 'atkPct', value: 0.2 }],
+      mods: [{ stat: 'atkPct', value: 0.1 }],
     });
   });
 

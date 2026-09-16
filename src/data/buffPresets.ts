@@ -27,6 +27,9 @@ import type { Attribute, StatKey } from './schema.ts';
  *   and RES-shred riders (noted per entry where dropped), and the
  *   multi-mechanic stack engines of a few 5-stars (see Thousandfold
  *   Deliverance note). Add those as custom buffs if needed.
+ * - Split application: `isAutoApplied` presets (wielder weapons, met
+ *   Sonata thresholds, main-slot Echoes) are applied by `computeStats`
+ *   and hidden from the manual picker; team/incoming presets stay manual.
  */
 
 export type BuffPresetSource = 'Echo' | 'Sonata' | 'Weapon';
@@ -48,9 +51,29 @@ export interface BuffPreset {
   /** Snapshot record id (echoDefId, sonataSetId, or weaponId). */
   sourceRef: string;
   target: BuffPresetTarget;
+  /** Sonata presets: the piece threshold this transcription belongs to. */
+  sonataPieceCount?: 2 | 3 | 5;
+  /**
+   * Character ids this preset is gated to (e.g. Sigillum is Aemeath-only).
+   * `computeStats` auto-applies the preset only for these characters.
+   */
+  requiresCharacterIds?: string[];
   mods: BuffPresetMod[];
   /** Full-uptime/stack assumption or excluded-rider note. Always set when the transcription simplifies. */
   assumption?: string;
+}
+
+/**
+ * Whether `computeStats` applies this preset automatically (wielder weapon
+ * passives, met-threshold Sonata effects that include the wearer, and
+ * main-slot Echo bonuses). Auto-applied presets are hidden from the manual
+ * picker so they cannot double-apply; team/incoming presets stay manual.
+ */
+export function isAutoApplied(preset: BuffPreset): boolean {
+  if (preset.source === 'Sonata') {
+    return preset.target !== 'incoming' && preset.sonataPieceCount !== undefined;
+  }
+  return preset.target === 'wielder';
 }
 
 export interface PresetResolution {
@@ -111,10 +134,10 @@ export const BUFF_PRESETS: BuffPreset[] = [
   { id: 'echo-twin-nova-nebulous-cannon', label: 'Twin Nova: Nebulous Cannon (main slot)', source: 'Echo', sourceRef: 'twin-nova-nebulous-cannon', target: 'wielder', mods: [{ stat: 'dmgBonus:Spectro', value: 0.12 }, { stat: 'dmgBonus:basic', value: 0.12 }] },
   { id: 'echo-twin-nova-collapsar-blade', label: 'Twin Nova: Collapsar Blade (main slot)', source: 'Echo', sourceRef: 'twin-nova-collapsar-blade', target: 'wielder', mods: [{ stat: 'dmgBonus:Electro', value: 0.12 }, { stat: 'dmgBonus:basic', value: 0.12 }] },
   { id: 'echo-reactor-husk', label: 'Reactor Husk (main slot)', source: 'Echo', sourceRef: 'reactor-husk', target: 'wielder', mods: [{ stat: 'energyRegen', value: 0.10 }] },
-  { id: 'echo-sigillum', label: 'Sigillum (main slot, Aemeath)', source: 'Echo', sourceRef: 'sigillum', target: 'wielder', mods: [{ stat: 'dmgBonus:liberation', value: 0.25 }], assumption: 'Aemeath only.' },
+  { id: 'echo-sigillum', label: 'Sigillum (main slot, Aemeath)', source: 'Echo', sourceRef: 'sigillum', target: 'wielder', requiresCharacterIds: ['aemeath'], mods: [{ stat: 'dmgBonus:liberation', value: 0.25 }], assumption: 'Aemeath only.' },
   { id: 'echo-nameless-explorer', label: 'Nameless Explorer (main slot)', source: 'Echo', sourceRef: 'nameless-explorer', target: 'wielder', mods: [{ stat: 'dmgBonus:Aero', value: 0.12 }, { stat: 'dmgBonus:echo', value: 0.20 }] },
   { id: 'echo-reminiscence-voidborne', label: 'Reminiscence: Voidborne Construct (main slot)', source: 'Echo', sourceRef: 'reminiscence-threnodian-voidborne-construct', target: 'wielder', mods: [{ stat: 'dmgBonus:Glacio', value: 0.12 }, { stat: 'dmgBonus:liberation', value: 0.12 }] },
-  { id: 'echo-adam-smasher', label: 'Reminiscence: Adam Smasher (main slot, Lucy/Rebecca)', source: 'Echo', sourceRef: 'reminiscence-nightmare-adam-smasher', target: 'wielder', mods: [{ stat: 'critRate', value: 0.15 }], assumption: 'Lucy / Rebecca only.' },
+  { id: 'echo-adam-smasher', label: 'Reminiscence: Adam Smasher (main slot, Lucy/Rebecca)', source: 'Echo', sourceRef: 'reminiscence-nightmare-adam-smasher', target: 'wielder', requiresCharacterIds: ['lucy', 'rebecca'], mods: [{ stat: 'critRate', value: 0.15 }], assumption: 'Lucy / Rebecca only.' },
   { id: 'echo-forbidden-bastion', label: 'Forbidden Bastion (main slot)', source: 'Echo', sourceRef: 'forbidden-bastion', target: 'wielder', mods: [{ stat: 'healingBonus', value: 0.10 }] },
   { id: 'echo-myriad-snare', label: 'Myriad Snare (main slot)', source: 'Echo', sourceRef: 'myriad-snare-rustfire-chassis', target: 'wielder', mods: [{ stat: 'dmgBonus:Fusion', value: 0.12 }, { stat: 'dmgBonus:heavy', value: 0.12 }] },
   { id: 'echo-thousand-puppet-pavilion', label: 'Thousand-Puppet Pavilion (main slot)', source: 'Echo', sourceRef: 'thousand-puppet-pavilion', target: 'wielder', mods: [{ stat: 'dmgBonus:Havoc', value: 0.12 }, { stat: 'dmgBonus:heavy', value: 0.12 }] },
@@ -123,15 +146,15 @@ export const BUFF_PRESETS: BuffPreset[] = [
 
   // ---- Sonata set bonuses with concrete numbers (custom notes) ----
   // 2pc `stat` bonuses are already applied by computeStats — never duplicated here.
-  { id: 'sonata-freezing-frost-5pc', label: 'Freezing Frost 5pc', source: 'Sonata', sourceRef: 'freezing-frost', target: 'wielder', mods: [{ stat: 'dmgBonus:Glacio', value: 0.30 }], assumption: 'Full stacks (3 x 10%), full uptime after Basic/Heavy.' },
-  { id: 'sonata-molten-rift-5pc', label: 'Molten Rift 5pc', source: 'Sonata', sourceRef: 'molten-rift', target: 'wielder', mods: [{ stat: 'dmgBonus:Fusion', value: 0.30 }], assumption: 'After Resonance Skill, full uptime assumed.' },
-  { id: 'sonata-void-thunder-5pc', label: 'Void Thunder 5pc', source: 'Sonata', sourceRef: 'void-thunder', target: 'wielder', mods: [{ stat: 'dmgBonus:Electro', value: 0.30 }], assumption: 'Full stacks (2 x 15%), full uptime.' },
-  { id: 'sonata-sierra-gale-5pc', label: 'Sierra Gale 5pc', source: 'Sonata', sourceRef: 'sierra-gale', target: 'wielder', mods: [{ stat: 'dmgBonus:Aero', value: 0.30 }], assumption: 'After Intro Skill, full uptime assumed.' },
-  { id: 'sonata-celestial-light-5pc', label: 'Celestial Light 5pc', source: 'Sonata', sourceRef: 'celestial-light', target: 'wielder', mods: [{ stat: 'dmgBonus:Spectro', value: 0.30 }], assumption: 'After Intro Skill, full uptime assumed.' },
-  { id: 'sonata-havoc-eclipse-5pc', label: 'Havoc Eclipse 5pc', source: 'Sonata', sourceRef: 'havoc-eclipse', target: 'wielder', mods: [{ stat: 'dmgBonus:Havoc', value: 0.30 }], assumption: 'Full stacks (4 x 7.5%), full uptime.' },
-  { id: 'sonata-rejuvenating-glow-5pc', label: 'Rejuvenating Glow 5pc (team)', source: 'Sonata', sourceRef: 'rejuvenating-glow', target: 'team', mods: [{ stat: 'atkPct', value: 0.15 }], assumption: 'Party-wide for 30s after healing; scored full uptime.' },
-  { id: 'sonata-moonlit-clouds-5pc', label: 'Moonlit Clouds 5pc (incoming)', source: 'Sonata', sourceRef: 'moonlit-clouds', target: 'incoming', mods: [{ stat: 'atkPct', value: 0.225 }], assumption: 'Next resonator for 15s after the wielder casts Outro Skill.' },
-  { id: 'sonata-lingering-tunes-5pc', label: 'Lingering Tunes 5pc', source: 'Sonata', sourceRef: 'lingering-tunes', target: 'wielder', mods: [{ stat: 'atkPct', value: 0.20 }, { stat: 'dmgBonus:outro', value: 0.60 }], assumption: 'On-field ramp complete (4 x 5% ATK); Outro Skill DMG +60%.' },
+  { id: 'sonata-freezing-frost-5pc', label: 'Freezing Frost 5pc', source: 'Sonata', sourceRef: 'freezing-frost', sonataPieceCount: 5, target: 'wielder', mods: [{ stat: 'dmgBonus:Glacio', value: 0.30 }], assumption: 'Full stacks (3 x 10%), full uptime after Basic/Heavy.' },
+  { id: 'sonata-molten-rift-5pc', label: 'Molten Rift 5pc', source: 'Sonata', sourceRef: 'molten-rift', sonataPieceCount: 5, target: 'wielder', mods: [{ stat: 'dmgBonus:Fusion', value: 0.30 }], assumption: 'After Resonance Skill, full uptime assumed.' },
+  { id: 'sonata-void-thunder-5pc', label: 'Void Thunder 5pc', source: 'Sonata', sourceRef: 'void-thunder', sonataPieceCount: 5, target: 'wielder', mods: [{ stat: 'dmgBonus:Electro', value: 0.30 }], assumption: 'Full stacks (2 x 15%), full uptime.' },
+  { id: 'sonata-sierra-gale-5pc', label: 'Sierra Gale 5pc', source: 'Sonata', sourceRef: 'sierra-gale', sonataPieceCount: 5, target: 'wielder', mods: [{ stat: 'dmgBonus:Aero', value: 0.30 }], assumption: 'After Intro Skill, full uptime assumed.' },
+  { id: 'sonata-celestial-light-5pc', label: 'Celestial Light 5pc', source: 'Sonata', sourceRef: 'celestial-light', sonataPieceCount: 5, target: 'wielder', mods: [{ stat: 'dmgBonus:Spectro', value: 0.30 }], assumption: 'After Intro Skill, full uptime assumed.' },
+  { id: 'sonata-havoc-eclipse-5pc', label: 'Havoc Eclipse 5pc', source: 'Sonata', sourceRef: 'havoc-eclipse', sonataPieceCount: 5, target: 'wielder', mods: [{ stat: 'dmgBonus:Havoc', value: 0.30 }], assumption: 'Full stacks (4 x 7.5%), full uptime.' },
+  { id: 'sonata-rejuvenating-glow-5pc', label: 'Rejuvenating Glow 5pc (team)', source: 'Sonata', sourceRef: 'rejuvenating-glow', sonataPieceCount: 5, target: 'team', mods: [{ stat: 'atkPct', value: 0.15 }], assumption: 'Party-wide for 30s after healing; scored full uptime.' },
+  { id: 'sonata-moonlit-clouds-5pc', label: 'Moonlit Clouds 5pc (incoming)', source: 'Sonata', sourceRef: 'moonlit-clouds', sonataPieceCount: 5, target: 'incoming', mods: [{ stat: 'atkPct', value: 0.225 }], assumption: 'Next resonator for 15s after the wielder casts Outro Skill.' },
+  { id: 'sonata-lingering-tunes-5pc', label: 'Lingering Tunes 5pc', source: 'Sonata', sourceRef: 'lingering-tunes', sonataPieceCount: 5, target: 'wielder', mods: [{ stat: 'atkPct', value: 0.20 }, { stat: 'dmgBonus:outro', value: 0.60 }], assumption: 'On-field ramp complete (4 x 5% ATK); Outro Skill DMG +60%.' },
 
   // ---- Weapon passives (rank series R1..R5, full stacks / full uptime) ----
   { id: 'weapon-autumntrace', label: 'Autumntrace', source: 'Weapon', sourceRef: 'autumntrace', target: 'wielder', mods: [{ stat: 'atkPct', ...rank([0.20, 0.31, 0.42, 0.53, 0.64]) }], assumption: 'Full stacks (5) after Basic/Heavy hits.' },

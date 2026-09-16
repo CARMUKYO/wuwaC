@@ -1,4 +1,10 @@
 import {
+  BUFF_PRESETS,
+  isAutoApplied,
+  resolvePresetMods,
+  type BuffPreset,
+} from '../data/buffPresets.ts';
+import {
   statKeySchema,
   type CharacterData,
   type OwnedEcho,
@@ -130,10 +136,16 @@ export interface ComputeStatsResult {
   baseHp: { character: number };
   baseDef: { character: number };
   /**
-   * Effects seen but not applied (conditional/custom sonata bonuses, weapon
-   * passive prose, chain ranks). Surfaced, never silently dropped.
+   * Effects seen but not applied (untranscribed conditional/custom sonata
+   * bonuses, weapon passives, chain ranks). Surfaced, never silently dropped.
    */
   warnings: string[];
+  /**
+   * Transcribed full-uptime/stack assumptions applied to the sheet
+   * (wielded weapon passive, met Sonata thresholds, main-slot Echo).
+   * Rendered next to the score so applied optimism is never silent.
+   */
+  appliedAssumptions: string[];
 }
 
 export interface ComputeStatsInput {
@@ -142,6 +154,45 @@ export interface ComputeStatsInput {
   roster: RosterEntry;
   echoes: OwnedEcho[];
   sonataSets: SonataSetData[];
+  /** Slot-1 echo: its transcribed main-slot bonus applies (other slots never do). */
+  mainEcho?: OwnedEcho;
+}
+
+/**
+ * Auto-applied transcription lookups, built once. `computeStats` runs in
+ * the optimizer hot loop, so these are Maps — never a linear preset scan.
+ */
+const WEAPON_PRESETS = new Map<string, BuffPreset>();
+const SONATA_PRESETS = new Map<string, BuffPreset>();
+const ECHO_PRESETS = new Map<string, BuffPreset>();
+for (const preset of BUFF_PRESETS) {
+  if (!isAutoApplied(preset)) continue;
+  if (preset.source === 'Weapon') WEAPON_PRESETS.set(preset.sourceRef, preset);
+  else if (preset.source === 'Sonata' && preset.sonataPieceCount !== undefined) {
+    SONATA_PRESETS.set(`${preset.sourceRef}@${preset.sonataPieceCount}`, preset);
+  } else if (preset.source === 'Echo') ECHO_PRESETS.set(preset.sourceRef, preset);
+}
+
+/**
+ * Whether `computeStats` would apply a main-slot bonus for this character
+ * holding this echo definition in slot 1. Lets the optimizer bound its
+ * best-main rescoring to carriers instead of all five slots.
+ */
+export function hasMainEchoBonus(characterId: string, echoDefId: string): boolean {
+  const preset = ECHO_PRESETS.get(echoDefId);
+  return (
+    preset !== undefined &&
+    (preset.requiresCharacterIds === undefined || preset.requiresCharacterIds.includes(characterId))
+  );
+}
+
+/** One-line disclosure for an applied preset, e.g. "Verdant Summit R5 — full stacks (2)". */
+function describeApplied(
+  preset: BuffPreset,
+  resolution: { weaponRank?: number },
+): string {
+  const rank = preset.mods.some((m) => m.valuesByRank) ? ` R${resolution.weaponRank ?? 5}` : '';
+  return preset.assumption ? `${preset.label}${rank} — ${preset.assumption}` : `${preset.label}${rank}`;
 }
 
 /**
@@ -153,15 +204,25 @@ export interface ComputeStatsInput {
  * - Forte nodes are all active — `RosterEntry` tracks no unlock state yet.
  * - Weapon uses the last curve entry at/below its level (no weapon
  *   ascension tracked yet — same TODO class as character ascension).
- * - Only unconditional `stat` effects apply; `conditional`/`custom` warn.
+ * - Transcribed `conditional`/`custom` effects (wielded weapon passive, met
+ *   Sonata thresholds, slot-1 Echo bonus) auto-apply at full stacks and
+ *   full uptime, disclosed via `appliedAssumptions`; untranscribed ones warn.
  */
 export function computeStats(input: ComputeStatsInput): ComputeStatsResult {
-  const { character, weapon, roster, echoes, sonataSets } = input;
+  const { character, weapon, roster, echoes, sonataSets, mainEcho } = input;
   const sheet = emptySheet();
   const warnings: string[] = [];
+  const appliedAssumptions: string[] = [];
   const add = (stat: StatKey, value: number): void => {
     sheet[stat] += value;
   };
+  const resolution = { weaponRank: roster.weaponRank, attribute: character.attribute };
+  const applyPreset = (preset: BuffPreset): void => {
+    for (const mod of resolvePresetMods(preset, resolution)) add(mod.stat, mod.value);
+    appliedAssumptions.push(describeApplied(preset, resolution));
+  };
+  const gateAllows = (preset: BuffPreset): boolean =>
+    preset.requiresCharacterIds === undefined || preset.requiresCharacterIds.includes(character.id);
 
   // Documented bases (reference doc §1/§6). Other stats start at 0 —
   // no base Energy Regen etc. is documented, so none is seeded.
@@ -181,7 +242,11 @@ export function computeStats(input: ComputeStatsInput): ComputeStatsResult {
   }
   if (weapon.passive.effect.kind === 'stat') {
     add(weapon.passive.effect.stat, scaledByRank(weapon.passive.effect.value, roster.weaponRank));
-  } else {
+  }
+  const weaponPreset = WEAPON_PRESETS.get(weapon.id);
+  if (weaponPreset && gateAllows(weaponPreset)) {
+    applyPreset(weaponPreset);
+  } else if (weapon.passive.effect.kind !== 'stat') {
     warnings.push(`weapon passive "${weapon.passive.name}" not applied (${weapon.passive.effect.kind})`);
   }
 
@@ -216,9 +281,19 @@ export function computeStats(input: ComputeStatsInput): ComputeStatsResult {
     if (pieces === 0) continue;
     for (const bonus of set.bonuses) {
       if (bonus.pieceCount > pieces) continue;
-      if (bonus.effect.kind === 'stat') add(bonus.effect.stat, bonus.effect.value);
+      if (bonus.effect.kind === 'stat') {
+        add(bonus.effect.stat, bonus.effect.value);
+        continue;
+      }
+      const preset = SONATA_PRESETS.get(`${set.id}@${bonus.pieceCount}`);
+      if (preset && gateAllows(preset)) applyPreset(preset);
       else warnings.push(`sonata "${set.name}" ${bonus.pieceCount}pc not applied (${bonus.effect.kind})`);
     }
+  }
+
+  if (mainEcho) {
+    const preset = ECHO_PRESETS.get(mainEcho.echoDefId);
+    if (preset && gateAllows(preset)) applyPreset(preset);
   }
 
   return {
@@ -227,6 +302,7 @@ export function computeStats(input: ComputeStatsInput): ComputeStatsResult {
     baseHp: { character: base.hp },
     baseDef: { character: base.def },
     warnings,
+    appliedAssumptions,
   };
 }
 

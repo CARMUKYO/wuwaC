@@ -4,10 +4,14 @@ import type { ObjectiveSpec } from '../domain/objectives.ts';
 /**
  * Optimizer layer: dominance pruning (reference doc §7, step 2).
  *
- * An echo is pruned when another echo of the SAME cost meets-or-beats it on
- * every objective-relevant stat and strictly beats it on at least one.
- * Objective-relative by design: stats outside the relevant set are ignored,
- * so ties (and off-objective strengths) always survive. Pure functions.
+ * An echo is pruned when another echo of the SAME cost and SAME Sonata set
+ * meets-or-beats it on every objective-relevant stat and strictly beats it
+ * on at least one. The Sonata restriction is a soundness requirement, not
+ * caution: set bonuses depend on combo composition, so a cross-set swap of
+ * a pruned echo for its dominator can lose a 2pc/5pc threshold and lower
+ * the score. Objective-relative by design: stats outside the relevant set
+ * are ignored, so ties (and off-objective strengths) always survive.
+ * Pure functions.
  */
 
 /**
@@ -94,7 +98,7 @@ export interface PruneResult {
   pruned: string[];
 }
 
-/** Drop strictly-dominated echoes, comparing within equal cost only. */
+/** Drop strictly-dominated echoes, comparing within equal cost and Sonata set only. */
 export function pruneDominated(echoes: OwnedEcho[], relevantStats: StatKey[]): PruneResult {
   const contributions = new Map(echoes.map((e) => [e.id, contributionsOf(e)] as const));
   const pruned = new Set<string>();
@@ -102,6 +106,7 @@ export function pruneDominated(echoes: OwnedEcho[], relevantStats: StatKey[]): P
     for (const incumbent of echoes) {
       if (challenger.id === incumbent.id) continue;
       if (challenger.cost !== incumbent.cost) continue;
+      if (challenger.sonataId !== incumbent.sonataId) continue;
       if (pruned.has(incumbent.id)) continue;
       if (
         dominates(

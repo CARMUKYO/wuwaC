@@ -187,7 +187,9 @@ describe('computeDamage (Jiyan worked example)', () => {
   //   ATK          = (437.5 + 587.5) x 1.12 = 1148
   //   baseAbility  = 1148 x 5.2416 = 6017.3568
   //   resistances  = 0.9 x (1520/3032)
-  //   bonuses      = 1 x 1 x 1 x (0.13 x 1.986 + 0.87) = 1.12818
+  //   bonuses      = 1.6 x 1 x 1 x (0.13 x 1.986 + 0.87) = 1.805088
+  // (Verdant R1 auto-applies Aero +12% and Heavy 2x24%; the Qingloong
+  // motion is Heavy-typed, so DmgBonusPercent = 1 + 0.12 + 0.48 = 1.6.)
   const roster: RosterEntry = {
     characterId: 'jiyan',
     level: 90,
@@ -198,7 +200,7 @@ describe('computeDamage (Jiyan worked example)', () => {
     weaponLevel: 90,
     weaponRank: 1,
   };
-  const { sheet, baseAtk, baseHp, baseDef, warnings } = computeStats({
+  const { sheet, baseAtk, baseHp, baseDef, warnings, appliedAssumptions } = computeStats({
     character: jiyan,
     weapon: verdant,
     roster,
@@ -216,7 +218,11 @@ describe('computeDamage (Jiyan worked example)', () => {
     // Bases stay out of the sheet (bonuses only) — v2 aligns HP/DEF with ATK.
     expect(sheet.hp).toBe(0);
     expect(sheet.def).toBe(0);
-    expect(warnings).toHaveLength(1); // unstructured weapon passive
+    // Transcribed Verdant R1 applies instead of warning.
+    expect(sheet['dmgBonus:Aero']).toBeCloseTo(0.12, 9);
+    expect(sheet['dmgBonus:heavy']).toBeCloseTo(0.48, 9);
+    expect(warnings).toHaveLength(0);
+    expect(appliedAssumptions).toHaveLength(1);
   });
 
   it('composes the full formula tree', () => {
@@ -234,8 +240,8 @@ describe('computeDamage (Jiyan worked example)', () => {
     });
     expect(result.baseDamage).toBeCloseTo(6017.3568, 6);
     expect(result.resistances).toBeCloseTo(0.9 * (1520 / 3032), 8);
-    expect(result.bonuses).toBeCloseTo(1.12818, 9);
-    expect(result.damage).toBeCloseTo(6017.3568 * 0.9 * (1520 / 3032) * 1.12818, 6);
+    expect(result.bonuses).toBeCloseTo(1.805088, 9);
+    expect(result.damage).toBeCloseTo(6017.3568 * 0.9 * (1520 / 3032) * 1.805088, 6);
   });
 
   it('scales HP skills off total Max HP (wiki HP page formula)', () => {

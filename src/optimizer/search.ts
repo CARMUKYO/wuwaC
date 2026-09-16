@@ -10,8 +10,8 @@ import type {
 import type { ResonanceMode } from '../domain/characterMods.ts';
 import type { EnemyProfile } from '../domain/damage.ts';
 import type { ObjectiveSpec } from '../domain/objectives.ts';
-import type { StatSheet } from '../domain/stats.ts';
-import { computeStats } from '../domain/stats.ts';
+import type { ComputeStatsResult, StatSheet } from '../domain/stats.ts';
+import { computeStats, hasMainEchoBonus } from '../domain/stats.ts';
 import { resolveObjectiveSkill, scoreSheet } from '../domain/objectives.ts';
 import { pruneDominated, relevantStatsForObjective } from './prune.ts';
 
@@ -54,6 +54,10 @@ export interface RankedBuild {
   score: number;
   sheet: StatSheet;
   warnings: string[];
+  /** Transcribed assumptions applied to the sheet (from computeStats). */
+  appliedAssumptions: string[];
+  /** Winning slot-1 echo id when a main-slot bonus improved the score. */
+  mainEchoId?: string;
 }
 
 export interface SearchResult {
@@ -73,12 +77,14 @@ export interface ProgressUpdate {
  * Exhaustive search over unordered 5-echo combos with dominance pruning.
  * Throws on malformed requests; returns empty builds when no combo qualifies.
  *
- * Scaling (measured 2026-09, `npm run bench`, Apple-silicon-class CPU):
- * mixed-tuning inventories stay interactive through n=50 (28k scored in
- * ~0.4s — cost budget + prune compound hard). Adversarial dense inventories
- * (50 fully-tuned, mutually non-dominated echoes) approach ~1M+ scored
- * combos and tens of seconds; that case wants branch-and-bound (deferred,
- * reference doc §7 step 3) rather than a cap, so results stay exact.
+ * Scaling (measured 2026-09-12, `npm run bench`): n=50 scores 92k combos
+ * in ~1.4s (~65k combos/s). Pruning is same-cost-and-set-only for
+ * soundness (a cross-set swap can lose a set threshold), so it keeps ~3x
+ * more combos than the old unsound cross-set rule at identical per-combo
+ * cost; the cost budget remains the main filter. Adversarial dense
+ * inventories (50 fully-tuned, mutually non-dominated echoes) approach
+ * ~1M+ scored combos and tens of seconds; that case wants branch-and-bound
+ * (deferred, reference doc §7 step 3) rather than a cap, so exactness holds.
  */
 export function searchExhaustive(
   data: SearchData,
@@ -121,39 +127,65 @@ export function searchExhaustive(
   const top: RankedBuild[] = [];
   let evaluated = 0;
 
+  const scoreContext = {
+    skill,
+    skills: character.skills,
+    characterId: character.id,
+    attribute: character.attribute,
+    resonanceChain: roster.resonanceChain,
+    attackerLevel: roster.level,
+    enemy,
+    resonanceMode: data.resonanceMode,
+  };
+
   const consider = (combo: OwnedEcho[]): void => {
     if (combo.reduce((sum, e) => sum + e.cost, 0) > request.costBudget) return;
     if (!satisfiesLock(combo, request)) return;
-    const { sheet, baseAtk, baseHp, baseDef, warnings } = computeStats({
-      character,
-      weapon,
-      roster,
-      echoes: combo,
-      sonataSets: data.sonataSets,
-    });
+    const scoreWithMain = (mainEcho: OwnedEcho | undefined): { result: ComputeStatsResult; score: number } => {
+      const result = computeStats({
+        character,
+        weapon,
+        roster,
+        echoes: combo,
+        sonataSets: data.sonataSets,
+        mainEcho,
+      });
+      const score = scoreSheet(request.objective, result.sheet, {
+        ...scoreContext,
+        baseAtk: result.baseAtk,
+        baseHp: result.baseHp,
+        baseDef: result.baseDef,
+      });
+      return { result, score };
+    };
+    // Best-main selection: the baseline plus one rescore per distinct
+    // carrier definition (transcribed main-slot bonus for this character).
+    // Bonuses are strictly non-negative, so ties keep the baseline.
+    let best = scoreWithMain(undefined);
+    let mainEchoId: string | undefined;
+    const seenDefs = new Set<string>();
+    for (const candidate of combo) {
+      if (seenDefs.has(candidate.echoDefId)) continue;
+      seenDefs.add(candidate.echoDefId);
+      if (!hasMainEchoBonus(character.id, candidate.echoDefId)) continue;
+      const rescored = scoreWithMain(candidate);
+      if (rescored.score > best.score) {
+        best = rescored;
+        mainEchoId = candidate.id;
+      }
+    }
     evaluated += 1;
     onProgress?.({ evaluated, total });
     for (const [stat, minimum] of minEntries) {
-      if (sheet[stat] < minimum) return;
+      if (best.result.sheet[stat] < minimum) return;
     }
-    const score = scoreSheet(request.objective, sheet, {
-      skill,
-      skills: character.skills,
-      characterId: character.id,
-      attribute: character.attribute,
-      resonanceChain: roster.resonanceChain,
-      baseAtk,
-      baseHp,
-      baseDef,
-      attackerLevel: roster.level,
-      enemy,
-      resonanceMode: data.resonanceMode,
-    });
     insertBounded(top, {
       echoIds: combo.map((e) => e.id).sort(),
-      score,
-      sheet,
-      warnings,
+      score: best.score,
+      sheet: best.result.sheet,
+      warnings: best.result.warnings,
+      appliedAssumptions: best.result.appliedAssumptions,
+      ...(mainEchoId === undefined ? {} : { mainEchoId }),
     }, request.topN);
   };
 

@@ -56,6 +56,9 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
 
   const [budget, setBudget] = useState<'10' | '12'>('12');
   const [topN, setTopN] = useState('5');
+  const [lockMode, setLockMode] = useState<'none' | 'five' | 'twoPlusTwo'>('none');
+  const [lockSetA, setLockSetA] = useState('');
+  const [lockSetB, setLockSetB] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [result, setResult] = useState<SearchResult | null>(null);
   const [lastRun, setLastRun] = useState<{ data: SearchData; request: OptimizeRequest } | null>(null);
@@ -76,10 +79,23 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
       setStatus({ kind: 'error', message: 'Top N must be a whole number from 1 to 50.' });
       return;
     }
+    if (lockMode === 'five' && lockSetA === '') {
+      setStatus({ kind: 'error', message: 'Pick a Sonata set for the 5-piece lock.' });
+      return;
+    }
+    if (lockMode === 'twoPlusTwo' && (lockSetA === '' || lockSetB === '' || lockSetA === lockSetB)) {
+      setStatus({ kind: 'error', message: 'Pick two different Sonata sets for the 2+2 lock.' });
+      return;
+    }
     const data: SearchData = { character, weapon, roster, echoes, sonataSets, enemy, resonanceMode };
     const request: OptimizeRequest = {
       costBudget: budget === '10' ? 10 : 12,
-      sonataLock: { mode: 'none' },
+      sonataLock:
+        lockMode === 'five'
+          ? { mode: 'five', setId: lockSetA }
+          : lockMode === 'twoPlusTwo'
+            ? { mode: 'twoPlusTwo', setIdA: lockSetA, setIdB: lockSetB }
+            : { mode: 'none' },
       objective: { kind: 'rotation-dpr', blocks, buffs, globalBuffIds, crit },
       topN: parsedTopN,
     };
@@ -106,14 +122,20 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
     );
   };
 
-  const handleSave = async (echoIds: string[]): Promise<void> => {
+  /** Slot order for apply/save: winning main echo first (slot 1), rest sorted. */
+  const slotOrder = (echoIds: string[], mainEchoId: string | undefined): [string, string, string, string, string] => {
+    const rest = echoIds.filter((id) => id !== mainEchoId).sort();
+    return (mainEchoId === undefined ? rest : [mainEchoId, ...rest]) as [string, string, string, string, string];
+  };
+
+  const handleSave = async (echoIds: string[], mainEchoId: string | undefined): Promise<void> => {
     if (!lastRun || saveName.trim() === '') return;
     const key = echoIds.join('+');
     await saveBuild({
       name: saveName.trim(),
       characterId: lastRun.data.character.id,
       weaponId: lastRun.data.weapon.id,
-      echoIds: [...echoIds].sort() as [string, string, string, string, string],
+      echoIds: slotOrder(echoIds, mainEchoId),
       objectiveId: 'Rotation DPR',
       objective: lastRun.request.objective,
       score: result?.builds.find((b) => b.echoIds.join('+') === key)?.score,
@@ -136,6 +158,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
           You need at least 5 echoes in your inventory to run the optimizer.
         </p>
       ) : (
+        <>
         <div className="mt-2 grid grid-cols-3 items-end gap-2">
           <div>
             <label htmlFor="ropt-budget" className={labelClass}>Cost budget</label>
@@ -148,16 +171,51 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
             <label htmlFor="ropt-topn" className={labelClass}>Top N</label>
             <input id="ropt-topn" value={topN} onChange={(e) => setTopN(e.target.value)} inputMode="numeric" className={`${selectClass} mt-0.5`} />
           </div>
-          <button
-            type="button"
-            onClick={handleRun}
-            disabled={!canRun}
-            title={blocks.length === 0 ? 'Add rotation actions first' : undefined}
-            className="rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white disabled:opacity-40"
-          >
-            Find best builds
-          </button>
+          <div>
+            <label htmlFor="ropt-lock" className={labelClass}>Sonata lock</label>
+            <select id="ropt-lock" value={lockMode} onChange={(e) => setLockMode(e.target.value as 'none' | 'five' | 'twoPlusTwo')} className={`${selectClass} mt-0.5`}>
+              <option value="none">None</option>
+              <option value="five">5-piece</option>
+              <option value="twoPlusTwo">2+2</option>
+            </select>
+          </div>
         </div>
+        {lockMode !== 'none' && (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="ropt-lock-a" className={labelClass}>
+                {lockMode === 'five' ? 'Locked set' : 'Set A (2pc)'}
+              </label>
+              <select id="ropt-lock-a" value={lockSetA} onChange={(e) => setLockSetA(e.target.value)} className={`${selectClass} mt-0.5`}>
+                <option value="">Pick a set…</option>
+                {sonataSets.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            {lockMode === 'twoPlusTwo' && (
+              <div>
+                <label htmlFor="ropt-lock-b" className={labelClass}>Set B (2pc)</label>
+                <select id="ropt-lock-b" value={lockSetB} onChange={(e) => setLockSetB(e.target.value)} className={`${selectClass} mt-0.5`}>
+                  <option value="">Pick a set…</option>
+                  {sonataSets.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={handleRun}
+          disabled={!canRun}
+          title={blocks.length === 0 ? 'Add rotation actions first' : undefined}
+          className="mt-2 rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white disabled:opacity-40"
+        >
+          Find best builds
+        </button>
+        </>
       )}
 
       {status.kind === 'running' && (
@@ -182,6 +240,10 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
                 const uplift = currentDpr !== null && currentDpr > 0
                   ? ((build.score - currentDpr) / currentDpr) * 100
                   : null;
+                const labels = build.echoIds.map((id) => {
+                  const label = echoLabels.get(id) ?? id;
+                  return id === build.mainEchoId ? `${label} (main)` : label;
+                });
                 return (
                   <li key={key} className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
                     <p className="text-sm font-medium">
@@ -194,17 +256,22 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
                       )}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {build.echoIds.map((id) => echoLabels.get(id) ?? id).join(' · ')}
+                      {labels.join(' · ')}
                     </p>
                     {build.warnings.length > 0 && (
                       <p className="text-xs text-amber-300">
                         {build.warnings.length} unmodeled effect{build.warnings.length === 1 ? '' : 's'}
                       </p>
                     )}
+                    {build.appliedAssumptions.length > 0 && (
+                      <p className="text-xs text-slate-500" title={build.appliedAssumptions.join('\n')}>
+                        Assumes: {build.appliedAssumptions.join('; ')}
+                      </p>
+                    )}
                     <div className="mt-1 flex gap-2">
                       <button
                         type="button"
-                        onClick={() => onApply(build.echoIds)}
+                        onClick={() => onApply(slotOrder(build.echoIds, build.mainEchoId))}
                         className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800"
                       >
                         Apply to loadout
@@ -221,7 +288,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
                           />
                           <button
                             type="button"
-                            onClick={() => void handleSave(build.echoIds)}
+                            onClick={() => void handleSave(build.echoIds, build.mainEchoId)}
                             disabled={saveName.trim() === ''}
                             className="rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-900 hover:bg-white disabled:opacity-40"
                           >

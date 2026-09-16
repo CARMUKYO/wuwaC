@@ -121,10 +121,11 @@ user's chosen objective.
   often applies a debuff or its own burst) + Support/Healer (buffs,
   shields, healing, and Concerto-gauge utility).
 - For v1, it's enough to model a team as 3 characters with visible Sonata
-  coverage. For v2, model each character's Outro effect as a timed buff
-  that can be applied to the domain layer's stat sheet for whichever
-  character comes on-field next, so the optimizer can eventually account
-  for team buffs rather than evaluating a character in a vacuum.
+  coverage. For v2 (implemented): each character's transcribed Outro and
+  team buffs resolve via `resolveTeamBuffs` into calculator buffs, import
+  as global buffs, and flow through the rotation objective into the
+  optimizer — windows are recorded in labels but scored full-rotation
+  (blocks carry no timestamps yet).
 
 ## 6. Damage formula
 
@@ -315,6 +316,15 @@ resets kit resources.
   partial build to cut branches early; (4) move the whole thing into a Web
   Worker (or a worker pool, sharding by locked Sonata set) so the UI stays
   responsive.
+- Soundness rule (implemented): dominance pruning must compare within the
+  same Sonata set, not just the same cost — set bonuses depend on combo
+  composition, so a cross-set swap of a pruned Echo for its dominator can
+  lose a 2pc/5pc threshold and lower the score.
+- Transcribed `conditional`/`custom` effects (wielded weapon passive at the
+  roster rank, met Sonata thresholds, slot-1 Echo bonus) auto-apply in
+  `computeStats` at full stacks/uptime so the calculator and optimizer
+  agree by construction; every applied effect is disclosed via
+  `appliedAssumptions`, and untranscribed effects still warn.
 - Score builds against a user-chosen objective function, not just raw
   ATK — expected damage for a specific skill, a specific stat threshold
   ("maximize ATK subject to Crit Rate ≥ 70%"), etc. Design the objective

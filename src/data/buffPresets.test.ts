@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadBundledSnapshot } from './index.ts';
 import {
   BUFF_PRESETS,
+  isAutoApplied,
   resolvePresetMods,
   type BuffPreset,
 } from './buffPresets.ts';
@@ -77,6 +78,24 @@ describe('buff presets', () => {
     });
     expect(mods).toContainEqual({ stat: 'dmgBonus:Spectro', value: 0.24 });
     expect(mods).toContainEqual({ stat: 'dmgBonus:heavy', value: 0.96 });
+  });
+
+  it('marks wielder effects auto-applied and team/incoming manual', () => {
+    expect(isAutoApplied(preset('weapon-autumntrace'))).toBe(true);
+    expect(isAutoApplied(preset('sonata-sierra-gale-5pc'))).toBe(true);
+    expect(isAutoApplied(preset('echo-lorelei'))).toBe(true);
+    expect(isAutoApplied(preset('weapon-static-mist-outro'))).toBe(false);
+    expect(isAutoApplied(preset('sonata-moonlit-clouds-5pc'))).toBe(false);
+    expect(isAutoApplied(preset('sonata-rejuvenating-glow-5pc'))).toBe(true);
+    expect(isAutoApplied(preset('echo-denia-outro'))).toBe(false);
+  });
+
+  it('gives every auto-applied sonata preset a piece threshold', () => {
+    for (const p of BUFF_PRESETS) {
+      if (p.source === 'Sonata' && isAutoApplied(p)) {
+        expect(p.sonataPieceCount).toBeDefined();
+      }
+    }
   });
 
   it('transcribes spot-checked echo and sonata values', () => {

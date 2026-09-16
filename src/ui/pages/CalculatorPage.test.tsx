@@ -20,6 +20,7 @@ const { calls, canned } = vi.hoisted(() => ({
         score: 9876.5,
         sheet: {} as never,
         warnings: [] as string[],
+        appliedAssumptions: ['Verdant Summit R1 — full stacks (2)'],
       },
     ],
     evaluated: 1,
@@ -255,6 +256,23 @@ describe('CalculatorPage', () => {
 
     await user.click(screen.getByRole('button', { name: /apply to loadout/i }));
     expect(useCalculatorStore.getState().echoIds).toEqual(canned.builds[0].echoIds);
+    // Both the calculator results (real auto-apply) and the optimizer
+    // result (canned) disclose the Verdant assumption.
+    expect(screen.getAllByText(/assumes: verdant summit r1/i)).toHaveLength(2);
+  });
+
+  it('passes the sonata lock through to the optimizer request', async () => {
+    setupScorable();
+    const user = userEvent.setup();
+    render(<CalculatorPage />);
+
+    await user.selectOptions(screen.getByLabelText(/sonata lock/i), 'five');
+    await user.selectOptions(screen.getByLabelText(/locked set/i), 'sierra-gale');
+    await user.click(screen.getByRole('button', { name: /find best builds/i }));
+    await screen.findByText(/9,877 dpr/i);
+
+    const request = calls[calls.length - 1][1] as OptimizeRequest;
+    expect(request.sonataLock).toEqual({ mode: 'five', setId: 'sierra-gale' });
   });
 
   it('saves a rotation result with its spec', async () => {

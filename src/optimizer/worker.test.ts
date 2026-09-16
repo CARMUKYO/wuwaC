@@ -59,7 +59,7 @@ class FakeWorker implements WorkerLike {
 }
 
 const canned: SearchResult = {
-  builds: [{ echoIds: ['a', 'b', 'c', 'd', 'e'], score: 42, sheet: emptySheet(), warnings: [] }],
+  builds: [{ echoIds: ['a', 'b', 'c', 'd', 'e'], score: 42, sheet: emptySheet(), warnings: [], appliedAssumptions: [] }],
   evaluated: 56,
   prunedEchoes: [],
 };

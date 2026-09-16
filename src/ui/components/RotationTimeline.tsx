@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { BUFF_PRESETS, resolvePresetMods, type BuffPreset } from '../../data/buffPresets.ts';
+import { BUFF_PRESETS, isAutoApplied, resolvePresetMods, type BuffPreset } from '../../data/buffPresets.ts';
 import { statKeySchema, type CharacterData, type StatKey } from '../../data/schema.ts';
 import {
   characterResonanceModes,
@@ -182,9 +182,8 @@ export function RotationTimeline(props: RotationTimelineProps) {
   const handleAddPreset = (): void => {
     if (!selectedPreset) return;
     const mods = resolvePresetMods(selectedPreset, { weaponRank, attribute: character.attribute });
-    const targetSuffix = selectedPreset.target === 'wielder' ? '' : ` (${selectedPreset.target})`;
     onAddBuff({
-      label: `${selectedPreset.label}${targetSuffix}`,
+      label: selectedPreset.label,
       source: `${selectedPreset.source} preset`,
       mods,
     });
@@ -706,7 +705,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
               <option value="">Pick a preset…</option>
               {(['Echo', 'Sonata', 'Weapon'] as const).map((source) => (
                 <optgroup key={source} label={source}>
-                  {BUFF_PRESETS.filter((p) => p.source === source).map((p) => (
+                  {BUFF_PRESETS.filter((p) => p.source === source && !isAutoApplied(p)).map((p) => (
                     <option key={p.id} value={p.id}>{p.label}</option>
                   ))}
                 </optgroup>

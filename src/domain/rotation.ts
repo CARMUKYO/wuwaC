@@ -57,6 +57,8 @@ export interface RotationInput {
   crit: CritMode;
   /** Required when the character has Resonance Modes (dual-mode kits). */
   resonanceMode?: ResonanceMode;
+  /** Slot-1 echo id: its transcribed main-slot bonus applies (other slots never do). */
+  mainEchoId?: string;
 }
 
 export interface BlockResult {
@@ -78,6 +80,8 @@ export interface RotationResult {
   blocks: BlockResult[];
   /** computeStats warnings plus unknown-buff-id warnings. Never dropped silently. */
   warnings: string[];
+  /** Transcribed assumptions applied to the sheet (from computeStats). */
+  appliedAssumptions: string[];
 }
 
 /** Sum known-buff mods onto a sheet copy. Unknown ids become warnings, never errors. */
@@ -116,7 +120,7 @@ export interface CharacterBases {
 }
 
 export function calculateRotation(input: RotationInput): RotationResult {
-  const { character, weapon, roster, echoes, sonataSets, enemy, blocks, buffs, globalBuffIds, rotationTime, crit, resonanceMode } = input;
+  const { character, weapon, roster, echoes, sonataSets, enemy, blocks, buffs, globalBuffIds, rotationTime, crit, resonanceMode, mainEchoId } = input;
   if (!Number.isFinite(rotationTime) || rotationTime <= 0) {
     throw new Error(`rotation time must be a positive number of seconds, got ${rotationTime}`);
   }
@@ -124,7 +128,14 @@ export function calculateRotation(input: RotationInput): RotationResult {
     throw new Error(`rotation needs exactly 5 echoes, got ${echoes.length}`);
   }
 
-  const { sheet: baseSheet, baseAtk, baseHp, baseDef, warnings } = computeStats({ character, weapon, roster, echoes, sonataSets });
+  const { sheet: baseSheet, baseAtk, baseHp, baseDef, warnings, appliedAssumptions } = computeStats({
+    character,
+    weapon,
+    roster,
+    echoes,
+    sonataSets,
+    mainEcho: mainEchoId === undefined ? undefined : echoes.find((e) => e.id === mainEchoId),
+  });
   const scored = scoreRotationBlocks(baseSheet, { baseAtk, baseHp, baseDef }, {
     skills: character.skills,
     characterId: character.id,
@@ -143,7 +154,7 @@ export function calculateRotation(input: RotationInput): RotationResult {
   const results: BlockResult[] = scored.blocks.map((b, i) => ({ ...b, id: blocks[i].id }));
   const dpr = scored.dpr;
   for (const r of results) r.share = dpr > 0 ? (r.damage / dpr) * 100 : 0;
-  return { dpr, dps: dpr / rotationTime, totalTime: rotationTime, blocks: results, warnings };
+  return { dpr, dps: dpr / rotationTime, totalTime: rotationTime, blocks: results, warnings, appliedAssumptions };
 }
 
 export interface ScoredBlock {

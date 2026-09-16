@@ -6,13 +6,14 @@ function mkEcho(
   id: string,
   cost: 1 | 3 | 4,
   stats: Partial<Record<StatKey, number>>,
+  sonataId = 'sierra-gale',
 ): OwnedEcho {
   const entries = Object.entries(stats);
   return {
     id,
     label: id,
     echoDefId: `${id}-def`,
-    sonataId: 'sierra-gale',
+    sonataId,
     cost,
     level: 25,
     rarity: 5,
@@ -45,6 +46,14 @@ describe('pruneDominated', () => {
     const small = mkEcho('small', 1, { atk: 50 });
     const result = pruneDominated([big, small], ['atk']);
     expect(result.kept.map((e) => e.id).sort()).toEqual(['big', 'small']);
+    expect(result.pruned).toEqual([]);
+  });
+
+  it('never compares across sonata sets (set bonuses are composition-dependent)', () => {
+    const strong = mkEcho('strong', 3, { atk: 100 }, 'void-thunder');
+    const weak = mkEcho('weak', 3, { atk: 50 }, 'sierra-gale');
+    const result = pruneDominated([strong, weak], ['atk']);
+    expect(result.kept.map((e) => e.id).sort()).toEqual(['strong', 'weak']);
     expect(result.pruned).toEqual([]);
   });
 
