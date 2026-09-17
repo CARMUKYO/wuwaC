@@ -1,6 +1,8 @@
-import type { CharacterSkill, MotionBonusKind } from '../data/schema.ts';
+import { CHAIN_PRESETS, type ChainMotionPreset } from '../data/chainPresets.ts';
+import type { CharacterSkill, MotionBonusKind, SkillKind } from '../data/schema.ts';
 import { aemeathSkillMods } from './aemeath.ts';
 import { chisaSkillMods, type ChisaModInputs } from './chisa.ts';
+import { jiyanOutroLanceSpec } from './jiyan.ts';
 import type { NegativeStatusType } from './negativeStatus.ts';
 import { xuanlingSkillMods, type XuanlingModInputs } from './xuanling.ts';
 import { zaniMotionMultiplier, type ZaniModInputs } from './zani.ts';
@@ -46,9 +48,54 @@ export interface ResolvedSkillMods {
   motionMultiplier: number;
   dmgBonusExtra: number;
   amplifyExtra: number;
+  /** Skill-scoped crit extras (chain motion entries). Rate clamps at the crit seam. */
+  critRateExtra: number;
+  critDmgExtra: number;
+  /** Motion-scoped DEF ignore (chain motion entries). Adds to sheet defIgnore. */
+  defIgnoreExtra: number;
 }
 
-const NEUTRAL_MODS: ResolvedSkillMods = { motionMultiplier: 1, dmgBonusExtra: 0, amplifyExtra: 0 };
+const NEUTRAL_MODS: ResolvedSkillMods = {
+  motionMultiplier: 1,
+  dmgBonusExtra: 0,
+  amplifyExtra: 0,
+  critRateExtra: 0,
+  critDmgExtra: 0,
+  defIgnoreExtra: 0,
+};
+
+/** Motion-scope chain transcriptions by character (rank-gated at consumption). */
+const CHAIN_MOTION = new Map<string, ChainMotionPreset[]>();
+for (const preset of CHAIN_PRESETS) {
+  if (preset.scope !== 'motion') continue;
+  const list = CHAIN_MOTION.get(preset.characterId);
+  if (list) list.push(preset);
+  else CHAIN_MOTION.set(preset.characterId, [preset]);
+}
+
+/**
+ * Whether a motion-scope chain entry targets this (skill kind, motion).
+ * Case-insensitive substring on the snapshot motion name plus optional
+ * skill-kind / scored-bucket filters; unset filters match everything.
+ * Exported for the dead-pattern test — every catalog entry must match
+ * at least one real motion.
+ */
+export function chainMotionEntryMatches(
+  entry: ChainMotionPreset,
+  skillKind: SkillKind,
+  motionName: string,
+  motionDmgType?: MotionBonusKind,
+): boolean {
+  if (entry.skillKind !== undefined && entry.skillKind !== skillKind) return false;
+  if (entry.dmgType !== undefined && entry.dmgType !== motionDmgType) return false;
+  if (
+    entry.motionNameIncludes !== undefined &&
+    !motionName.toLowerCase().includes(entry.motionNameIncludes.toLowerCase())
+  ) {
+    return false;
+  }
+  return true;
+}
 
 export function characterSkillMods(
   characterId: string | undefined,
@@ -60,25 +107,60 @@ export function characterSkillMods(
   inputs: KitStateInputs = {},
 ): ResolvedSkillMods {
   if (characterId === undefined) return NEUTRAL_MODS;
+  let mods: ResolvedSkillMods;
   if (characterId === 'zani') {
-    return {
+    mods = {
       ...NEUTRAL_MODS,
       motionMultiplier: zaniMotionMultiplier(characterId, resonanceChain, skill.kind, motionName, inputs),
     };
+  } else if (characterId === 'yangyang-xuanling') {
+    const xuanling = xuanlingSkillMods(characterId, resonanceChain, skill.kind, motionName, motionDmgType, inputs);
+    mods = {
+      motionMultiplier: xuanling.motionMultiplier,
+      dmgBonusExtra: 0,
+      amplifyExtra: xuanling.amplifyExtra,
+      critRateExtra: 0,
+      critDmgExtra: 0,
+      defIgnoreExtra: 0,
+    };
+  } else if (characterId === 'chisa') {
+    const chisa = chisaSkillMods(characterId, resonanceChain, skill, motionName, { ...inputs, forteLevel });
+    mods = {
+      motionMultiplier: chisa.motionMultiplier,
+      dmgBonusExtra: chisa.dmgBonusExtra,
+      amplifyExtra: 0,
+      critRateExtra: 0,
+      critDmgExtra: 0,
+      defIgnoreExtra: 0,
+    };
+  } else if (characterId === 'aemeath') {
+    const aemeath = aemeathSkillMods(characterId, resonanceChain, skill, motionName, motionDmgType);
+    mods = {
+      motionMultiplier: aemeath.motionMultiplier,
+      dmgBonusExtra: aemeath.dmgBonusExtra,
+      amplifyExtra: 0,
+      critRateExtra: 0,
+      critDmgExtra: 0,
+      defIgnoreExtra: 0,
+    };
+  } else {
+    mods = { ...NEUTRAL_MODS };
   }
-  if (characterId === 'yangyang-xuanling') {
-    const mods = xuanlingSkillMods(characterId, resonanceChain, skill.kind, motionName, motionDmgType, inputs);
-    return { motionMultiplier: mods.motionMultiplier, dmgBonusExtra: 0, amplifyExtra: mods.amplifyExtra };
+  // Generic chain motion entries stack multiplicatively on top of any
+  // module mods; skill-scoped crit extras sum additively (rate clamps at
+  // the crit seam in computeDamage). Catalog discipline keeps modules and
+  // entries disjoint (module-covered ranks carry `appliedElsewhere`
+  // notes, never motion entries), and the per-module ratio tests pin
+  // their totals against double-application.
+  for (const entry of CHAIN_MOTION.get(characterId) ?? []) {
+    if (entry.rank > resonanceChain) continue;
+    if (!chainMotionEntryMatches(entry, skill.kind, motionName, motionDmgType)) continue;
+    if (entry.motionMultiplier !== undefined) mods.motionMultiplier *= entry.motionMultiplier;
+    if (entry.critRateExtra !== undefined) mods.critRateExtra += entry.critRateExtra;
+    if (entry.critDmgExtra !== undefined) mods.critDmgExtra += entry.critDmgExtra;
+    if (entry.defIgnoreExtra !== undefined) mods.defIgnoreExtra += entry.defIgnoreExtra;
   }
-  if (characterId === 'chisa') {
-    const mods = chisaSkillMods(characterId, resonanceChain, skill, motionName, { ...inputs, forteLevel });
-    return { motionMultiplier: mods.motionMultiplier, dmgBonusExtra: mods.dmgBonusExtra, amplifyExtra: 0 };
-  }
-  if (characterId === 'aemeath') {
-    const mods = aemeathSkillMods(characterId, resonanceChain, skill, motionName, motionDmgType);
-    return { motionMultiplier: mods.motionMultiplier, dmgBonusExtra: mods.dmgBonusExtra, amplifyExtra: 0 };
-  }
-  return NEUTRAL_MODS;
+  return mods;
 }
 
 /**
@@ -97,6 +179,66 @@ const STATUS_BLOCK_CHARACTERS: Record<string, NegativeStatusType[]> = {
 
 export function characterStatusBlocks(characterId: string): NegativeStatusType[] {
   return STATUS_BLOCK_CHARACTERS[characterId] ?? [];
+}
+
+/**
+ * Motions proven by kit prose to be coordinated attacks. These consume
+ * the `dmgBonus:coordinated` bucket on top of their typed buckets
+ * (Decision 3, reference doc §6 note). Listed only when the motion is
+ * EXCLUSIVELY a coordinated attack — trigger hits whose prose says
+ * "triggers N Coordinated Attacks" are the trigger, not the damage:
+ * - Yinlin "Judgment Strike Damage" (Forte 1001507: "triggering
+ *   Coordinated Attacks ... Judgement Strike deals Resonance Skill DMG").
+ * - Verina "Coordinated Attack DMG" (Liberation 1000303 Photosynthesis
+ *   Mark; the Healing twin scores 0 regardless and is not listed).
+ * - Yuanwu "Thunder Wedge Coordinated Attack DMG" (Skill 1001602 Thunder
+ *   Field; DEF-scaling per its motion row).
+ * - Mortefi "Marcato Damage" (Liberation 1001203: "launches a Coordinated
+ *   Attack, firing 1 Marcato"; the cast hit is "Violent Finale Damage").
+ * - Zhezhi "Inklit Spirit DMG" (Liberation 1002203, its only motion:
+ *   "summoned to perform a Coordinated Attack ... considered as Basic
+ *   Attack DMG").
+ * - Cantarella "Diffusion DMG" (Liberation 1003103: "summon Dreamweavers
+ *   to perform Coordinated Attack"; hits: 21 = max Dreamweavers).
+ * - Baizhi "Remnant Entities Damage" (Liberation 1000403: stacks "are
+ *   automatically consumed to perform Coordinated Attacks"; HP-scaling
+ *   per its motion row; the Healing twin scores 0 and is not listed).
+ * Deliberately unlisted (2026-09-17): Cantarella "Tidal Surge DMG" and
+ * "Phantom Sting Stage 3 DMG" merely TRIGGER 3 coordinated attacks each
+ * — Tidal/Ripple MV parity (0.85) proves the triggered damage is not
+ * folded into the trigger's MV, and no separate MVs exist. Chain-gated
+ * coordinated hits (Calcharo S6, Mortefi/Zhezhi chains) stay with the
+ * untranscribed-chain warnings.
+ * Jiyan's outro lance is not listed here — it has no motion values and
+ * scores through jiyan.ts instead (see isBuffOnlySkill).
+ */
+const COORDINATED_MOTIONS: Record<string, string[]> = {
+  yinlin: ['Judgment Strike Damage'],
+  verina: ['Coordinated Attack DMG'],
+  yuanwu: ['Thunder Wedge Coordinated Attack DMG'],
+  mortefi: ['Marcato Damage'],
+  zhezhi: ['Inklit Spirit DMG'],
+  cantarella: ['Diffusion DMG'],
+  baizhi: ['Remnant Entities Damage'],
+};
+
+export function characterCoordinatedMotions(characterId: string): string[] {
+  return COORDINATED_MOTIONS[characterId] ?? [];
+}
+
+export function isCoordinatedMotion(characterId: string | undefined, motionName: string): boolean {
+  if (characterId === undefined) return false;
+  return (COORDINATED_MOTIONS[characterId] ?? []).includes(motionName);
+}
+
+/**
+ * Whether a skill is damage-free for this character. Jiyan's outro looks
+ * buff-carrier-shaped (no motion values) but scores its coordinated lance
+ * — everything else with no motions is a true buff carrier.
+ */
+export function isBuffOnlySkill(characterId: string, skill: CharacterSkill): boolean {
+  if (skill.motionValues.length > 0) return false;
+  return jiyanOutroLanceSpec(characterId, skill, '') === null;
 }
 
 /** Characters whose rotations want a target Havoc Bane stack input. */

@@ -130,14 +130,65 @@ describe('calculateRotation', () => {
   });
 
   it('scores buff-only outros as zero-damage carriers', () => {
-    const result = calculateRotation(
-      baseInput([{ id: 'o', skillId: '1001109', motionName: '', forteLevel: 1, activeBuffIds: [] }]),
-    );
+    // Yinlin's outro is genuinely motion-less (Jiyan's scores its
+    // coordinated lance instead — see the lance test below).
+    const yinlin = snapshot.characters.find((c) => c.id === 'yinlin')!;
+    const outro = yinlin.skills.find((s) => s.kind === 'outro')!;
+    expect(outro.motionValues).toHaveLength(0);
+    const input = {
+      ...baseInput([{ id: 'o', skillId: outro.id, motionName: '', forteLevel: 1, activeBuffIds: [] }]),
+      character: yinlin,
+    };
+    const result = calculateRotation({ ...input, roster: { ...input.roster, characterId: 'yinlin' } });
     expect(result.blocks).toHaveLength(1);
     expect(result.blocks[0].damage).toBe(0);
     expect(result.blocks[0].share).toBe(0);
     expect(result.blocks[0].buffCarrier).toBe(true);
     expect(result.dpr).toBe(0);
+  });
+
+  it('scores Jiyan outro blocks as coordinated lances, not buff carriers', () => {
+    const outro = jiyan.skills.find((s) => s.kind === 'outro')!;
+    const result = calculateRotation(
+      baseInput([{ id: 'lance', skillId: outro.id, motionName: '', forteLevel: 1, activeBuffIds: [] }]),
+    );
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].buffCarrier).toBe(false);
+    expect(result.blocks[0].label).toMatch(/coordinated lance/);
+    expect(result.blocks[0].damage).toBeGreaterThan(0);
+    expect(result.dpr).toBe(result.blocks[0].damage);
+  });
+
+  it('scores echo-skill blocks from their carried values', () => {
+    const echoBlock: ActionBlock = {
+      id: 'echo', skillId: '', motionName: 'Lorelei', forteLevel: 1, activeBuffIds: [],
+      damageKind: 'echoSkill', echoName: 'Lorelei', echoMotionValue: 4.05,
+      echoAttribute: 'Havoc', echoCooldown: 25,
+    };
+    const result = calculateRotation(baseInput([echoBlock]));
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].buffCarrier).toBe(false);
+    expect(result.blocks[0].label).toBe('Lorelei (Echo Skill, 25s CD)');
+    expect(result.blocks[0].damage).toBeGreaterThan(0);
+    expect(result.dpr).toBe(result.blocks[0].damage);
+  });
+
+  it('applies block buffs to echo-skill blocks like any other block (hand-computed)', () => {
+    const buff: RotationBuff = { id: 'amp', label: 'AMP', source: 'test', mods: [{ stat: 'amplify', value: 0.2 }] };
+    const mk = (activeBuffIds: string[]): ActionBlock => ({
+      id: 'e', skillId: '', motionName: 'Lorelei', forteLevel: 1, activeBuffIds,
+      damageKind: 'echoSkill', echoName: 'Lorelei', echoMotionValue: 4.05, echoAttribute: 'Havoc',
+    });
+    const plain = calculateRotation(baseInput([mk([])]));
+    const buffed = calculateRotation(baseInput([mk(['amp'])], [buff]));
+    // DmgAmplifyTotal 1.2 vs 1.0 — every other term identical, ratio exactly 1.2.
+    expect(buffed.dpr / plain.dpr).toBeCloseTo(1.2, 10);
+  });
+
+  it('throws descriptively on echo blocks without carried values', () => {
+    expect(() => calculateRotation(
+      baseInput([{ id: 'e', skillId: '', motionName: 'X', forteLevel: 1, activeBuffIds: [], damageKind: 'echoSkill' }]),
+    )).toThrow(/echoMotionValue/);
   });
 
   it('warns on unknown buff ids instead of dropping the block', () => {
@@ -160,6 +211,20 @@ describe('isBlockStale', () => {
     expect(isBlockStale(jiyan, { ...block('1', 'Stage 1 DMG'), skillId: 'nope' })).toBe(true);
     expect(isBlockStale(jiyan, block('1', 'Nope'))).toBe(true);
     expect(isBlockStale(jiyan, { id: 'o', skillId: '1001109', motionName: '', forteLevel: 1, activeBuffIds: [] })).toBe(false);
+  });
+
+  it('never flags self-contained echo-skill blocks', () => {
+    expect(isBlockStale(jiyan, {
+      id: 'e', skillId: '', motionName: 'Lorelei', forteLevel: 1, activeBuffIds: [],
+      damageKind: 'echoSkill', echoName: 'Lorelei', echoMotionValue: 4.05, echoAttribute: 'Havoc',
+    })).toBe(false);
+  });
+
+  it('never flags character-independent tune-break blocks', () => {
+    expect(isBlockStale(jiyan, {
+      id: 't', skillId: '', motionName: 'Tune Break DMG', forteLevel: 1, activeBuffIds: [],
+      damageKind: 'tuneBreak', tuneBreakMultiplier: 10,
+    })).toBe(false);
   });
 });
 

@@ -5,6 +5,12 @@ import {
   type BuffPreset,
 } from '../data/buffPresets.ts';
 import {
+  CHAIN_PRESETS,
+  type ChainNotePreset,
+  type ChainPreset,
+  type ChainSheetPreset,
+} from '../data/chainPresets.ts';
+import {
   statKeySchema,
   type CharacterData,
   type OwnedEcho,
@@ -25,6 +31,26 @@ export type StatSheet = Record<StatKey, number>;
 /** Zeroed sheet. Documented base values (crit 5%/150%) are seeded in `computeStats`, not here. */
 export function emptySheet(): StatSheet {
   return Object.fromEntries(statKeySchema.options.map((k) => [k, 0])) as StatSheet;
+}
+
+/**
+ * Curve lookup honoring ascension at exact breakpoint levels. Curves
+ * carry post-ascension `.5` tiers (verified: 20.5/40.5/…/80.5); the k-th
+ * breakpoint tier (1-based, data order) resolves iff ascension >= k.
+ * Non-breakpoint levels behave exactly like `lookupCurve` (post-tier
+ * values are already baked into the entries above each breakpoint).
+ */
+export function lookupAscendedCurve(
+  points: { level: number; value: number }[],
+  level: number,
+  ascension: number,
+): number {
+  const tiers = [...new Set(points.filter((p) => !Number.isInteger(p.level)).map((p) => Math.floor(p.level)))].sort(
+    (a, b) => a - b,
+  );
+  const rank = tiers.indexOf(level) + 1;
+  const probe = rank > 0 && ascension >= rank ? level + 0.5 : level;
+  return lookupCurve(points, probe);
 }
 
 /** Last curve point at or below `level` (ascension `.5` tiers included). Throws when below the first point. */
@@ -142,8 +168,9 @@ export interface ComputeStatsResult {
   warnings: string[];
   /**
    * Transcribed full-uptime/stack assumptions applied to the sheet
-   * (wielded weapon passive, met Sonata thresholds, main-slot Echo).
-   * Rendered next to the score so applied optimism is never silent.
+   * (wielded weapon passive, met Sonata thresholds, main-slot Echo,
+   * chain ranks). Rendered next to the score so applied optimism is
+   * never silent.
    */
   appliedAssumptions: string[];
 }
@@ -172,6 +199,14 @@ for (const preset of BUFF_PRESETS) {
     SONATA_PRESETS.set(`${preset.sourceRef}@${preset.sonataPieceCount}`, preset);
   } else if (preset.source === 'Echo') ECHO_PRESETS.set(preset.sourceRef, preset);
 }
+/** Chain transcriptions by `${characterId}@${rank}` (all scopes — sheet applies here, others silence warnings). */
+const CHAIN_BY_RANK = new Map<string, ChainPreset[]>();
+for (const preset of CHAIN_PRESETS) {
+  const key = `${preset.characterId}@${preset.rank}`;
+  const list = CHAIN_BY_RANK.get(key);
+  if (list) list.push(preset);
+  else CHAIN_BY_RANK.set(key, [preset]);
+}
 
 /**
  * Whether `computeStats` would apply a main-slot bonus for this character
@@ -193,6 +228,12 @@ function describeApplied(
 ): string {
   const rank = preset.mods.some((m) => m.valuesByRank) ? ` R${resolution.weaponRank ?? 5}` : '';
   return preset.assumption ? `${preset.label}${rank} — ${preset.assumption}` : `${preset.label}${rank}`;
+}
+
+/** One-line disclosure for an applied chain rank, e.g. "Jiyan S3 — Full uptime on the 8s window …". */
+function describeChainApplied(characterName: string, entry: ChainSheetPreset): string {
+  const head = `${characterName} S${entry.rank}`;
+  return entry.assumption ? `${head} — ${entry.assumption}` : head;
 }
 
 /**
@@ -236,9 +277,13 @@ export function computeStats(input: ComputeStatsInput): ComputeStatsResult {
   // with the base; v2 aligns all three stats.)
 
 
-  const weaponAtk = lookupCurve(weapon.atkByLevel, roster.weaponLevel);
+  const weaponAscension = roster.weaponAscension ?? 0;
+  const weaponAtk = lookupAscendedCurve(weapon.atkByLevel, roster.weaponLevel, weaponAscension);
   if (weapon.secondaryStat) {
-    add(weapon.secondaryStat.stat, lookupCurve(weapon.secondaryStat.byLevel, roster.weaponLevel));
+    add(
+      weapon.secondaryStat.stat,
+      lookupAscendedCurve(weapon.secondaryStat.byLevel, roster.weaponLevel, weaponAscension),
+    );
   }
   if (weapon.passive.effect.kind === 'stat') {
     add(weapon.passive.effect.stat, scaledByRank(weapon.passive.effect.value, roster.weaponRank));
@@ -250,13 +295,33 @@ export function computeStats(input: ComputeStatsInput): ComputeStatsResult {
     warnings.push(`weapon passive "${weapon.passive.name}" not applied (${weapon.passive.effect.kind})`);
   }
 
-  // TODO: forte unlock state is untracked — all synced nodes count as active.
-  for (const node of character.forteNodes) add(node.stat, node.value);
+  // Forte unlocks are user-declared (the provider ships no gating data);
+  // an absent id set keeps the legacy all-active behavior.
+  const unlocked = roster.forteUnlockedIds === undefined ? null : new Set(roster.forteUnlockedIds);
+  for (const node of character.forteNodes) {
+    if (unlocked !== null && !unlocked.has(node.id)) continue;
+    add(node.stat, node.value);
+  }
 
   for (const rank of character.resonanceChain) {
     if (rank.rank > roster.resonanceChain) continue;
     if (rank.effect.kind === 'stat') add(rank.effect.stat, rank.effect.value);
-    else warnings.push(`resonance chain S${rank.rank} "${rank.name}" not applied (${rank.effect.kind})`);
+    const chainEntries = CHAIN_BY_RANK.get(`${character.id}@${rank.rank}`) ?? [];
+    for (const entry of chainEntries) {
+      if (entry.scope !== 'sheet') continue;
+      for (const mod of entry.mods) add(mod.stat, mod.value);
+      appliedAssumptions.push(describeChainApplied(character.name, entry));
+    }
+    if (rank.effect.kind !== 'stat') {
+      const isNote = (e: ChainPreset): e is ChainNotePreset => e.scope === 'note';
+      const modeled = chainEntries.some((e) => !isNote(e) || e.appliedElsewhere !== undefined);
+      if (chainEntries.length === 0) {
+        warnings.push(`resonance chain S${rank.rank} "${rank.name}" not applied (${rank.effect.kind})`);
+      } else if (!modeled) {
+        const reason = chainEntries.find(isNote)?.reason ?? 'untranscribed';
+        warnings.push(`resonance chain S${rank.rank} "${rank.name}" not modeled: ${reason}`);
+      }
+    }
   }
 
   for (const echo of echoes) {

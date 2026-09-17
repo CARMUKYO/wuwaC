@@ -46,6 +46,13 @@ describe('parseDisplayValue', () => {
     expect(() => parseDisplayValue('critRate', '-1')).toThrow();
   });
 
+  it('accepts negatives for RES Penetration (shred) only', () => {
+    expect(parseDisplayValue('resistancePenetration', '-10')).toBeCloseTo(-0.1, 10);
+    expect(() => parseDisplayValue('defIgnore', '-10')).toThrow();
+    expect(() => parseDisplayValue('defReduction', '-5')).toThrow();
+    expect(() => parseDisplayValue('dmgBonus:Havoc', '-15')).toThrow();
+  });
+
   it('round-trips through toDisplayValue', () => {
     expect(parseDisplayValue('critDmg', toDisplayValue('critDmg', 0.126))).toBeCloseTo(0.126, 10);
   });
@@ -58,5 +65,6 @@ describe('statLabel', () => {
     expect(statLabel('dmgBonus:Aero')).toBe('Aero DMG');
     expect(statLabel('dmgBonus:skill')).toBe('Resonance Skill DMG');
     expect(statLabel('dmgBonus:physical')).toBe('Physical DMG');
+    expect(statLabel('dmgBonus:coordinated')).toBe('Coordinated Attack DMG');
   });
 });

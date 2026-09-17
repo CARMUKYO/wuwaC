@@ -4,7 +4,7 @@ import type { CritMode } from '../domain/damage.ts';
 import { DEFAULT_ENEMY_LEVEL, DEFAULT_ENEMY_RES } from '../domain/enemy.ts';
 import { maxStatusStacks } from '../domain/negativeStatus.ts';
 import type { ActionBlock, RotationBuff } from '../domain/rotation.ts';
-import type { RosterEntry } from '../data/schema.ts';
+import { attributeSchema, type RosterEntry } from '../data/schema.ts';
 
 /**
  * Calculator page state (Phase 1: input controls; Phase 2: rotation).
@@ -20,6 +20,7 @@ export const DEFAULT_CHAIN = 0;
 export const DEFAULT_FORTE_LEVEL = 10;
 export const DEFAULT_WEAPON_LEVEL = 90;
 export const DEFAULT_WEAPON_RANK = 1;
+export const DEFAULT_WEAPON_ASCENSION = 0;
 export const DEFAULT_ROTATION_TIME = 10;
 export const MAX_ROTATION_TIME = 3600;
 
@@ -46,6 +47,9 @@ interface CalculatorState {
   weaponId: string;
   weaponLevel: number;
   weaponRank: number;
+  weaponAscension: number;
+  /** Unlocked forte node ids; null = all unlocked (pre-U6 behavior). */
+  forteUnlockedIds: string[] | null;
   enemyKind: 'mob' | 'boss';
   enemyLevel: number;
   enemyBaseRES: number;
@@ -69,6 +73,8 @@ interface CalculatorState {
   setWeaponId: (id: string) => void;
   setWeaponLevel: (level: number) => void;
   setWeaponRank: (rank: number) => void;
+  setWeaponAscension: (ascension: number) => void;
+  setForteUnlockedIds: (ids: string[] | null) => void;
   setEnemyKind: (kind: 'mob' | 'boss') => void;
   setEnemyLevel: (level: number) => void;
   setEnemyBaseRES: (res: number) => void;
@@ -97,6 +103,10 @@ interface CalculatorState {
         | 'tuneStrainStacks'
         | 'tuneResponseStacks'
         | 'tuneBreakMultiplier'
+        | 'echoMotionValue'
+        | 'echoFlatDamage'
+        | 'echoAttribute'
+        | 'echoScaling'
       >
     >,
   ) => void;
@@ -119,6 +129,8 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
   weaponId: '',
   weaponLevel: DEFAULT_WEAPON_LEVEL,
   weaponRank: DEFAULT_WEAPON_RANK,
+  weaponAscension: DEFAULT_WEAPON_ASCENSION,
+  forteUnlockedIds: null,
   enemyKind: 'mob',
   enemyLevel: DEFAULT_ENEMY_LEVEL,
   enemyBaseRES: DEFAULT_ENEMY_RES,
@@ -139,6 +151,8 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       forteLevels: id === s.characterId ? s.forteLevels : {},
       // Modes belong to one kit — a stale mode would score the wrong kit.
       resonanceMode: id === s.characterId ? s.resonanceMode : null,
+      // Node ids differ per character — stale unlocks would gate the wrong nodes.
+      forteUnlockedIds: id === s.characterId ? s.forteUnlockedIds : null,
       rosterSourceId: '',
     })),
   setResonanceMode: (mode) => set({ resonanceMode: mode }),
@@ -157,6 +171,9 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
     set((s) => ({ weaponLevel: clampInt(level, 1, 90, s.weaponLevel) })),
   setWeaponRank: (rank) =>
     set((s) => ({ weaponRank: clampInt(rank, 1, 5, s.weaponRank) })),
+  setWeaponAscension: (ascension) =>
+    set((s) => ({ weaponAscension: clampInt(ascension, 0, 6, s.weaponAscension) })),
+  setForteUnlockedIds: (ids) => set({ forteUnlockedIds: ids }),
   setEnemyKind: (kind) => set({ enemyKind: kind }),
   setEnemyLevel: (level) =>
     set((s) => ({ enemyLevel: clampInt(level, 1, 120, s.enemyLevel) })),
@@ -247,6 +264,18 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
         if (patch.tuneBreakMultiplier !== undefined && Number.isFinite(patch.tuneBreakMultiplier)) {
           next.tuneBreakMultiplier = Math.min(99, Math.max(0, patch.tuneBreakMultiplier));
         }
+        if (patch.echoMotionValue !== undefined && Number.isFinite(patch.echoMotionValue)) {
+          next.echoMotionValue = Math.min(99, Math.max(0, patch.echoMotionValue));
+        }
+        if (patch.echoFlatDamage !== undefined && Number.isFinite(patch.echoFlatDamage)) {
+          next.echoFlatDamage = Math.max(0, patch.echoFlatDamage);
+        }
+        if (patch.echoAttribute !== undefined && (attributeSchema.options as string[]).includes(patch.echoAttribute)) {
+          next.echoAttribute = patch.echoAttribute;
+        }
+        if (patch.echoScaling !== undefined && ['ATK', 'HP', 'DEF'].includes(patch.echoScaling)) {
+          next.echoScaling = patch.echoScaling;
+        }
         return next;
       }),
     })),
@@ -291,6 +320,8 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       weaponId: entry.weaponId,
       weaponLevel: entry.weaponLevel,
       weaponRank: entry.weaponRank,
+      weaponAscension: entry.weaponAscension ?? DEFAULT_WEAPON_ASCENSION,
+      forteUnlockedIds: entry.forteUnlockedIds ?? null,
       rosterSourceId: entry.characterId,
     }),
   resetAll: () =>
@@ -303,6 +334,8 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       weaponId: '',
       weaponLevel: DEFAULT_WEAPON_LEVEL,
       weaponRank: DEFAULT_WEAPON_RANK,
+      weaponAscension: DEFAULT_WEAPON_ASCENSION,
+      forteUnlockedIds: null,
       enemyKind: 'mob',
       enemyLevel: DEFAULT_ENEMY_LEVEL,
       enemyBaseRES: DEFAULT_ENEMY_RES,

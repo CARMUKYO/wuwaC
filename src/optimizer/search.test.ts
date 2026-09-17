@@ -264,6 +264,41 @@ describe('searchExhaustive', () => {
     expect(buffed).not.toEqual(plain);
   });
 
+  it('scores echo-skill blocks through the shared rotation path (echo bucket wins)', () => {
+    // Six cost-1 echoes, pick 5, one Lorelei-style echo block: the two
+    // Echo-Skill-DMG pieces must survive in the winner — dropping either
+    // costs far more echo damage than any fill. This pins the optimizer
+    // picking up echo-block math with no search changes.
+    const inv: OwnedEcho[] = [
+      mkEcho('echo1', { main: ['dmgBonus:echo', 0.3], cost: 1 }),
+      mkEcho('echo2', { main: ['dmgBonus:echo', 0.3], cost: 1 }),
+      mkEcho('crit1', { main: ['critDmg', 0.4], cost: 1 }),
+      mkEcho('crit2', { main: ['critDmg', 0.4], cost: 1 }),
+      mkEcho('fill1', { main: ['atkPct', 0.15], cost: 1 }),
+      mkEcho('fill2', { main: ['atkPct', 0.15], cost: 1 }),
+    ];
+    const blocks = [
+      {
+        skillId: '', motionName: 'Lorelei', forteLevel: 1, activeBuffIds: [] as string[],
+        damageKind: 'echoSkill' as const, echoName: 'Lorelei',
+        echoMotionValue: 4.05, echoAttribute: 'Havoc' as const,
+      },
+    ];
+    const result = searchExhaustive(
+      { ...data, echoes: inv },
+      {
+        costBudget: 12,
+        sonataLock: { mode: 'none' },
+        objective: { kind: 'rotation-dpr', blocks, buffs: [], globalBuffIds: [], crit: 'expected' },
+        topN: 1,
+      },
+    );
+    expect(result.builds).toHaveLength(1);
+    expect(result.builds[0].echoIds).toContain('echo1');
+    expect(result.builds[0].echoIds).toContain('echo2');
+    expect(result.builds[0].score).toBeGreaterThan(0);
+  });
+
   it('prunes by default and reports dropped echoes', () => {
     // Relevant stat is flat atk: e2 (600) dominates same-set e1/e8,
     // e6 (50) dominates same-set e7. e9 survives despite zero atk — it is

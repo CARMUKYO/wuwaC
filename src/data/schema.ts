@@ -92,6 +92,14 @@ export const statKeySchema = z.enum([
    * maps to it). Aggregates like any bucket; unscored by character skills.
    */
   'dmgBonus:physical',
+  /**
+   * Coordinated Attack DMG Bonus. Joins `AllDmgBonus` additively, but ONLY
+   * for hits flagged as coordinated attacks (registry in
+   * domain/characterMods.ts — Decision 3, reference doc §6 note). A
+   * coordinated attack is not an Echo skill: never merge with
+   * `dmgBonus:echo`.
+   */
+  'dmgBonus:coordinated',
   'amplify',
   /** Amplification that applies to Negative Status damage only. */
   'negativeStatusAmplify',
@@ -104,7 +112,16 @@ export const statKeySchema = z.enum([
   /** Attacker-side DEF ignore (ratio) and flat DEF reduction (pre-ratio). */
   'defIgnore',
   'defReduction',
-  /** Attacker-side resistance penetration, signed (shred goes negative). */
+  /**
+   * Attacker-side resistance penetration, SIGNED. `computeDamage` adds
+   * this to the enemy base (`resTotal = base + penetration`, reference
+   * doc §6), so penetration is positive and RES shred is NEGATIVE —
+   * shred lowers effective resistance by exactly its magnitude. Pinned
+   * by the shred-sign test in damage.test.ts: flipping the sign inverts
+   * the proven damage ratio. Element-agnostic by design — element-gated
+   * kit shred (Phoebe Spectro, Woodland Aria Aero, Suisui Havoc) is
+   * transcribed here with its gate disclosed in the assumption.
+   */
   'resistancePenetration',
   /** Unused by every live kit today; modeled for completeness (doc §6). */
   'specialBase',
@@ -402,8 +419,15 @@ export const rosterEntrySchema = z.object({
   resonanceChain: z.number().int().min(0).max(6),
   /** Skill id -> Forte level. No max cap: unsourced — TODO once verified. */
   forteLevels: z.record(z.string(), z.number().int().min(1)),
+  /**
+   * Unlocked forte-node ids. Absent = all active (legacy default — the
+   * provider ships no unlock gating, so this is user-declared).
+   */
+  forteUnlockedIds: z.array(z.string().min(1)).optional(),
   weaponId: z.string().min(1),
   weaponLevel: z.number().int().min(1).max(90),
+  /** Weapon ascension tier: selects the post-ascension curve entry at `weaponLevel`. Absent = 0. */
+  weaponAscension: z.number().int().min(0).max(6).optional(),
   weaponRank: z.number().int().min(1).max(5),
 });
 export type RosterEntry = z.infer<typeof rosterEntrySchema>;
@@ -422,7 +446,7 @@ export const rotationBlockSpecSchema = z.object({
   forteLevel: z.number().int().min(1),
   activeBuffIds: z.array(z.string()),
   /** Optional non-motion damage source. Omitted means a normal kit motion. */
-  damageKind: z.enum(['ability', 'negativeStatus', 'tuneRupture', 'tuneBreak']).optional(),
+  damageKind: z.enum(['ability', 'negativeStatus', 'tuneRupture', 'tuneBreak', 'echoSkill']).optional(),
   // Keep in sync with NEGATIVE_STATUSES in src/domain/negativeStatus.ts
   // (duplicated here because the data layer must not import the domain).
   statusType: z
@@ -455,6 +479,20 @@ export const rotationBlockSpecSchema = z.object({
    * exists (G3) — the user supplies it from their own research.
    */
   tuneBreakMultiplier: z.number().min(0).max(99).optional(),
+  /**
+   * Echo-skill block inputs (damageKind 'echoSkill'). The block carries
+   * the slot-1 Echo's parsed skill values as data so rotation objectives
+   * cross the worker boundary self-contained (see data/echoSkills.ts for
+   * the parser and its documented shapes). Motion value and attribute are
+   * required by the scorer; scaling defaults to ATK, flat to 0.
+   * Cooldown is display-only — blocks carry no timestamps (non-goal).
+   */
+  echoName: z.string().min(1).optional(),
+  echoMotionValue: z.number().min(0).max(99).optional(),
+  echoFlatDamage: z.number().min(0).optional(),
+  echoAttribute: attributeSchema.optional(),
+  echoScaling: z.enum(['ATK', 'HP', 'DEF']).optional(),
+  echoCooldown: z.number().min(0).optional(),
 });
 export type RotationBlockSpec = z.infer<typeof rotationBlockSpecSchema>;
 

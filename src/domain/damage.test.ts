@@ -7,6 +7,7 @@ import {
   computeBaseDamage,
   computeCritMultiplier,
   computeDamage,
+  computeEchoSkillDamage,
   computeFixedStatusCritMultiplier,
   computeNegativeStatusBaseDamage,
   computeNegativeStatusDamage,
@@ -45,6 +46,48 @@ describe('computeResMultiplier', () => {
     expect(computeResMultiplier(0.4)).toBeCloseTo(0.6, 10);
     expect(computeResMultiplier(0.8)).toBeCloseTo(0.2, 10); // 1/(1+4)
     expect(computeResMultiplier(1)).toBeCloseTo(1 / 6, 10);
+  });
+});
+
+describe('resistance penetration (shred sign convention)', () => {
+  it('lowers effective resistance by exactly the shred magnitude, end to end (hand-computed)', () => {
+    const base = {
+      ...toyBases,
+      attackerLevel: 90,
+      skill: toySkill,
+      motionName: 'Hit',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'expected' as const,
+    };
+    const plain = computeDamage({ ...base, sheet: emptySheet() });
+    // Mob Fusion RES is 0.1 with no penetration: ResMultiplier 0.9.
+    expect(plain.resistances).toBeCloseTo(0.9 * (1520 / 3032), 10);
+    const shredded = emptySheet();
+    shredded.resistancePenetration = -0.1;
+    const result = computeDamage({ ...base, sheet: shredded });
+    // resTotal = 0.1 + (-0.1) = 0 → ResMultiplier exactly 1.
+    expect(result.resistances).toBeCloseTo(1520 / 3032, 10);
+    // Every other term is identical, so damage scales by exactly 1/0.9.
+    // A flipped sign would give 0.8/0.9 instead — this ratio pins it.
+    expect(result.damage / plain.damage).toBeCloseTo(1 / 0.9, 10);
+  });
+
+  it('amplifies past zero into the negative branch on over-shred (hand-computed)', () => {
+    const shredded = emptySheet();
+    shredded.resistancePenetration = -0.15;
+    const result = computeDamage({
+      ...toyBases,
+      attackerLevel: 90,
+      skill: toySkill,
+      motionName: 'Hit',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'expected' as const,
+      sheet: shredded,
+    });
+    // resTotal = 0.1 - 0.15 = -0.05 → 1 - (-0.05)/2 = 1.025.
+    expect(result.resistances).toBeCloseTo(1.025 * (1520 / 3032), 10);
   });
 });
 
@@ -101,6 +144,18 @@ describe('computeDmgBonusPercent', () => {
     sheet['dmgBonus:skill'] = 0.2;
     expect(computeDmgBonusPercent(sheet, 'Aero', 'forte')).toBeCloseTo(1.1, 10);
   });
+
+  it('adds the coordinated bucket only for flagged coordinated hits (hand-computed)', () => {
+    const sheet = emptySheet();
+    sheet['dmgBonus:Electro'] = 0.2;
+    sheet['dmgBonus:skill'] = 0.25;
+    sheet['dmgBonus:coordinated'] = 0.4;
+    // 1 + 0.2 + 0.25 + 0.4 = 1.85 for coordinated hits...
+    expect(computeDmgBonusPercent(sheet, 'Electro', 'skill', 0, true)).toBeCloseTo(1.85, 10);
+    // ...and 1.45 for ordinary hits on the identical sheet.
+    expect(computeDmgBonusPercent(sheet, 'Electro', 'skill')).toBeCloseTo(1.45, 10);
+    expect(computeDmgBonusPercent(sheet, 'Electro', 'skill', 0, false)).toBeCloseTo(1.45, 10);
+  });
 });
 
 describe('amplify / special', () => {
@@ -154,15 +209,24 @@ const toyBases = {
 };
 
 describe('resolveMotion', () => {
-  it('maps forteLevel to index forteLevel - 1, clamped (assumption under test)', () => {
+  it('maps forteLevel to index forteLevel - 1, clamped (verified against provider RateLv)', () => {
     expect(resolveMotion(toySkill, 'Hit', 1).ratio).toBe(0.5);
     expect(resolveMotion(toySkill, 'Hit', 2).ratio).toBe(0.6);
     expect(resolveMotion(toySkill, 'Hit', 99).ratio).toBe(0.6);
     expect(resolveMotion(toySkill, 'Hit', 0).ratio).toBe(0.5);
   });
 
+  it('matches the provider 10-level combat track (Yangyang Stage 1)', () => {
+    // DamageList.RateLv carries exactly levels 1-10; values[0..9] match it.
+    const yangyang = snapshot.characters.find((c) => c.id === 'yangyang')!;
+    const basic = yangyang.skills.find((s) => s.kind === 'basic')!;
+    expect(resolveMotion(basic, 'Stage 1 DMG', 1).ratio).toBeCloseTo(0.225, 10);
+    expect(resolveMotion(basic, 'Stage 1 DMG', 10).ratio).toBeCloseTo(0.4473, 10);
+  });
+
   it('pins the real liberation array against data drift', () => {
-    // Forte 10 -> index 9. If the mapping is ever corrected, update here too.
+    // Forte 10 -> index 9. Entries 10-19 are an unlabeled second track the
+    // combat formula never addresses; they stay intentionally ignored.
     // dmgType uses toMatchObject: a re-sync may refine the bucket (DamageList
     // evidence says Jiyan's Liberation hits are Heavy Attack) without changing
     // the motion values pinned here.
@@ -177,6 +241,25 @@ describe('resolveMotion', () => {
 
   it('throws on unknown components', () => {
     expect(() => resolveMotion(toySkill, 'Missing', 1)).toThrow();
+  });
+
+  it('scores multi-hit motions once: ratios are hit-totals, not per-hit', () => {
+    // The 8-hit Qingloong motion resolves the folded total 5.2416; damage
+    // below divides it back out exactly (no hidden x8 anywhere).
+    const sheet = emptySheet();
+    const result = computeDamage({
+      sheet,
+      baseAtk: { character: 1000, weapon: 0 },
+      baseHp: { character: 10000 },
+      baseDef: { character: 1000 },
+      attackerLevel: 90,
+      skill: liberation,
+      motionName: 'Lance of Qingloong Stage 1 DMG',
+      forteLevel: 10,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+    });
+    expect(result.baseDamage / 1000).toBeCloseTo(5.2416, 10);
   });
 });
 
@@ -392,6 +475,188 @@ describe('computeDamage (Jiyan worked example)', () => {
     });
     expect(hpSkill.scaling).toBe('HP');
     expect(result.damage).toBeGreaterThan(0);
+  });
+});
+
+describe('coordinated attacks (Decision 3)', () => {
+  const yinlin = snapshot.characters.find((c) => c.id === 'yinlin')!;
+  const forte = yinlin.skills.find((s) => s.id === '1001507')!;
+  const outro = jiyan.skills.find((s) => s.kind === 'outro')!;
+
+  function coordinatedSheet(): ReturnType<typeof emptySheet> {
+    const sheet = emptySheet();
+    sheet['dmgBonus:Electro'] = 0.2;
+    sheet['dmgBonus:skill'] = 0.25;
+    sheet['dmgBonus:coordinated'] = 0.4;
+    return sheet;
+  }
+
+  it('scores Yinlin Judgment Strike with the coordinated bucket (hand-computed)', () => {
+    const result = computeDamage({
+      sheet: coordinatedSheet(),
+      ...toyBases,
+      attackerLevel: 90,
+      skill: forte,
+      motionName: 'Judgment Strike Damage',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+      characterId: 'yinlin',
+    });
+    // baseAbility = 1000 x 0.3956 = 395.6; bonuses = 1 + 0.2 + 0.25 + 0.4.
+    expect(result.baseDamage).toBeCloseTo(395.6, 6);
+    expect(result.bonuses).toBeCloseTo(1.85, 10);
+    expect(result.damage).toBeCloseTo(395.6 * 0.9 * (1520 / 3032) * 1.85, 6);
+  });
+
+  it('withholds the coordinated bucket from ordinary motions on the same sheet', () => {
+    const result = computeDamage({
+      sheet: coordinatedSheet(),
+      ...toyBases,
+      attackerLevel: 90,
+      skill: forte,
+      motionName: 'Chameleon Cipher Damage',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+      characterId: 'yinlin',
+    });
+    // Heavy-typed, not coordinated: 1 + 0.2 Electro + 0 Heavy + 0 coord.
+    expect(result.bonuses).toBeCloseTo(1.2, 10);
+    // ...and without kit context the flag never fires, even for the Strike.
+    const contextFree = computeDamage({
+      sheet: coordinatedSheet(),
+      ...toyBases,
+      attackerLevel: 90,
+      skill: forte,
+      motionName: 'Judgment Strike Damage',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+    });
+    expect(contextFree.bonuses).toBeCloseTo(1.45, 10);
+  });
+
+  it('scores Jiyan outro lance from the prose spec (hand-computed)', () => {
+    const sheet = emptySheet();
+    sheet['dmgBonus:Aero'] = 0.1;
+    sheet['dmgBonus:coordinated'] = 0.4;
+    sheet['dmgBonus:outro'] = 0.5; // Unstated type: the outro bucket must NOT leak in.
+    const ctx = {
+      sheet,
+      ...toyBases,
+      attackerLevel: 90,
+      skill: outro,
+      motionName: '',
+      enemy: standardMob(90),
+      crit: 'nonCrit' as const,
+      characterId: 'jiyan',
+    };
+    const result = computeDamage({ ...ctx, forteLevel: 1 });
+    // base = 1000 x 3.134 = 3134; bonuses = 1 + 0.1 + 0.4 = 1.5.
+    expect(result.baseDamage).toBeCloseTo(3134, 6);
+    expect(result.bonuses).toBeCloseTo(1.5, 10);
+    expect(result.damage).toBeCloseTo(3134 * 0.9 * (1520 / 3032) * 1.5, 4);
+    // Fixed MV: forte level changes nothing.
+    expect(computeDamage({ ...ctx, forteLevel: 10 }).damage).toBe(result.damage);
+  });
+
+  it('scales the lance by exactly ×2.2 at Jiyan S5', () => {
+    const common = {
+      sheet: emptySheet(),
+      ...toyBases,
+      attackerLevel: 90,
+      skill: outro,
+      motionName: '',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'nonCrit' as const,
+      characterId: 'jiyan',
+    };
+    const s4 = computeDamage({ ...common, resonanceChain: 4 });
+    const s5 = computeDamage({ ...common, resonanceChain: 5 });
+    expect(s5.damage / s4.damage).toBeCloseTo(2.2, 10);
+  });
+
+  it('still throws for outro-shaped damage outside the lance spec', () => {
+    // No kit context: Jiyan's outro has no motion component to resolve.
+    expect(() => computeDamage({
+      sheet: emptySheet(),
+      ...toyBases,
+      attackerLevel: 90,
+      skill: outro,
+      motionName: '',
+      forteLevel: 1,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+    })).toThrow();
+  });
+});
+
+describe('computeEchoSkillDamage', () => {
+  it('scores a Lorelei-style hit through the echo buckets (hand-computed)', () => {
+    const sheet = emptySheet();
+    sheet['dmgBonus:Havoc'] = 0.12;
+    sheet['dmgBonus:echo'] = 0.35;
+    sheet['dmgBonus:Aero'] = 0.99; // Character bucket must NOT leak into echo damage.
+    const result = computeEchoSkillDamage({
+      sheet,
+      ...toyBases,
+      scaling: 'ATK',
+      motionValue: 4.05,
+      attribute: 'Havoc',
+      attackerLevel: 90,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+    });
+    // base = 1000 x 4.05 = 4050; bonuses = 1 + 0.12 + 0.35 = 1.47.
+    expect(result.baseDamage).toBeCloseTo(4050, 6);
+    expect(result.bonuses).toBeCloseTo(1.47, 10);
+    expect(result.damage).toBeCloseTo(4050 * 0.9 * (1520 / 3032) * 1.47, 4);
+  });
+
+  it('scales HP echoes off Max HP and adds hybrid flats (hand-computed)', () => {
+    // Fallacy-style: HP = 10000 x 1.5 + 1000 = 16000; base = 16000 x 0.1586.
+    const hpSheet = emptySheet();
+    hpSheet.hpPct = 0.5;
+    hpSheet.hp = 1000;
+    const hp = computeEchoSkillDamage({
+      sheet: hpSheet,
+      ...toyBases,
+      scaling: 'HP',
+      motionValue: 0.1586,
+      attribute: 'Spectro',
+      attackerLevel: 90,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+    });
+    expect(hp.baseDamage).toBeCloseTo(2537.6, 6);
+    // Hooscamp-style hybrid: 1000 x 0.48 + 96 = 576.
+    const hybrid = computeEchoSkillDamage({
+      sheet: emptySheet(),
+      ...toyBases,
+      scaling: 'ATK',
+      motionValue: 0.48,
+      flatDamage: 96,
+      attribute: 'Aero',
+      attackerLevel: 90,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+    });
+    expect(hybrid.baseDamage).toBeCloseTo(576, 10);
+  });
+
+  it('rejects negative motion values', () => {
+    expect(() => computeEchoSkillDamage({
+      sheet: emptySheet(),
+      ...toyBases,
+      scaling: 'ATK',
+      motionValue: -1,
+      attribute: 'Havoc',
+      attackerLevel: 90,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+    })).toThrow(/non-negative/);
   });
 });
 

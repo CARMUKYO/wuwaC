@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { parseEchoSkillHits } from '../../data/echoSkills.ts';
 import { findEchoDef, loadBundledSnapshot } from '../../data/index.ts';
+import { isBuffOnlySkill } from '../../domain/characterMods.ts';
 import type { CritMode } from '../../domain/damage.ts';
 import { buildEnemyProfile } from '../../domain/enemy.ts';
 import { calculateRotation, type BlockResult } from '../../domain/rotation.ts';
@@ -57,6 +59,7 @@ export function CalculatorPage() {
     const resolved = resolveTeamBuffs(
       pickedTeam,
       (id) => snapshot.characters.find((c) => c.id === id)?.name ?? null,
+      Object.fromEntries(rosterEntries.map((e) => [e.characterId, e.resonanceChain])),
     );
     setTeamWarnings(resolved.warnings);
     for (const buff of resolved.buffs) {
@@ -69,7 +72,9 @@ export function CalculatorPage() {
   const character = snapshot.characters.find((c) => c.id === calc.characterId);
   const weapon = snapshot.weapons.find((w) => w.id === calc.weaponId);
   const scorable = character?.skills.filter((s) => s.motionValues.length > 0) ?? [];
-  const buffOnly = character?.skills.filter((s) => s.motionValues.length === 0) ?? [];
+  // Jiyan's outro is damage (coordinated lance), not a buff carrier — it
+  // belongs in neither list (its fixed MV ignores forte levels).
+  const buffOnly = character?.skills.filter((s) => isBuffOnlySkill(character.id, s)) ?? [];
   /** Pistols resonators use pistols: the list filters, mismatches warn and block scoring. */
   const usableWeapons = character
     ? snapshot.weapons.filter((w) => w.weaponType === character.weaponType)
@@ -81,6 +86,19 @@ export function CalculatorPage() {
     snapshot.characters.find((c) => c.id === id)?.name ?? id;
   const echoById = new Map(echoes.map((e) => [e.id, e]));
   const picked = calc.echoIds.map((id) => (id === null ? null : (echoById.get(id) ?? null)));
+  // Slot-1 echo skill for the rotation's "add Echo skill" panel (only slot
+  // 1's skill is usable in combat — reference doc §2).
+  const mainEchoSkill = (() => {
+    const first = picked[0];
+    if (!first) return null;
+    const def = findEchoDef(snapshot, first.echoDefId);
+    if (!def?.skillDescription) return null;
+    return {
+      echoName: def.name,
+      cooldown: def.skillCooldown,
+      hits: parseEchoSkillHits(def.skillDescription),
+    };
+  })();
   const costTotal = picked.reduce((sum, e) => sum + (e?.cost ?? 0), 0);
   const pickedIds = picked.filter((e) => e !== null).map((e) => e.id);
   const hasDuplicates = new Set(pickedIds).size !== pickedIds.length;
@@ -113,12 +131,15 @@ export function CalculatorPage() {
             weaponId: weapon.id,
             weaponLevel: calc.weaponLevel,
             weaponRank: calc.weaponRank,
+            weaponAscension: calc.weaponAscension,
+            forteUnlockedIds: calc.forteUnlockedIds ?? undefined,
           }
         : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       character?.id, weapon?.id, calc.level, calc.ascension, calc.resonanceChain,
       calc.forteLevels, calc.weaponLevel, calc.weaponRank,
+      calc.weaponAscension, calc.forteUnlockedIds,
     ],
   );
   const enemyProfile = useMemo(
@@ -295,6 +316,14 @@ export function CalculatorPage() {
               onChange={calc.setWeaponRank}
             />
             <SliderField
+              id="calc-weapon-ascension"
+              label="Weapon ascension"
+              value={calc.weaponAscension}
+              min={0}
+              max={6}
+              onChange={calc.setWeaponAscension}
+            />
+            <SliderField
               id="calc-rotation-time"
               label="Rotation time"
               value={calc.rotationTime}
@@ -328,6 +357,38 @@ export function CalculatorPage() {
               </p>
             )}
           </fieldset>
+
+          {character.forteNodes.length > 0 && (
+            <fieldset className="mt-4">
+              <legend className="text-sm font-semibold">Forte nodes unlocked</legend>
+              <div className="mt-2 grid gap-1 md:grid-cols-2">
+                {character.forteNodes.map((node) => {
+                  const unlocked = calc.forteUnlockedIds === null
+                    ? true
+                    : calc.forteUnlockedIds.includes(node.id);
+                  return (
+                    <label key={node.id} className="flex items-center gap-2 text-xs text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={unlocked}
+                        onChange={() => {
+                          const current = calc.forteUnlockedIds === null
+                            ? character.forteNodes.map((n) => n.id)
+                            : calc.forteUnlockedIds;
+                          calc.setForteUnlockedIds(
+                            unlocked
+                              ? current.filter((id) => id !== node.id)
+                              : [...current, node.id],
+                          );
+                        }}
+                      />
+                      <span>{node.title}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
         </>
       )}
 
@@ -469,6 +530,7 @@ export function CalculatorPage() {
               dps={scoring?.result?.dps ?? null}
               rotationTime={calc.rotationTime}
               weaponRank={calc.weaponRank}
+              mainEchoSkill={mainEchoSkill}
               onAddBlock={(skillId, motionName, forteLevel, options) =>
                 calc.addBlock({ skillId, motionName, forteLevel, activeBuffIds: [], ...options })}
               onRemoveBlock={calc.removeBlock}

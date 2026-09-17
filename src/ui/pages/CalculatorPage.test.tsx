@@ -113,8 +113,33 @@ describe('CalculatorPage', () => {
     expect(screen.getByLabelText(/^character level \(exact value\)$/i)).toHaveValue(80);
     // Roster forte 8 flows into Jiyan's basic-attack slider.
     expect(screen.getByLabelText(/lone lance.*exact value/i)).toHaveValue(8);
-    // Buff-only outro is listed, not slider-ed — and offered as a carrier button.
-    expect(screen.getByRole('button', { name: /discipline.*buff carrier/i })).toBeInTheDocument();
+    // Jiyan's outro is damage (coordinated lance), not a buff carrier —
+    // offered as an add-button, not a slider.
+    expect(screen.getByRole('button', { name: /discipline.*coordinated lance/i })).toBeInTheDocument();
+  });
+
+  it('moves the weapon ascension slider into the store', async () => {
+    useCalculatorStore.getState().setCharacterId('jiyan');
+    render(<CalculatorPage />);
+    fireEvent.change(screen.getByRole('slider', { name: /weapon ascension/i }), { target: { value: '3' } });
+    await waitFor(() => {
+      expect(useCalculatorStore.getState().weaponAscension).toBe(3);
+    });
+  });
+
+  it('renders forte unlock checkboxes checked by default and toggles into the store', async () => {
+    useCalculatorStore.getState().setCharacterId('jiyan');
+    const user = userEvent.setup();
+    render(<CalculatorPage />);
+    const boxes = screen.getAllByRole('checkbox', { name: /crit\. rate\+|atk\+/i });
+    expect(boxes.length).toBeGreaterThan(0);
+    for (const box of boxes) expect(box).toBeChecked();
+    await user.click(boxes[0]);
+    await waitFor(() => {
+      const ids = useCalculatorStore.getState().forteUnlockedIds;
+      expect(ids).not.toBeNull();
+      expect(ids).toHaveLength(boxes.length - 1);
+    });
   });
 
   it('moves the character level slider into the store', async () => {

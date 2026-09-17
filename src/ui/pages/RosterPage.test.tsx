@@ -78,6 +78,35 @@ describe('RosterPage', () => {
     expect(within(select).getByRole('option', { name: 'Autumntrace' })).toBeInTheDocument();
   });
 
+  it('edits weapon ascension and persists it', async () => {
+    const user = userEvent.setup();
+    render(<RosterPage />);
+    await addJiyan(user);
+
+    const slider = screen.getByRole('slider', { name: /weapon ascension for jiyan/i });
+    expect(slider).toHaveValue('0');
+    fireEvent.change(slider, { target: { value: '4' } });
+    await waitFor(async () => {
+      expect((await db.roster.get('jiyan'))?.weaponAscension).toBe(4);
+    });
+  });
+
+  it('toggles forte nodes from all-active and persists the unlock set', async () => {
+    const user = userEvent.setup();
+    render(<RosterPage />);
+    await addJiyan(user);
+
+    const boxes = screen.getAllByRole('checkbox', { name: /unlocked for jiyan/i });
+    expect(boxes.length).toBeGreaterThan(0);
+    for (const box of boxes) expect(box).toBeChecked();
+    await user.click(boxes[0]);
+    await waitFor(async () => {
+      const ids = (await db.roster.get('jiyan'))?.forteUnlockedIds;
+      expect(ids).toHaveLength(boxes.length - 1);
+    });
+    expect(boxes[0]).not.toBeChecked();
+  });
+
   it('warns on a saved wrong-type weapon instead of hiding it', async () => {
     await useRosterStore.getState().upsert({
       characterId: 'jiyan',

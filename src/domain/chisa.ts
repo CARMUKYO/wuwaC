@@ -36,12 +36,12 @@ const SAW_MOTIONS = /sawring - blitz|chainsaw mode - dodge counter|sawring - era
  * - S5: her Liberation motions gain +100% DMG Bonus (additive bucket).
  *
  * NOT modeled: S1's fixed 61803 Havoc DMG on Snare application (fixed
- * damage with bonus-ignoring semantics — TODO), S1's Snare ATK +30% and
- * S2's 10% Havoc RES ignore (manual rotation buffs / no per-element
- * resPen stat — TODO), S4's 1s trigger pacing (rotation realism, user),
- * S6 Finality amplifications (manual buffs: +0.30 status amplify,
- * +0.40 attacker amplify), Thread of Bane's 18% DEF ignore (conditional
- * on Snare — manual buff).
+ * damage with bonus-ignoring semantics — TODO), S4's 1s trigger pacing
+ * (rotation realism, user), S6 Finality amplifications (manual buffs:
+ * +0.30 status amplify, +0.40 attacker amplify), Thread of Bane's 18%
+ * DEF ignore (conditional on Snare — manual buff). S1's Snare ATK +30%
+ * and S2's 10% Havoc RES ignore auto-apply via the chain catalog
+ * (chainPresets.ts) — do NOT also add them as manual buffs.
  */
 export function chisaSkillMods(
   characterId: string | undefined,

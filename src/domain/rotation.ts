@@ -12,6 +12,7 @@ import type {
 } from '../data/schema.ts';
 import {
   computeDamage,
+  computeEchoSkillDamage,
   computeNegativeStatusDamage,
   computeTuneBreakDamage,
   computeTuneRuptureDamage,
@@ -20,6 +21,7 @@ import {
 } from './damage.ts';
 import { negativeStatusDef } from './negativeStatus.ts';
 import { characterResonanceModes, type ResonanceMode } from './characterMods.ts';
+import { jiyanOutroLanceSpec } from './jiyan.ts';
 import { computeStats, type StatSheet } from './stats.ts';
 
 /**
@@ -106,7 +108,11 @@ function applyBuffs(
 
 /** Whether a block still resolves against the given character (stale after a switch). */
 export function isBlockStale(character: CharacterData, block: ActionBlock): boolean {
-  if (block.damageKind === 'negativeStatus') return false;
+  if (block.damageKind === 'negativeStatus' || block.damageKind === 'echoSkill') return false;
+  // Tune Break blocks carry no skill id by design (character-independent
+  // damage kind); tuneRupture blocks carry real skill/motion ids and fall
+  // through to the kit lookup below.
+  if (block.damageKind === 'tuneBreak') return false;
   const skill = character.skills.find((s) => s.id === block.skillId);
   if (!skill) return true;
   if (skill.motionValues.length === 0) return false;
@@ -269,6 +275,36 @@ export function scoreRotationBlocks(
       };
     }
 
+    if (block.damageKind === 'echoSkill') {
+      if (block.echoMotionValue === undefined || block.echoAttribute === undefined) {
+        throw new Error('echoSkill block needs echoMotionValue and echoAttribute');
+      }
+      const result = computeEchoSkillDamage({
+        sheet,
+        baseAtk: bases.baseAtk,
+        baseHp: bases.baseHp,
+        baseDef: bases.baseDef,
+        scaling: block.echoScaling ?? 'ATK',
+        motionValue: block.echoMotionValue,
+        flatDamage: block.echoFlatDamage ?? 0,
+        attribute: block.echoAttribute,
+        attackerLevel,
+        enemy,
+        crit,
+        targetHavocBaneStacks: block.targetHavocBaneStacks,
+        tuneStrainStacks: block.tuneStrainStacks,
+      });
+      const cooldown = block.echoCooldown !== undefined ? `, ${block.echoCooldown}s CD` : '';
+      return {
+        skillId: block.skillId,
+        motionName: block.motionName,
+        label: `${block.echoName ?? 'Echo Skill'} (Echo Skill${cooldown})`,
+        damage: result.damage,
+        share: 0,
+        buffCarrier: false,
+      };
+    }
+
     const skill = skills.find((s) => s.id === block.skillId);
     if (!skill) throw new Error(`unknown skill: ${JSON.stringify(block.skillId)}`);
     if (block.damageKind === 'tuneRupture') {
@@ -296,7 +332,12 @@ export function scoreRotationBlocks(
         buffCarrier: false,
       };
     }
-    if (skill.motionValues.length === 0) {
+    // Jiyan's outro looks buff-carrier-shaped but scores its coordinated
+    // lance through computeDamage (one block = one lance trigger).
+    const lance = skill.motionValues.length === 0
+      ? jiyanOutroLanceSpec(characterId, skill, block.motionName)
+      : null;
+    if (skill.motionValues.length === 0 && lance === null) {
       return { skillId: skill.id, motionName: block.motionName, label: skill.label, damage: 0, share: 0, buffCarrier: true };
     }
     if (characterId === 'cartethyia' && resonanceChain >= 4 && statusHasBeenInflicted) {
@@ -328,7 +369,7 @@ export function scoreRotationBlocks(
       wovenMyriad: block.wovenMyriad,
       tuneStrainStacks: block.tuneStrainStacks,
     });
-    return { skillId: skill.id, motionName: block.motionName, label: skill.label, damage, share: 0, buffCarrier: false };
+    return { skillId: skill.id, motionName: block.motionName, label: lance === null ? skill.label : `${skill.label} (coordinated lance)`, damage, share: 0, buffCarrier: false };
   });
 
   return { dpr: results.reduce((sum, r) => sum + r.damage, 0), blocks: results, warnings };

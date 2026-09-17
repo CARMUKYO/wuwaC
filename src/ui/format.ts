@@ -19,13 +19,24 @@ export function toDisplayValue(stat: StatKey, stored: number): string {
   return String(Math.round(stored * 100 * 1e6) / 1e6);
 }
 
-/** Form text -> stored value. Throws on empty/non-numeric/negative input. */
+/**
+ * Stats whose sheet semantics admit negatives. Today only
+ * `resistancePenetration`: RES shred is modeled as negative penetration,
+ * so custom buffs must be able to enter it. Every other stat keeps the
+ * non-negative guard (echo substats can never be negative).
+ */
+const SIGNED_STATS: ReadonlySet<StatKey> = new Set(['resistancePenetration']);
+
+/**
+ * Form text -> stored value. Throws on empty/non-numeric input, and on
+ * negatives except for signed stats (see SIGNED_STATS).
+ */
 export function parseDisplayValue(stat: StatKey, text: string): number {
   const trimmed = text.trim();
   if (trimmed === '') throw new Error('stat value is required');
   const num = Number(trimmed);
   if (!Number.isFinite(num)) throw new Error(`not a number: ${JSON.stringify(text)}`);
-  if (num < 0) throw new Error('stat value must be non-negative');
+  if (num < 0 && !SIGNED_STATS.has(stat)) throw new Error('stat value must be non-negative');
   return isPercentStat(stat) ? num / 100 : num;
 }
 
@@ -94,6 +105,7 @@ export function statLabel(stat: StatKey): string {
           return `${DAMAGE_TYPE_LABELS[bucket as DamageType]} DMG`;
         }
         if (bucket === 'physical') return 'Physical DMG';
+        if (bucket === 'coordinated') return 'Coordinated Attack DMG';
         return `${ATTRIBUTE_LABELS[bucket as Attribute]} DMG`;
       }
       throw new Error(`unknown stat key: ${stat}`);

@@ -25,6 +25,19 @@ export type SonataLock =
   | { mode: 'five'; setId: string }
   | { mode: 'twoPlusTwo'; setIdA: string; setIdB: string };
 
+/** Optional kit state for expected-damage objectives (same fields as ScoreContext). */
+export interface KitStateRequest {
+  targetStatusStacks?: number;
+  conviction?: number;
+  targetHavocBaneStacks?: number;
+  blazesConsumed?: number;
+  nightfallBlazes?: number;
+  ringsConsumed?: number;
+  voiceFlux?: boolean;
+  wovenMyriad?: boolean;
+  tuneStrainStacks?: number;
+}
+
 export interface OptimizeRequest {
   costBudget: 10 | 12;
   sonataLock: SonataLock;
@@ -34,6 +47,8 @@ export interface OptimizeRequest {
   topN: number;
   /** Exhaustive baseline can skip pruning (tests, debugging). Default true. */
   prune?: boolean;
+  /** Kit state for expected-damage scoring. Absent = zeros = context-free. */
+  kitState?: KitStateRequest;
 }
 
 export interface SearchData {
@@ -136,6 +151,7 @@ export function searchExhaustive(
     attackerLevel: roster.level,
     enemy,
     resonanceMode: data.resonanceMode,
+    ...request.kitState,
   };
 
   const consider = (combo: OwnedEcho[]): void => {

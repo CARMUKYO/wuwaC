@@ -1,3 +1,4 @@
+import { CHAIN_PRESETS, type ChainTeamPreset } from '../data/chainPresets.ts';
 import { TEAM_BUFFS } from '../data/teamBuffs.ts';
 import type { Team } from '../data/schema.ts';
 import type { RotationBuff } from './rotation.ts';
@@ -23,10 +24,14 @@ export interface ResolvedTeamBuffs {
 /**
  * `characterNameOf` resolves display names and reports unknown ids as
  * `null` (mirrors `teamSonataCoverage`'s `sonataNameOf` pattern).
+ * `chainRanks` gates chain team buffs by teammate Resonance Chain rank
+ * (members without an entry count as S0 — their table buffs still
+ * resolve, their chain buffs do not).
  */
 export function resolveTeamBuffs(
   team: Team,
   characterNameOf: (characterId: string) => string | null,
+  chainRanks: Record<string, number> = {},
 ): ResolvedTeamBuffs {
   const buffs: Omit<RotationBuff, 'id'>[] = [];
   const warnings: string[] = [];
@@ -38,12 +43,24 @@ export function resolveTeamBuffs(
       continue;
     }
     const entries = TEAM_BUFFS.filter((e) => e.characterId === characterId);
-    if (entries.length === 0) {
+    const rank = chainRanks[characterId] ?? 0;
+    const chainEntries = CHAIN_PRESETS.filter(
+      (e): e is ChainTeamPreset =>
+        e.scope === 'team' && e.characterId === characterId && e.rank <= rank,
+    );
+    if (entries.length === 0 && chainEntries.length === 0) {
       warnings.push(`no transcribable team buffs for ${name}`);
     }
     for (const entry of entries) {
       buffs.push({
         label: entry.windowSeconds !== undefined ? `${entry.label} · ${entry.windowSeconds}s` : entry.label,
+        source: 'Team',
+        mods: entry.mods.map((m) => ({ ...m })),
+      });
+    }
+    for (const entry of chainEntries) {
+      buffs.push({
+        label: entry.label,
         source: 'Team',
         mods: entry.mods.map((m) => ({ ...m })),
       });

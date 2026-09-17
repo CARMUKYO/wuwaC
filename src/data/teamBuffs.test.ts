@@ -25,7 +25,7 @@ describe('team buffs table', () => {
       // No sheet-buff team effect in the snapshot wording (see module doc).
       'yangyang', 'chixia', 'rover-spectro', 'encore', 'jiyan', 'camellya',
       'calcharo', 'lingyang', 'yuanwu', 'rover-havoc', 'jinhsi', 'xiangli-yao',
-      'carlotta', 'galbrena', 'chisa', 'luuk-herssen', 'sigrika', 'youhu',
+      'carlotta', 'galbrena', 'chisa', 'luuk-herssen', 'sigrika',
       'rover-aero', 'qingxiao', 'jingran',
     ]);
     const covered = new Set(TEAM_BUFFS.map((e) => e.characterId));
@@ -37,5 +37,21 @@ describe('team buffs table', () => {
     for (const id of excluded) {
       expect(snapshot.characters.some((c) => c.id === id)).toBe(true);
     }
+  });
+
+  it('transcribes RES-shred riders as negative penetration (Phoebe, Suisui)', () => {
+    const phoebe = TEAM_BUFFS.find((e) => e.characterId === 'phoebe')!;
+    expect(phoebe.mods).toContainEqual({ stat: 'negativeStatusAmplify', value: 1.0 });
+    expect(phoebe.mods).toContainEqual({ stat: 'resistancePenetration', value: -0.1 });
+    const suisui = TEAM_BUFFS.find((e) => e.characterId === 'suisui' && e.kind === 'other')!;
+    expect(suisui.mods).toContainEqual({ stat: 'defIgnore', value: 0.06 });
+    expect(suisui.mods).toContainEqual({ stat: 'resistancePenetration', value: -0.12 });
+  });
+
+  it('transcribes Youhu Outro to the coordinated bucket', () => {
+    const youhu = TEAM_BUFFS.find((e) => e.characterId === 'youhu')!;
+    expect(youhu.skillId).toBe('1002409');
+    expect(youhu.target).toBe('incoming');
+    expect(youhu.mods).toEqual([{ stat: 'dmgBonus:coordinated', value: 1.0 }]);
   });
 });

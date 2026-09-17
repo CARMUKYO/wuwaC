@@ -52,6 +52,67 @@ describe('resolveTeamBuffs', () => {
     ]);
   });
 
+  it('gates chain team buffs by teammate chain rank', () => {
+    const gated = resolveTeamBuffs(team(['chixia', 'yangyang', 'lynae']), characterNameOf, {
+      chixia: 5,
+      yangyang: 6,
+    });
+    expect(gated.buffs).toContainEqual({
+      label: 'Yangyang S6 (team ATK)',
+      source: 'Team',
+      mods: [{ stat: 'atkPct', value: 0.2 }],
+    });
+    expect(gated.buffs.some((b) => b.label.includes('Chixia'))).toBe(false);
+    expect(gated.warnings).toContain('no transcribable team buffs for Chixia');
+    expect(gated.warnings.some((w) => w.includes('Yangyang'))).toBe(false);
+    const met = resolveTeamBuffs(team(['chixia', 'verina', 'sanhua']), characterNameOf, { chixia: 6 });
+    expect(met.buffs).toContainEqual({
+      label: 'Chixia S6 (team Basic DMG)',
+      source: 'Team',
+      mods: [{ stat: 'dmgBonus:basic', value: 0.25 }],
+    });
+    expect(met.warnings.some((w) => w.includes('Chixia'))).toBe(false);
+  });
+
+  it('resolves the Luuk Herssen S4 team amplify at rank and stays silent below', () => {
+    const met = resolveTeamBuffs(team(['luuk-herssen', 'verina', 'sanhua']), characterNameOf, {
+      'luuk-herssen': 4,
+    });
+    expect(met.buffs).toContainEqual({
+      label: 'Luuk Herssen S4 (team DMG)',
+      source: 'Team',
+      mods: [{ stat: 'amplify', value: 0.2 }],
+    });
+    const gated = resolveTeamBuffs(team(['luuk-herssen', 'verina', 'sanhua']), characterNameOf, {
+      'luuk-herssen': 3,
+    });
+    expect(gated.buffs.some((b) => b.label.includes('Luuk Herssen'))).toBe(false);
+  });
+
+  it('resolves Wave-4 stacked team pairs with rank gating (Roccia S2, Sanhua S6)', () => {
+    const met = resolveTeamBuffs(team(['roccia', 'sanhua', 'verina']), characterNameOf, {
+      roccia: 2,
+      sanhua: 6,
+    });
+    expect(met.buffs).toContainEqual({
+      label: 'Roccia S2 (team Havoc DMG)',
+      source: 'Team',
+      mods: [{ stat: 'dmgBonus:Havoc', value: 0.4 }],
+    });
+    expect(met.buffs).toContainEqual({
+      label: 'Sanhua S6 (team ATK)',
+      source: 'Team',
+      mods: [{ stat: 'atkPct', value: 0.2 }],
+    });
+    const gated = resolveTeamBuffs(team(['roccia', 'sanhua', 'verina']), characterNameOf, {
+      roccia: 1,
+      sanhua: 5,
+    });
+    // Table outro entries still resolve — only the chain-gated parts drop.
+    expect(gated.buffs.some((b) => b.label.includes('Roccia S2') || b.label.includes('Sanhua S6'))).toBe(false);
+    expect(gated.buffs.some((b) => b.label.includes('Roccia Outro'))).toBe(true);
+  });
+
   it('merges manual outroBuffs overrides and reports custom effects as warnings', () => {
     const { buffs, warnings } = resolveTeamBuffs(
       team(['chixia', 'verina', 'sanhua'], {

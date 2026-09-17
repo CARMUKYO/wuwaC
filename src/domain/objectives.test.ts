@@ -70,6 +70,40 @@ describe('scoreSheet', () => {
     expect(scoreSheet(spec, sheet, ctx)).toBe(expected);
   });
 
+  it('threads chain context into expected-damage (Zani S2 ×1.8)', () => {
+    const zani = snapshot.characters.find((c) => c.id === 'zani')!;
+    const skill = zani.skills.find((s) => s.kind === 'skill')!;
+    const spec = {
+      kind: 'expected-damage',
+      skillId: skill.id,
+      motionName: 'Targeted Action DMG',
+      forteLevel: 10,
+      crit: 'nonCrit',
+    } as const;
+    const sheet = emptySheet();
+    const s0 = scoreSheet(spec, sheet, { ...ctx, skill, characterId: 'zani', resonanceChain: 0 });
+    const s2 = scoreSheet(spec, sheet, { ...ctx, skill, characterId: 'zani', resonanceChain: 2 });
+    expect(s2 / s0).toBeCloseTo(1.8, 10);
+  });
+
+  it('threads kit state into expected-damage (Zani S3 Blazes)', () => {
+    const zani = snapshot.characters.find((c) => c.id === 'zani')!;
+    const liberation = zani.skills.find((s) => s.kind === 'liberation')!;
+    const spec = {
+      kind: 'expected-damage',
+      skillId: liberation.id,
+      motionName: 'The Last Stand DMG',
+      forteLevel: 10,
+      crit: 'nonCrit',
+    } as const;
+    const sheet = emptySheet();
+    const base = { ...ctx, skill: liberation, characterId: 'zani', resonanceChain: 3 };
+    const noBlazes = scoreSheet(spec, sheet, base);
+    const fiftyBlazes = scoreSheet(spec, sheet, { ...base, blazesConsumed: 50 });
+    // S3 Last Stand scales ×(1 + 8% per Blaze): 0 → ×1, 50 → ×5.
+    expect(fiftyBlazes / noBlazes).toBeCloseTo(5, 10);
+  });
+
   it('throws when the spec names a different skill than the context', () => {
     const sheet = emptySheet();
     const basic = jiyan.skills.find((s) => s.kind === 'basic')!;

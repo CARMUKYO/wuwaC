@@ -1,15 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { BUFF_PRESETS, isAutoApplied, resolvePresetMods, type BuffPreset } from '../../data/buffPresets.ts';
-import { statKeySchema, type CharacterData, type StatKey } from '../../data/schema.ts';
+import { attributeSchema, statKeySchema, type Attribute, type CharacterData, type StatKey } from '../../data/schema.ts';
+import type { EchoSkillHit } from '../../data/echoSkills.ts';
 import {
   characterResonanceModes,
   characterStatusBlocks,
   characterTuneRuptureResponses,
   characterUsesHavocBane,
   characterUsesTuneStrain,
+  isBuffOnlySkill,
   type ResonanceMode,
 } from '../../domain/characterMods.ts';
 import { resolveMotion } from '../../domain/damage.ts';
+import { JIYAN_OUTRO_LANCE_MV } from '../../domain/jiyan.ts';
 import { maxStatusStacks, negativeStatusDef } from '../../domain/negativeStatus.ts';
 import type { ActionBlock, BlockResult, RotationBuff } from '../../domain/rotation.ts';
 import { isBlockStale } from '../../domain/rotation.ts';
@@ -27,8 +30,19 @@ type KitStatePatch = Partial<
     | 'tuneStrainStacks'
     | 'tuneResponseStacks'
     | 'tuneBreakMultiplier'
+    | 'echoMotionValue'
+    | 'echoFlatDamage'
+    | 'echoAttribute'
+    | 'echoScaling'
   >
 >;
+
+/** Slot-1 echo skill parsed for the "add Echo skill" panel (null = slot 1 empty/unknown). */
+export interface MainEchoSkill {
+  echoName: string;
+  cooldown?: number;
+  hits: EchoSkillHit[];
+}
 
 const KIND_ORDER = ['basic', 'heavy', 'skill', 'liberation', 'intro', 'outro', 'forte', 'echo', 'tunebreak'] as const;
 const KIND_LABELS: Record<string, string> = {
@@ -62,11 +76,13 @@ interface RotationTimelineProps {
   rotationTime: number;
   /** Equipped weapon rank (1-5) for resolving weapon preset series. Defaults to 5. */
   weaponRank?: number;
+  /** Slot-1 echo skill for the "add Echo skill" panel. Absent = slot 1 empty/unknown. */
+  mainEchoSkill?: MainEchoSkill | null;
   onAddBlock: (
     skillId: string,
     motionName: string,
     forteLevel: number,
-    options?: Pick<ActionBlock, 'damageKind' | 'statusType' | 'statusStacks' | 'tuneResponseStacks' | 'tuneBreakMultiplier'>,
+    options?: Pick<ActionBlock, 'damageKind' | 'statusType' | 'statusStacks' | 'tuneResponseStacks' | 'tuneBreakMultiplier' | 'echoName' | 'echoMotionValue' | 'echoFlatDamage' | 'echoAttribute' | 'echoScaling' | 'echoCooldown'>,
   ) => void;
   onRemoveBlock: (id: string) => void;
   onMoveBlock: (id: string, direction: -1 | 1) => void;
@@ -119,6 +135,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
   const {
     character, resonanceChain, forteLevels, resonanceMode, onSetResonanceMode, blocks, buffs, globalBuffIds, results, dpr, dps, rotationTime,
     weaponRank = 5,
+    mainEchoSkill = null,
     onAddBlock, onRemoveBlock, onMoveBlock, onSetBlockForte, onSetBlockStatusStacks, onSetBlockConviction,
     onSetBlockKitState, onToggleBlockBuff, onToggleGlobalBuff, onAddBuff, onRemoveBuff,
   } = props;
@@ -222,7 +239,13 @@ export function RotationTimeline(props: RotationTimelineProps) {
               const statusLabel = block.statusType ? negativeStatusDef(block.statusType).label : null;
               const tuneBreak = block.damageKind === 'tuneBreak';
               const tuneRupture = block.damageKind === 'tuneRupture';
-              const specialKind = negativeStatus || tuneBreak || tuneRupture;
+              const echoSkill = block.damageKind === 'echoSkill';
+              const specialKind = negativeStatus || tuneBreak || tuneRupture || echoSkill;
+              const echoSubtitle = echoSkill
+                ? `${((block.echoMotionValue ?? 0) * 100).toFixed(1)}% ${block.echoAttribute ?? '?'}${(block.echoFlatDamage ?? 0) > 0 ? ` +${block.echoFlatDamage}` : ''}${(block.echoScaling ?? 'ATK') !== 'ATK' ? ` [${block.echoScaling}]` : ''}`
+                : null;
+              const lanceBlock = !specialKind && skill !== undefined &&
+                skill.motionValues.length === 0 && !isBuffOnlySkill(character.id, skill);
               const blockLabel = specialKind
                 ? (result?.label ?? (statusLabel ? `${statusLabel} DMG` : block.motionName !== '' ? `${block.motionName} (Tune)` : 'Tune Break DMG'))
                 : (skill?.label ?? block.skillId);
@@ -241,7 +264,11 @@ export function RotationTimeline(props: RotationTimelineProps) {
                           ? `${block.statusStacks ?? 1} stack${(block.statusStacks ?? 1) === 1 ? '' : 's'}`
                           : tuneBreak
                             ? `coefficient ${block.tuneBreakMultiplier ?? '—'}`
-                            : block.motionName === '' ? 'No damage component' : block.motionName}
+                            : echoSkill
+                              ? (echoSubtitle ?? 'Echo Skill')
+                              : lanceBlock
+                                ? 'Coordinated lance (one trigger)'
+                                : block.motionName === '' ? 'No damage component' : block.motionName}
                         {result && !result.buffCarrier && ` · ${Math.round(result.damage).toLocaleString()} dmg · ${result.share.toFixed(1)}%`}
                       </p>
                     </div>
@@ -269,7 +296,11 @@ export function RotationTimeline(props: RotationTimelineProps) {
                             ? `Tune Break ×${block.tuneBreakMultiplier ?? '—'}`
                             : tuneRupture
                               ? `${block.motionName} · ${block.tuneResponseStacks ?? 0} trail stacks`
-                              : `Forte ${block.forteLevel} · ${block.activeBuffIds.length} buff${block.activeBuffIds.length === 1 ? '' : 's'}`}
+                              : echoSkill
+                                ? `Echo Skill · ${block.activeBuffIds.length} buff${block.activeBuffIds.length === 1 ? '' : 's'}`
+                                : lanceBlock
+                                ? `Coordinated lance · ${block.activeBuffIds.length} buff${block.activeBuffIds.length === 1 ? '' : 's'}`
+                                : `Forte ${block.forteLevel} · ${block.activeBuffIds.length} buff${block.activeBuffIds.length === 1 ? '' : 's'}`}
                       </summary>
                       <div className="mt-2 grid gap-2 md:grid-cols-2">
                         {tuneBreak ? (
@@ -342,6 +373,78 @@ export function RotationTimeline(props: RotationTimelineProps) {
                               className={`${inputClass} mt-0.5`}
                             />
                           </div>
+                        ) : echoSkill ? (
+                          <>
+                            <div>
+                              <label htmlFor={`block-echo-mv-${block.id}`} className={labelClass}>Motion value (%)</label>
+                              <input
+                                id={`block-echo-mv-${block.id}`}
+                                type="number"
+                                min={0}
+                                max={9900}
+                                step="any"
+                                value={block.echoMotionValue === undefined ? '' : Math.round(block.echoMotionValue * 100 * 1e6) / 1e6}
+                                onChange={(e) => {
+                                  if (e.target.value.trim() === '') return;
+                                  const num = Number(e.target.value);
+                                  if (Number.isFinite(num)) onSetBlockKitState(block.id, { echoMotionValue: num / 100 });
+                                }}
+                                className={`${inputClass} mt-0.5`}
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor={`block-echo-flat-${block.id}`} className={labelClass}>Flat damage</label>
+                              <input
+                                id={`block-echo-flat-${block.id}`}
+                                type="number"
+                                min={0}
+                                step="any"
+                                value={block.echoFlatDamage ?? 0}
+                                onChange={(e) => {
+                                  if (e.target.value.trim() === '') return;
+                                  const num = Number(e.target.value);
+                                  if (Number.isFinite(num)) onSetBlockKitState(block.id, { echoFlatDamage: num });
+                                }}
+                                className={`${inputClass} mt-0.5`}
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor={`block-echo-attr-${block.id}`} className={labelClass}>Damage element</label>
+                              <select
+                                id={`block-echo-attr-${block.id}`}
+                                value={block.echoAttribute ?? 'Havoc'}
+                                onChange={(e) => onSetBlockKitState(block.id, { echoAttribute: e.target.value as Attribute })}
+                                className={`${inputClass} mt-0.5`}
+                              >
+                                {attributeSchema.options.map((attr) => (
+                                  <option key={attr} value={attr}>{attr}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label htmlFor={`block-echo-scaling-${block.id}`} className={labelClass}>Scales off</label>
+                              <select
+                                id={`block-echo-scaling-${block.id}`}
+                                value={block.echoScaling ?? 'ATK'}
+                                onChange={(e) => {
+                                  const scaling = e.target.value;
+                                  if (scaling === 'ATK' || scaling === 'HP' || scaling === 'DEF') {
+                                    onSetBlockKitState(block.id, { echoScaling: scaling });
+                                  }
+                                }}
+                                className={`${inputClass} mt-0.5`}
+                              >
+                                <option value="ATK">ATK</option>
+                                <option value="HP">HP</option>
+                                <option value="DEF">DEF</option>
+                              </select>
+                            </div>
+                            {block.echoCooldown !== undefined && (
+                              <p className="text-xs text-slate-500">
+                                Cooldown {block.echoCooldown}s (shown, not simulated — blocks carry no timestamps).
+                              </p>
+                            )}
+                          </>
                         ) : (
                           <div>
                             <label htmlFor={`block-forte-${block.id}`} className={labelClass}>Forte level</label>
@@ -566,8 +669,22 @@ export function RotationTimeline(props: RotationTimelineProps) {
             <div key={kind}>
               <p className="text-xs font-medium text-slate-400">{KIND_LABELS[kind]}</p>
               <div className="mt-1 flex flex-wrap gap-1">
-                {character.skills.filter((s) => s.kind === kind).flatMap((skill) =>
-                  skill.motionValues.length === 0 ? (
+                {character.skills.filter((s) => s.kind === kind).flatMap((skill) => {
+                  if (skill.motionValues.length === 0 && !isBuffOnlySkill(character.id, skill)) {
+                    // Jiyan's outro lance: buff-carrier-shaped, scores damage.
+                    return (
+                      <button
+                        key={skill.id}
+                        type="button"
+                        title={`${(JIYAN_OUTRO_LANCE_MV * 100).toFixed(1)}% ATK · Aero + coordinated buckets`}
+                        onClick={() => onAddBlock(skill.id, '', forteLevels[skill.id] ?? 10)}
+                        className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                      >
+                        {skill.label} (coordinated lance)
+                      </button>
+                    );
+                  }
+                  return skill.motionValues.length === 0 ? (
                     <button
                       key={skill.id}
                       type="button"
@@ -590,8 +707,8 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         {(motion.dmgType ?? skill.kind) !== skill.kind && ` (${KIND_LABELS[motion.dmgType ?? skill.kind] ?? motion.dmgType} bonus)`}
                       </button>
                     ))
-                  ),
-                )}
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -669,6 +786,44 @@ export function RotationTimeline(props: RotationTimelineProps) {
             </button>
           </div>
         </div>
+        {mainEchoSkill !== null && (
+          <div className="mt-3 rounded-md border border-slate-800 p-2">
+            <p className="text-xs font-medium text-slate-400">Echo Skill (slot 1: {mainEchoSkill.echoName})</p>
+            {mainEchoSkill.hits.length === 0 ? (
+              <p className="mt-1 text-xs text-slate-500">
+                No damaging skill to score — heals, shields, Physical damage, and utility echoes carry no scorable hit.
+              </p>
+            ) : (
+              <>
+                <p className="mt-1 text-xs text-slate-500">
+                  One block per hit — repeat for multi-hit skills{mainEchoSkill.cooldown !== undefined ? ` (cooldown ${mainEchoSkill.cooldown}s shown, not simulated)` : ''}.
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {mainEchoSkill.hits.map((hit) => (
+                    <button
+                      key={hit.label}
+                      type="button"
+                      onClick={() => onAddBlock('', mainEchoSkill.echoName, 1, {
+                        damageKind: 'echoSkill',
+                        echoName: mainEchoSkill.echoName,
+                        echoMotionValue: hit.motionValue,
+                        echoFlatDamage: hit.flatDamage,
+                        echoAttribute: hit.attribute,
+                        echoScaling: hit.scaling,
+                        echoCooldown: mainEchoSkill.cooldown,
+                      })}
+                      className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                    >
+                      {mainEchoSkill.hits.length > 1 ? `${hit.label} · ` : ''}{(hit.motionValue * 100).toFixed(1)}% {hit.attribute}
+                      {hit.flatDamage > 0 && ` +${hit.flatDamage}`}
+                      {hit.scaling !== 'ATK' && ` [${hit.scaling}]`}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </section>
 
       <section aria-label="Buffs" className="rounded-lg border border-slate-800 bg-slate-900 p-3">
@@ -759,6 +914,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
         <button type="button" onClick={(e) => handleAddBuff(e as unknown as FormEvent)} className="mt-2 rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800">
           Add buff
         </button>
+        <p className="mt-1 text-xs text-slate-500">RES shred is entered as a negative RES Penetration value.</p>
       </section>
     </div>
   );

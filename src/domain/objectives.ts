@@ -30,6 +30,19 @@ export interface ScoreContext {
   attribute?: Attribute;
   /** Required when the character has Resonance Modes (dual-mode kits). */
   resonanceMode?: ResonanceMode;
+  /**
+   * Optional kit state for expected-damage objectives (mirrors the
+   * DamageContext kit fields). Absent = zeros = today's behavior.
+   */
+  targetStatusStacks?: number;
+  conviction?: number;
+  targetHavocBaneStacks?: number;
+  blazesConsumed?: number;
+  nightfallBlazes?: number;
+  ringsConsumed?: number;
+  voiceFlux?: boolean;
+  wovenMyriad?: boolean;
+  tuneStrainStacks?: number;
 }
 
 export type ObjectiveFn = (sheet: StatSheet, ctx: ScoreContext) => number;
@@ -69,6 +82,17 @@ export function scoreSheet(spec: ObjectiveSpec, sheet: StatSheet, ctx: ScoreCont
         forteLevel: spec.forteLevel,
         enemy: ctx.enemy,
         crit: spec.crit,
+        characterId: ctx.characterId,
+        resonanceChain: ctx.resonanceChain,
+        targetStatusStacks: ctx.targetStatusStacks,
+        conviction: ctx.conviction,
+        targetHavocBaneStacks: ctx.targetHavocBaneStacks,
+        blazesConsumed: ctx.blazesConsumed,
+        nightfallBlazes: ctx.nightfallBlazes,
+        ringsConsumed: ctx.ringsConsumed,
+        voiceFlux: ctx.voiceFlux,
+        wovenMyriad: ctx.wovenMyriad,
+        tuneStrainStacks: ctx.tuneStrainStacks,
       }).damage;
     }
     case 'rotation-dpr': {

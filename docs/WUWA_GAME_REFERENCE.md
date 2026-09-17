@@ -92,13 +92,35 @@ user's chosen objective.
   (comparable to Genshin's talent + constellation-adjacent passive
   nodes combined). Model as leveled nodes that each contribute either a
   skill-multiplier increase or a flat/percentage stat bonus.
+  Node unlock state is user-declared (the provider ships no gating
+  data): `roster.forteUnlockedIds` gates which nodes apply, and an
+  absent set keeps the legacy all-active behavior.
 - **Resonance Chain**: the duplicate-copy system, S0 (no dupes) through
   S6, each rank altering the kit (stat bonus, new effect, or multiplier
-  increase). Functionally analogous to Genshin's Constellations. Model as
-  a per-character array of 6 discrete effect definitions.
+  increase). Functionally analogous to Genshin's Constellations. The sync
+  step keeps every rank as unstructured prose (never invent structure);
+  the hand-curated `CHAIN_PRESETS` catalog transcribes the transcribable
+  subset instead — all 348 ranks (58 characters × 6) accounted as
+  `sheet` (auto-applied stat mods), `motion` (per-motion multipliers,
+  skill-scoped crit, motion-scoped DEF ignore, matched by skill kind /
+  motion-name substring / scored bucket), `team` (rank-gated manual
+  team buffs, always paired with the wielder's own sheet part), or
+  `note` (dated reason; `appliedElsewhere` cites the per-character
+  module that scores the rank instead). Stacking and timed effects
+  transcribe at full stacks / full uptime with a disclosed assumption;
+  energy, cooldown, shield, revive, ammo, interrupt, and extra-hit
+  mechanics stay notes. Motion-scoped "Amplified" wordings score as
+  per-motion multipliers; per-element RES shred scores sheet-wide as
+  negative penetration; "All DMG Amplification" maps to the amplify
+  term. Skill-named wordings apply skill-wide, motion-named wordings to
+  the named motion only.
 - **Weapon**: each weapon type (Sword, Broadblade, Pistols, Gauntlets,
   Rectifier) has a base ATK curve, one secondary stat, and a passive
   effect that scales with refinement rank (1–5, from owning duplicates).
+  Weapon ATK/secondary curves carry post-ascension `.5` tiers at the
+  20/40/…/80 breakpoints; `roster.weaponAscension` (0–6, default 0)
+  selects the tier with the same rank semantics as character
+  ascension (`lookupAscendedCurve`).
 
 ## 5. Team mechanics (needed for the v2 rotation layer)
 
@@ -115,7 +137,12 @@ user's chosen objective.
   damage-optimization lever in real play.
 - **Coordinated Attacks**: some kits trigger an off-field ally to jump in
   and attack automatically under certain conditions, independent of the
-  Intro/Outro handoff.
+  Intro/Outro handoff. Coordinated-attack DMG bonuses (Hecate, Youhu
+  Outro, Empyrean Anthem, ...) score in the additive
+  `dmgBonus:coordinated` bucket, consumed only by hits flagged as
+  coordinated attacks (registry in `domain/characterMods.ts` plus
+  Jiyan's outro lance in `domain/jiyan.ts`) — see the §6
+  `DmgBonusPercent` note for why the bucket is additive.
 - **Roles**: teams are typically built as Main DPS (spends most on-field
   time, receives the team's buffs) + Sub-DPS (brief on-field window,
   often applies a debuff or its own burst) + Support/Healer (buffs,
@@ -154,7 +181,11 @@ BaseAbilityDamage = AbilityAttributeStat × MotionValuePercent
 almost every skill, unless the specific skill's data says otherwise).
 `MotionValuePercent` ("MV") is the skill's own multiplier, part of that
 skill's kit data — this is exactly the kind of number that must come from
-the encore.moe data sync (section 8), never be guessed.
+the encore.moe data sync (section 8), never be guessed. Synced MVs are
+hit-totals (the parser folds `N%*k` hit counts into the ratio), so each
+motion scores exactly once; the displayed hit count is informational.
+Forte level N maps to array index N−1 over skill levels 1–10 (verified
+against the provider's 10-entry `DamageList.RateLv` combat track).
 
 Total ATK itself is derived, not a single stored number:
 
@@ -173,7 +204,12 @@ Resistances = ResMultiplier × DefMultiplier × DmgReductionTotal × ElemReducti
   the attack's element. Most non-boss enemies have a base resistance of
   10% per element; bosses with an element-specific resistance add
   another 30%, for 40% total. These are per-enemy data, not constants to
-  hardcode into the formula itself.
+  hardcode into the formula itself. Sign convention: penetration is
+  positive, RES shred is NEGATIVE — shred lowers effective resistance by
+  exactly its magnitude (pinned by the shred-sign test). The sheet key
+  is element-agnostic, so element-gated kit shred (Phoebe Spectro,
+  Woodland Aria Aero, Suisui Havoc) is transcribed with its gate
+  disclosed in the assumption.
 - `ResMultiplier` — piecewise on `ResTotal`:
   - if `ResTotal < 0`: `1 − ResTotal / 2`
   - if `0 ≤ ResTotal < 0.8`: `1 − ResTotal`
@@ -211,7 +247,18 @@ Bonuses = DmgBonusPercent × DmgAmplifyTotal × SpecialDmgPercent × CritMultipl
   weapon, Echo main/substats, and Sonata bonuses. This additive sum is
   exactly the `attributeDmgBonus` / damage-type-bucket aggregation
   described in section 1 — implement it as one function that sums the
-  relevant buckets for a given hit.
+  relevant buckets for a given hit. Coordinated attacks additionally
+  consume `dmgBonus:coordinated` in the same sum: the formula tree has
+  no separate multiplicative term for named damage subtypes (only
+  attribute/action buckets plus global amplify), so "Coordinated Attack
+  DMG +X%" joins `AllDmgBonus` additively, gated on the hit being a
+  coordinated attack. A coordinated attack is not an Echo skill — never
+  map these bonuses to `dmgBonus:echo`.
+- Echo skills score as rotation blocks carrying the slot-1 Echo's parsed
+  motion value, damage element, and scaling (`computeEchoSkillDamage`):
+  the echo's own attribute bucket plus the `dmgBonus:echo` bucket, one
+  block per hit. Cooldowns are carried for display only — blocks have no
+  timestamps. Physical-DMG echoes are unscorable (no Physical RES term).
 - `DmgAmplifyTotal = 1 + (dmgAmplifyTarget + dmgAmplifyAttacker)` — a
   separate multiplier from an uncommon buff type ("DMG Amplify"), which
   can be negative (a reduction) as well as positive. Keep this as its
@@ -294,10 +341,11 @@ detonates the mark for one large instance, then responders
 a per-stack total-DMG amp scaling with Tune Break Boost. Tune Rupture
 DMG and Tune Break DMG formulas are unpublished (Phase 0 spikes G2/G3) —
 model response instances as labeled assumptions, never as verified
-formula. **Resonance Mode** (Aemeath, Denia, Lucilla, Lynae) switches a
-character between applying different statuses/dealing different damage
-types; treat it as a per-rotation calculator input, since switching
-resets kit resources.
+formula. **Resonance Mode** (Aemeath, Denia, Lynae — plus Lucilla
+in-game, but she stays unregistered until scoring consumes her mode)
+switches a character between applying different statuses/dealing
+different damage types; treat it as a per-rotation calculator input,
+since switching resets kit resources.
 
 ## 7. Optimizer search — practical notes
 
@@ -324,7 +372,13 @@ resets kit resources.
   roster rank, met Sonata thresholds, slot-1 Echo bonus) auto-apply in
   `computeStats` at full stacks/uptime so the calculator and optimizer
   agree by construction; every applied effect is disclosed via
-  `appliedAssumptions`, and untranscribed effects still warn.
+  `appliedAssumptions`, and untranscribed effects still warn. Sonata
+  notes that ship `{N}` placeholders transcribe from an inspected live
+  source (per-entry `liveSource` in the catalog); genuinely dynamic
+  effects (Halo 5pc's Buildup-scaling ATK) stay `custom` by decision.
+  Echo-skill and coordinated-lance rotation blocks carry their own
+  damage inputs, so the optimizer scores them through the shared
+  rotation path with no search changes.
 - Score builds against a user-chosen objective function, not just raw
   ATK — expected damage for a specific skill, a specific stat threshold
   ("maximize ATK subject to Crit Rate ≥ 70%"), etc. Design the objective

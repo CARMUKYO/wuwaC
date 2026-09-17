@@ -185,6 +185,14 @@ export function RosterPage() {
                       max={5}
                       onChange={(v) => commit(entry, { weaponRank: v })}
                     />
+                    <SliderField
+                      id={`roster-weapon-ascension-${entry.characterId}`}
+                      label={`Weapon ascension for ${name}`}
+                      value={entry.weaponAscension ?? 0}
+                      min={0}
+                      max={6}
+                      onChange={(v) => commit(entry, { weaponAscension: v })}
+                    />
                   </div>
                   {scorable.length > 0 && (
                     <fieldset className="mt-2">
@@ -203,6 +211,38 @@ export function RosterPage() {
                             }
                           />
                         ))}
+                      </div>
+                    </fieldset>
+                  )}
+                  {character && character.forteNodes.length > 0 && (
+                    <fieldset className="mt-2">
+                      <legend className="text-xs text-slate-300">Forte nodes unlocked (untouched = all active)</legend>
+                      <div className="mt-1 grid grid-cols-2 gap-1 md:grid-cols-3">
+                        {character.forteNodes.map((node) => {
+                          const unlocked = entry.forteUnlockedIds === undefined
+                            ? true
+                            : entry.forteUnlockedIds.includes(node.id);
+                          return (
+                            <label key={node.id} className="flex items-center gap-2 text-xs text-slate-300">
+                              <input
+                                type="checkbox"
+                                aria-label={`${node.title} unlocked for ${name}`}
+                                checked={unlocked}
+                                onChange={() => {
+                                  const current = entry.forteUnlockedIds === undefined
+                                    ? character.forteNodes.map((n) => n.id)
+                                    : entry.forteUnlockedIds;
+                                  commit(entry, {
+                                    forteUnlockedIds: unlocked
+                                      ? current.filter((id) => id !== node.id)
+                                      : [...current, node.id],
+                                  });
+                                }}
+                              />
+                              <span>{node.title}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     </fieldset>
                   )}

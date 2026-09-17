@@ -178,3 +178,37 @@ interface Team {
 ## Conventions
 
 - Use ESM `import`/`export` with explicit `.ts`/`.tsx` extensions in relative paths.
+
+## Subagent delegation
+
+Default to working inline — a lookup one `search`/`read` answers stays
+inline. Spawn child agents when the work splits into genuinely independent
+units:
+
+- **Fan-out transcription/audit**: N same-shaped units (per-Sonata-set
+  values, per-character/per-weapon checks, provider-vs-snapshot diffs).
+  One child per batch, not per keyword; cap width to the units at hand.
+- **Bounded read-only research**: snapshot/API/live-source lookups with a
+  crisp question that needs no session context.
+
+Never delegate cross-cutting design, final integration, or verification.
+Children are read-only researchers: they return evidence (file:line,
+values, exact URLs inspected), and the parent does all edits, runs the
+gates, and owns correctness. A child result you haven't verified is a
+lead, not a fact — especially numbers, which re-enter the
+no-fabrication guardrail at integration time.
+
+Reusable child briefs (paste into the spawn prompt, scoped to the task):
+
+- **data-transcriber**: "Transcribe these snapshot records into
+  `BUFF_PRESETS`/`TEAM_BUFFS` entry text: <ids>. Rules: values only from
+  the quoted source strings; flag ambiguities instead of guessing; return
+  entries + one-line provenance each. Do not edit files."
+- **source-scout**: "Find current numeric values for <items> from live
+  sources. Inspect underlying page content (search snippets don't count);
+  return value + exact URL per item, or 'unresolved' with what you tried.
+  Do not edit files."
+- **mechanics-checker**: "Review <diff/plan> against
+  `docs/WUWA_GAME_REFERENCE.md` (it wins over background knowledge).
+  Return each contradiction with doc section + file:line, or 'no
+  contradictions found'. Do not edit files."

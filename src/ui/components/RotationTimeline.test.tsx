@@ -1,14 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { loadBundledSnapshot } from '../../data/index.ts';
 import type { ActionBlock, RotationBuff } from '../../domain/rotation.ts';
-import { RotationTimeline } from './RotationTimeline.tsx';
+import { RotationTimeline, type MainEchoSkill } from './RotationTimeline.tsx';
 
 const character = loadBundledSnapshot().characters.find((c) => c.id === 'jiyan')!;
 
-function renderTimeline(overrides: { weaponRank?: number; onAddBuff?: (buff: Omit<RotationBuff, 'id'>) => void } = {}) {
+function renderTimeline(
+  overrides: {
+    weaponRank?: number;
+    onAddBuff?: (buff: Omit<RotationBuff, 'id'>) => void;
+    mainEchoSkill?: MainEchoSkill | null;
+    onAddBlock?: Mock;
+  } = {},
+) {
   const onAddBuff = overrides.onAddBuff ?? vi.fn();
+  const onAddBlock: Mock = overrides.onAddBlock ?? vi.fn();
   render(
     <RotationTimeline
       character={character}
@@ -24,7 +32,8 @@ function renderTimeline(overrides: { weaponRank?: number; onAddBuff?: (buff: Omi
       dps={null}
       rotationTime={20}
       weaponRank={overrides.weaponRank}
-      onAddBlock={() => {}}
+      mainEchoSkill={overrides.mainEchoSkill}
+      onAddBlock={onAddBlock}
       onRemoveBlock={() => {}}
       onMoveBlock={() => {}}
       onSetBlockForte={() => {}}
@@ -37,7 +46,7 @@ function renderTimeline(overrides: { weaponRank?: number; onAddBuff?: (buff: Omi
       onRemoveBuff={() => {}}
     />,
   );
-  return { onAddBuff: onAddBuff as ReturnType<typeof vi.fn> };
+  return { onAddBuff: onAddBuff as ReturnType<typeof vi.fn>, onAddBlock };
 }
 
 describe('RotationTimeline buff presets', () => {
@@ -119,5 +128,43 @@ describe('RotationTimeline buff presets', () => {
       source: 'Custom',
       mods: [{ stat: 'atkPct', value: 0.1 }],
     });
+  });
+});
+
+describe('RotationTimeline echo skill panel', () => {
+  const lorelei: MainEchoSkill = {
+    echoName: 'Lorelei',
+    cooldown: 25,
+    hits: [{ label: 'Hit 1', motionValue: 4.05, flatDamage: 0, attribute: 'Havoc', scaling: 'ATK' }],
+  };
+
+  it('adds an echo-skill block carrying the parsed hit values', async () => {
+    const user = userEvent.setup();
+    const { onAddBlock } = renderTimeline({ mainEchoSkill: lorelei });
+
+    await user.click(screen.getByRole('button', { name: /405\.0% havoc/i }));
+
+    expect(onAddBlock).toHaveBeenCalledOnce();
+    expect(onAddBlock).toHaveBeenCalledWith('', 'Lorelei', 1, {
+      damageKind: 'echoSkill',
+      echoName: 'Lorelei',
+      echoMotionValue: 4.05,
+      echoFlatDamage: 0,
+      echoAttribute: 'Havoc',
+      echoScaling: 'ATK',
+      echoCooldown: 25,
+    });
+  });
+
+  it('explains slot-1 echoes with no scorable hit instead of offering buttons', () => {
+    renderTimeline({ mainEchoSkill: { echoName: 'Diamondclaw', cooldown: 8, hits: [] } });
+
+    expect(screen.getByText(/no damaging skill to score/i)).toBeInTheDocument();
+  });
+
+  it('hides the panel when slot 1 is empty', () => {
+    renderTimeline({ mainEchoSkill: null });
+
+    expect(screen.queryByText(/echo skill \(slot 1/i)).not.toBeInTheDocument();
   });
 });

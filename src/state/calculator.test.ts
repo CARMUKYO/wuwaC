@@ -109,6 +109,35 @@ describe('calculator store', () => {
     expect(s.rosterSourceId).toBe('jiyan');
   });
 
+  it('prefills weapon ascension + forte unlocks, defaulting absent fields', () => {
+    freshState();
+    useCalculatorStore.getState().resetFromRoster({
+      ...entry,
+      weaponAscension: 4,
+      forteUnlockedIds: ['185', '186'],
+    });
+    let s = useCalculatorStore.getState();
+    expect(s.weaponAscension).toBe(4);
+    expect(s.forteUnlockedIds).toEqual(['185', '186']);
+    // Legacy entries without the fields: pre-ascension weapon, all nodes on.
+    useCalculatorStore.getState().resetFromRoster(entry);
+    s = useCalculatorStore.getState();
+    expect(s.weaponAscension).toBe(0);
+    expect(s.forteUnlockedIds).toBeNull();
+  });
+
+  it('clamps the weapon ascension slider and resets unlocks on character switch', () => {
+    freshState();
+    useCalculatorStore.getState().setWeaponAscension(9);
+    expect(useCalculatorStore.getState().weaponAscension).toBe(6);
+    useCalculatorStore.getState().setWeaponAscension(-1);
+    expect(useCalculatorStore.getState().weaponAscension).toBe(0);
+    useCalculatorStore.getState().setCharacterId('jiyan');
+    useCalculatorStore.getState().setForteUnlockedIds(['185']);
+    useCalculatorStore.getState().setCharacterId('verina');
+    expect(useCalculatorStore.getState().forteUnlockedIds).toBeNull();
+  });
+
   it('resetAll restores defaults', () => {
     freshState();
     useCalculatorStore.getState().resetFromRoster(entry);
@@ -117,6 +146,8 @@ describe('calculator store', () => {
     expect(s.characterId).toBe('');
     expect(s.forteLevels).toEqual({});
     expect(s.rosterSourceId).toBe('');
+    expect(s.weaponAscension).toBe(0);
+    expect(s.forteUnlockedIds).toBeNull();
   });
 
   it('adds, reorders, and removes blocks', () => {
@@ -201,6 +232,17 @@ describe('calculator store', () => {
     expect(t.tuneStrainStacks).toBe(10);
     expect(t.tuneResponseStacks).toBe(0);
     expect(t.tuneBreakMultiplier).toBeCloseTo(1.7334, 10);
+    useCalculatorStore.getState().setBlockKitState(row.id, {
+      echoMotionValue: 120,
+      echoFlatDamage: -5,
+      echoAttribute: 'Havoc',
+      echoScaling: 'HP',
+    });
+    const e = useCalculatorStore.getState().blocks[0];
+    expect(e.echoMotionValue).toBe(99);
+    expect(e.echoFlatDamage).toBe(0);
+    expect(e.echoAttribute).toBe('Havoc');
+    expect(e.echoScaling).toBe('HP');
     useCalculatorStore.getState().setBlockKitState('missing', { blazesConsumed: 10 });
     expect(useCalculatorStore.getState().blocks).toHaveLength(1);
   });

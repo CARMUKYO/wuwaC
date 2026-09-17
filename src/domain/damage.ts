@@ -5,7 +5,7 @@ import {
   type DamageType,
   type MotionBonusKind,
 } from '../data/schema.ts';
-import { computeAbilityStat, type StatSheet } from './stats.ts';
+import { computeAbilityStat, computeAtk, type StatSheet } from './stats.ts';
 import {
   aeroErosionMultiplier,
   cartethyiaConvictionCritDmg,
@@ -16,9 +16,11 @@ import { AEMEATH_S6_FIXED_CRIT } from './aemeath.ts';
 import {
   characterResonanceModes,
   characterSkillMods,
+  isCoordinatedMotion,
   tuneResponseStackRate,
   type ResonanceMode,
 } from './characterMods.ts';
+import { jiyanOutroLanceSpec } from './jiyan.ts';
 import {
   havocBaneDefReduction,
   maxStatusStacks,
@@ -152,16 +154,22 @@ export function computeElemReductionTotal(base: number, additional: number): num
  * Herssen's Liberation scores against `dmgBonus:basic`, Jiyan's
  * Liberation against `dmgBonus:heavy`. `forte` is only the fallback for
  * genuinely unknown types and keeps the v1 attribute-only behavior.
+ *
+ * Coordinated attacks additionally consume `dmgBonus:coordinated` (Decision
+ * 3, reference doc §6 note): same additive `AllDmgBonus` sum — the formula
+ * tree has no separate multiplicative term for named damage subtypes.
  */
 export function computeDmgBonusPercent(
   sheet: StatSheet,
   attribute: Attribute,
   kind: DamageType | 'forte',
   extra = 0,
+  isCoordinated = false,
 ): number {
   const attributeBonus = sheet[`dmgBonus:${attribute}`];
   const bucketBonus = kind === 'forte' ? 0 : sheet[`dmgBonus:${kind}`];
-  return 1 + attributeBonus + bucketBonus + extra;
+  const coordinatedBonus = isCoordinated ? sheet['dmgBonus:coordinated'] : 0;
+  return 1 + attributeBonus + bucketBonus + extra + coordinatedBonus;
 }
 
 /** DmgAmplifyTotal = 1 + (target + attacker). Signed — keep separate from the additive bucket. */
@@ -208,9 +216,19 @@ export interface ResolvedMotion {
 /**
  * Pick the motion component for (skill, forteLevel).
  *
- * TODO: verify the forteLevel → array-index mapping. Arrays carry ~20
- * entries against ~10 skill levels; v1 assumes index = forteLevel − 1
- * (clamped). Pinned by unit test — update test + mapping together.
+ * Index mapping (verified 2026-09-17 against the live provider record
+ * for Yangyang, encore id 1402): every `DamageList[].RateLv` — the
+ * combat-formula source — carries exactly 10 entries matching
+ * `SkillAttributes.values[0..9]` (Lv10 Stage 1 = 44.73% at index 9), so
+ * index = forteLevel − 1 over levels 1–10. Entries 10–19 are an
+ * unlabeled second track the formula never addresses; they are
+ * intentionally ignored. Pinned by unit test.
+ *
+ * Multi-hit scoring decision: ratios are hit-TOTALS — the sync parser
+ * folds the hit count into the ratio (`11.33%*8` → 0.9064), so each
+ * motion scores exactly once. `hits` is informational (per-hit
+ * crit-variance is not modeled; expected-mode averaging is exact for
+ * totals regardless of hit count).
  */
 export function resolveMotion(
   skill: CharacterSkill,
@@ -375,8 +393,62 @@ export function computeNegativeStatusDamage(ctx: NegativeStatusDamageContext): D
  * with ATK unless specifically mentioned"). HP/DEF totals mirror the ATK
  * shape without a weapon base (wiki HP page). Healing motions score 0.
  */
+export interface JiyanLanceDamageContext {
+  sheet: StatSheet;
+  /** Lance motion value from `jiyanOutroLanceSpec` (carries the S5 chain multiplier). */
+  motionValue: number;
+  baseAtk: { character: number; weapon: number };
+  attackerLevel: number;
+  enemy: EnemyProfile;
+  crit: CritMode;
+  /** Havoc Bane stacks on the target — percentage DEF reduction. */
+  targetHavocBaneStacks?: number;
+}
+
+/**
+ * Jiyan's Outro coordinated lance (jiyan.ts prose spec). Attribute bucket
+ * plus the coordinated bucket, no action-type bucket (unstated in kit —
+ * see jiyan.ts) and no kit mods; otherwise the standard formula tree.
+ */
+export function computeJiyanLanceDamage(ctx: JiyanLanceDamageContext): DamageResult {
+  const { sheet, enemy } = ctx;
+  const abilityStat = computeAtk(ctx.baseAtk.character, ctx.baseAtk.weapon, sheet);
+  const baseDamage = computeBaseAbilityDamage(abilityStat, ctx.motionValue);
+  const resTotal = enemy.baseResistance.Aero + sheet.resistancePenetration;
+  const resistances =
+    computeResMultiplier(resTotal) *
+    computeDefMultiplier({
+      attackerLevel: ctx.attackerLevel,
+      enemyLevel: enemy.level,
+      enemyDefOverride: enemy.enemyDefOverride,
+      defIgnore: sheet.defIgnore,
+      defReduction: sheet.defReduction,
+      enemyDefPctReduction: havocBaneDefReduction(ctx.targetHavocBaneStacks ?? 0),
+    }) *
+    computeDmgReductionTotal(enemy.dmgReductionBase, enemy.dmgReductionAdditional) *
+    computeElemReductionTotal(enemy.elemReductionBase, enemy.elemReductionAdditional);
+  const bonuses =
+    computeDmgBonusPercent(sheet, 'Aero', 'forte', 0, true) *
+    computeDmgAmplifyTotal(sheet.amplify, enemy.amplifyTarget) *
+    computeSpecialDmgPercent(sheet.specialBase, sheet.specialBonus) *
+    computeCritMultiplier(sheet.critRate, sheet.critDmg, ctx.crit);
+  return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
+}
+
 export function computeDamage(ctx: DamageContext): DamageResult {
   const { sheet, skill, enemy } = ctx;
+  const lance = jiyanOutroLanceSpec(ctx.characterId, skill, ctx.motionName, ctx.resonanceChain ?? 0);
+  if (lance !== null) {
+    return computeJiyanLanceDamage({
+      sheet,
+      motionValue: lance.motionValue,
+      baseAtk: ctx.baseAtk,
+      attackerLevel: ctx.attackerLevel,
+      enemy,
+      crit: ctx.crit,
+      targetHavocBaneStacks: ctx.targetHavocBaneStacks,
+    });
+  }
   const motion = resolveMotion(skill, ctx.motionName, ctx.forteLevel);
   if (motion.isHealing) {
     return { damage: 0, baseDamage: 0, resistances: 1, bonuses: 1 };
@@ -427,7 +499,7 @@ export function computeDamage(ctx: DamageContext): DamageResult {
       attackerLevel: ctx.attackerLevel,
       enemyLevel: enemy.level,
       enemyDefOverride: enemy.enemyDefOverride,
-      defIgnore: sheet.defIgnore,
+      defIgnore: sheet.defIgnore + kitMods.defIgnoreExtra,
       defReduction: sheet.defReduction,
       enemyDefPctReduction: havocBaneDefReduction(ctx.targetHavocBaneStacks ?? 0),
     }) *
@@ -436,21 +508,99 @@ export function computeDamage(ctx: DamageContext): DamageResult {
 
   const kind = motion.dmgType;
   const bonuses =
-    computeDmgBonusPercent(sheet, skill.attribute, kind, kitMods.dmgBonusExtra) *
+    computeDmgBonusPercent(
+      sheet,
+      skill.attribute,
+      kind,
+      kitMods.dmgBonusExtra,
+      isCoordinatedMotion(ctx.characterId, motion.name),
+    ) *
     computeDmgAmplifyTotal(sheet.amplify + kitMods.amplifyExtra, enemy.amplifyTarget) *
     computeTuneStrainMultiplier(sheet.tuneBreakBoost, ctx.tuneStrainStacks ?? 0) *
     computeSpecialDmgPercent(sheet.specialBase, sheet.specialBonus) *
     computeCritMultiplier(
-      sheet.critRate,
-      sheet.critDmg + cartethyiaConvictionCritDmg(
-        ctx.characterId,
-        ctx.resonanceChain ?? 0,
-        skill,
-        ctx.conviction ?? 0,
-      ),
+      sheet.critRate + kitMods.critRateExtra,
+      sheet.critDmg +
+        kitMods.critDmgExtra +
+        cartethyiaConvictionCritDmg(
+          ctx.characterId,
+          ctx.resonanceChain ?? 0,
+          skill,
+          ctx.conviction ?? 0,
+        ),
       ctx.crit,
     );
 
+  return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
+}
+
+export interface EchoSkillDamageContext {
+  sheet: StatSheet;
+  baseAtk: { character: number; weapon: number };
+  baseHp: { character: number };
+  baseDef: { character: number };
+  /** Which character stat the echo skill scales off (parser tail, default ATK). */
+  scaling: 'ATK' | 'HP' | 'DEF';
+  /** Ratio-of-scaling-stat part (block data, explicit). */
+  motionValue: number;
+  /** Flat part of `N%+M` hybrids (default 0). */
+  flatDamage?: number;
+  /** The ECHO's damage element — usually not the character's attribute. */
+  attribute: Attribute;
+  attackerLevel: number;
+  enemy: EnemyProfile;
+  crit: CritMode;
+  /** Havoc Bane stacks on the target — percentage DEF reduction. */
+  targetHavocBaneStacks?: number;
+  /** Tune Strain - Interfered stacks on the target (total-DMG amp). */
+  tuneStrainStacks?: number;
+}
+
+/**
+ * Slot-1 Echo skill damage: the standard formula tree with the echo's own
+ * damage element and the `dmgBonus:echo` bucket (attribute + echo, the
+ * same two-bucket shape as kit motions). One call scores one hit/stage —
+ * multi-hit skills compose via multiple blocks. No kit mods apply.
+ */
+export function computeEchoSkillDamage(ctx: EchoSkillDamageContext): DamageResult {
+  if (!(ctx.motionValue >= 0) || !Number.isFinite(ctx.motionValue)) {
+    throw new Error(`echo motion value must be a non-negative number, got ${ctx.motionValue}`);
+  }
+  const { sheet, enemy } = ctx;
+  const abilityStat = computeAbilityStat(
+    ctx.scaling,
+    {
+      atkCharacter: ctx.baseAtk.character,
+      atkWeapon: ctx.baseAtk.weapon,
+      hpCharacter: ctx.baseHp.character,
+      defCharacter: ctx.baseDef.character,
+    },
+    sheet,
+  );
+  const baseDamage = computeBaseDamage(
+    computeBaseAbilityDamage(abilityStat, ctx.motionValue),
+    ctx.flatDamage ?? 0,
+    0,
+  );
+  const resTotal = enemy.baseResistance[ctx.attribute] + sheet.resistancePenetration;
+  const resistances =
+    computeResMultiplier(resTotal) *
+    computeDefMultiplier({
+      attackerLevel: ctx.attackerLevel,
+      enemyLevel: enemy.level,
+      enemyDefOverride: enemy.enemyDefOverride,
+      defIgnore: sheet.defIgnore,
+      defReduction: sheet.defReduction,
+      enemyDefPctReduction: havocBaneDefReduction(ctx.targetHavocBaneStacks ?? 0),
+    }) *
+    computeDmgReductionTotal(enemy.dmgReductionBase, enemy.dmgReductionAdditional) *
+    computeElemReductionTotal(enemy.elemReductionBase, enemy.elemReductionAdditional);
+  const bonuses =
+    computeDmgBonusPercent(sheet, ctx.attribute, 'echo') *
+    computeDmgAmplifyTotal(sheet.amplify, enemy.amplifyTarget) *
+    computeTuneStrainMultiplier(sheet.tuneBreakBoost, ctx.tuneStrainStacks ?? 0) *
+    computeSpecialDmgPercent(sheet.specialBase, sheet.specialBonus) *
+    computeCritMultiplier(sheet.critRate, sheet.critDmg, ctx.crit);
   return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
 }
 
