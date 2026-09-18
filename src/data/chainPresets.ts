@@ -718,6 +718,14 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'hiyuki',
     rank: 1,
     skillKind: 'basic',
+    motionNameIncludes: 'plunging attack - foreclaimed self',
+    motionMultiplier: 2.2,
+  },
+  {
+    scope: 'motion',
+    characterId: 'hiyuki',
+    rank: 1,
+    skillKind: 'basic',
     motionNameIncludes: 'dodge counter - foreclaimed self',
     motionMultiplier: 2.2,
   },
@@ -944,7 +952,25 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     rank: 6,
     dmgType: 'heavy',
     motionMultiplier: 1.4,
-    assumption: 'Target Hack-Shifting/Interfered (gate-met); Hack DMG +60% unmodeled (no Hack pipeline).',
+    assumption: 'Target Hack-Shifting/Interfered (gate-met).',
+  },
+  {
+    scope: 'motion',
+    characterId: 'lucy',
+    rank: 6,
+    skillKind: 'liberation',
+    motionNameIncludes: 'cripple movement',
+    motionMultiplier: 1.6,
+    assumption: 'Target Hack-Shifting/Interfered (gate-met); one of two Hack-typed motions (with Data Crash).',
+  },
+  {
+    scope: 'motion',
+    characterId: 'lucy',
+    rank: 6,
+    skillKind: 'forte',
+    motionNameIncludes: 'data crash',
+    motionMultiplier: 1.6,
+    assumption: 'Target Hack-Shifting/Interfered (gate-met); one of two Hack-typed motions (with Cripple Movement).',
   },
 
   // --- Lumi -----------------------------------------------------------------
@@ -1074,7 +1100,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     skillKind: 'skill',
     motionNameIncludes: 'aureole of execution',
     motionMultiplier: 1.3,
-    assumption: 'Nearby teammates dealt Tune Break DMG (trigger met), 25s window.',
+    assumption: 'Nearby teammates dealt Tune Break DMG (trigger met), 25s window; Endnotes liberation +40% DMG Bonus/stack (max +120%) unmodeled (no skill-scoped additive bucket).',
   },
   {
     scope: 'motion',
@@ -1273,10 +1299,12 @@ export const CHAIN_PRESETS: ChainPreset[] = [
 
   // --- Roccia ---------------------------------------------------------------
   {
-    scope: 'note',
+    scope: 'motion',
     characterId: 'roccia',
     rank: 4,
-    reason: 'Real Fantasy has no snapshot motion (2026-09-17).',
+    skillKind: 'forte',
+    motionMultiplier: 1.6,
+    assumption: '12s window after casting Resonance Skill Acrobatic Trick. Forte skill is the whole Real Fantasy Stage 1-3 cycle.',
   },
   {
     scope: 'motion',
@@ -1544,7 +1572,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     rank: 5,
     skillKind: 'liberation',
     motionMultiplier: 2,
-    assumption: 'Outro Chain Rule +222% unmodeled (outro has no scored motions).',
+    assumption: 'Outro Chain Rule +222% scored in xiangliyaoOutroChainRuleSpec (base 237.63%, one block per trigger, up to 3; incoming-basic trigger timing is user-arranged).',
   },
   {
     scope: 'motion',
@@ -1603,7 +1631,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     skillKind: 'forte',
     motionNameIncludes: 'visual impact',
     motionMultiplier: 1.9,
-    assumption: 'Premixed Hue Additive-Color scaling unmodeled (no motion-bonus seam).',
+    assumption: 'Premixed Hue scored in lynaeSkillMods at 25 stacks (+1375% Spectro bonus to Additive Color only; stacks are removed when Additive Color ends).',
   },
   {
     scope: 'motion',
@@ -1615,6 +1643,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
   },
   {
     scope: 'motion',
+    motionNameIncludes: 'prismatic overblast',
     characterId: 'lynae',
     rank: 5,
     skillKind: 'liberation',
@@ -1641,10 +1670,11 @@ export const CHAIN_PRESETS: ChainPreset[] = [
 
   // --- Qingxiao -------------------------------------------------------------
   {
-    scope: 'note',
+    scope: 'sheet',
     characterId: 'qingxiao',
     rank: 1,
-    reason: 'Juque Perdition is an extra-hit mechanic with no pipeline (2026-09-17).',
+    mods: [{ stat: 'critRate', value: 0.16 }],
+    assumption: 'Juque Perdition extra-hit riders unmodeled (400% Aero hit, considered Basic, once per second; +4% per removed Exorcising Seal unmodeled).',
   },
   {
     scope: 'motion',
@@ -1655,10 +1685,12 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     motionMultiplier: 1.4,
   },
   {
-    scope: 'note',
+    scope: 'motion',
     characterId: 'qingxiao',
     rank: 3,
-    reason: 'World in Chorus stack scaling needs a stack input (2026-09-17).',
+    skillKind: 'liberation',
+    critDmgExtra: 1,
+    assumption: 'World in Chorus Heaven’s Reckoning scaling unmodeled (needs a Mindlock-stack input); Gathered Mind extra Tune Strain stack unmodeled.',
   },
   {
     scope: 'motion',
@@ -1683,7 +1715,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     skillKind: 'forte',
     motionNameIncludes: "heaven's reckoning",
     motionMultiplier: 1.4,
-    assumption: 'Juque Perdition riders unmodeled (extra-hit mechanic).',
+    assumption: 'Juque Perdition + Mindlock-scaled Juque riders unmodeled (extra-hit mechanic); +20% Tune Strain response unmodeled (no relative-boost mechanic).',
   },
   {
     scope: 'motion',
@@ -1730,7 +1762,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'aalto',
     rank: 6,
     mods: [{ stat: 'critRate', value: 0.08 }],
-    assumption: 'During Liberation Flower in the Mist (base Liberation buff unmodeled).',
+    assumption: 'During Liberation Flower in the Mist; base Gate buff unmodeled (+10% ATK per the Fandom Aalto/Combat table — transient bullet gate, no bullet-scoped base-buff input).',
   },
   {
     scope: 'motion',
@@ -2230,6 +2262,15 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'sheet',
     characterId: 'lynae',
     rank: 2,
+  {
+    scope: 'team',
+    characterId: 'lynae',
+    rank: 2,
+    label: 'Lynae S2 (team all-DMG amp)',
+    windowSeconds: 14,
+    mods: [{ stat: 'amplify', value: 0.25 }],
+    assumption: 'Outro additionally grants the incoming Resonator 25% All DMG Amp for 14s; teammates part.',
+  },
     mods: [{ stat: 'amplify', value: 0.25 }],
   },
   {
@@ -2392,7 +2433,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'qiuyuan',
     rank: 6,
     mods: [{ stat: 'critDmg', value: 1 }],
-    assumption: '6s window after Straw Cape (ends early on switch).',
+    assumption: '6s window after Straw Cape (ends early on switch); 600% exit-Inksplash extra hit unmodeled (extra hit, no mechanic).',
   },
 
   // --- Rebecca --------------------------------------------------------------
@@ -2623,7 +2664,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'note',
     characterId: 'youhu',
     rank: 2,
-    reason: 'Poetic Essence bonus doubling needs the base motion bonuses (unmodeled) (2026-09-17).',
+    reason: 'S2 doubles Antithesis +70% / Triplet +175% (Perfect Rhyme carries Triplet); no Auspice-combo input for the base or doubled bonus (2026-09-18).',
   },
   {
     scope: 'sheet',
@@ -2671,10 +2712,12 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     assumption: 'While in Apex Resonance.',
   },
   {
-    scope: 'note',
+    scope: 'motion',
     characterId: 'roccia',
     rank: 6,
-    reason: 'Real Fantasy DEF ignore has no snapshot motion; Reality Recreation extra form unmodeled (2026-09-17).',
+    skillKind: 'forte',
+    defIgnoreExtra: 0.6,
+    assumption: '12s window after Liberation; Reality Recreation extra form unmodeled (extra hit equal to Real Fantasy Stage 3, considered Heavy).',
   },
   {
     scope: 'sheet',
@@ -3868,7 +3911,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'note',
     characterId: 'rebecca',
     rank: 4,
-    reason: 'Buff-magnitude increase needs the unmodeled base (2026-09-17).',
+    reason: 'S4 +60% to A Girl Gets What She Wants! needs the unmodeled base (Huntress +30% Crit DMG / Guts 15% DEF ignore, mode-gated 12s window); resulting values unpublished in inspected sources (2026-09-18).',
   },
 
   // --- Lucy -----------------------------------------------------------------

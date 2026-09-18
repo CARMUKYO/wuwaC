@@ -22,6 +22,7 @@ import {
 } from './characterMods.ts';
 import { jiyanOutroLanceSpec } from './jiyan.ts';
 import { camellyaOutroTwiningSpec } from './camellya.ts';
+import { xiangliyaoOutroChainRuleSpec } from './xiangliyao.ts';
 import {
   havocBaneDefReduction,
   maxStatusStacks,
@@ -480,6 +481,49 @@ export function computeCamellyaTwiningDamage(ctx: CamellyaTwiningDamageContext):
   return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
 }
 
+export interface XiangliyaoChainRuleDamageContext {
+  sheet: StatSheet;
+  /** Chain Rule motion value from `xiangliyaoOutroChainRuleSpec` (carries the S5 chain multiplier). */
+  motionValue: number;
+  baseAtk: { character: number; weapon: number };
+  attackerLevel: number;
+  enemy: EnemyProfile;
+  crit: CritMode;
+  /** Havoc Bane stacks on the target — percentage DEF reduction. */
+  targetHavocBaneStacks?: number;
+}
+
+/**
+ * Xiangli Yao's Outro (Chain Rule) damage (xiangliyao.ts prose spec).
+ * Electro attribute bucket only — no action-type bucket is stated in
+ * kit, and Chain Rule is not a coordinated attack (unlike the Jiyan
+ * lance); no kit mods; otherwise the standard formula tree.
+ */
+export function computeXiangliyaoChainRuleDamage(ctx: XiangliyaoChainRuleDamageContext): DamageResult {
+  const { sheet, enemy } = ctx;
+  const abilityStat = computeAtk(ctx.baseAtk.character, ctx.baseAtk.weapon, sheet);
+  const baseDamage = computeBaseAbilityDamage(abilityStat, ctx.motionValue);
+  const resTotal = enemy.baseResistance.Electro + sheet.resistancePenetration;
+  const resistances =
+    computeResMultiplier(resTotal) *
+    computeDefMultiplier({
+      attackerLevel: ctx.attackerLevel,
+      enemyLevel: enemy.level,
+      enemyDefOverride: enemy.enemyDefOverride,
+      defIgnore: sheet.defIgnore,
+      defReduction: sheet.defReduction,
+      enemyDefPctReduction: havocBaneDefReduction(ctx.targetHavocBaneStacks ?? 0),
+    }) *
+    computeDmgReductionTotal(enemy.dmgReductionBase, enemy.dmgReductionAdditional) *
+    computeElemReductionTotal(enemy.elemReductionBase, enemy.elemReductionAdditional);
+  const bonuses =
+    computeDmgBonusPercent(sheet, 'Electro', 'forte', 0, false) *
+    computeDmgAmplifyTotal(sheet.amplify, enemy.amplifyTarget) *
+    computeSpecialDmgPercent(sheet.specialBase, sheet.specialBonus) *
+    computeCritMultiplier(sheet.critRate, sheet.critDmg, ctx.crit);
+  return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
+}
+
 export function computeDamage(ctx: DamageContext): DamageResult {
   const { sheet, skill, enemy } = ctx;
   const lance = jiyanOutroLanceSpec(ctx.characterId, skill, ctx.motionName, ctx.resonanceChain ?? 0);
@@ -499,6 +543,18 @@ export function computeDamage(ctx: DamageContext): DamageResult {
     return computeCamellyaTwiningDamage({
       sheet,
       motionValue: twining.motionValue,
+      baseAtk: ctx.baseAtk,
+      attackerLevel: ctx.attackerLevel,
+      enemy,
+      crit: ctx.crit,
+      targetHavocBaneStacks: ctx.targetHavocBaneStacks,
+    });
+  }
+  const chainRule = xiangliyaoOutroChainRuleSpec(ctx.characterId, skill, ctx.motionName, ctx.resonanceChain ?? 0);
+  if (chainRule !== null) {
+    return computeXiangliyaoChainRuleDamage({
+      sheet,
+      motionValue: chainRule.motionValue,
       baseAtk: ctx.baseAtk,
       attackerLevel: ctx.attackerLevel,
       enemy,

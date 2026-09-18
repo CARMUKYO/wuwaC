@@ -239,4 +239,21 @@ describe('resolveTeamBuffs', () => {
     });
     expect(warnings).toContain('custom team effect from Sanhua not scored: unstructured aria');
   });
+
+  it('resolves Lynae S2 team all-DMG amp at rank with its 14s window, silent below', () => {
+    const met = resolveTeamBuffs(team(['lynae', 'verina', 'sanhua']), characterNameOf, {
+      lynae: 2,
+    });
+    expect(met.buffs).toContainEqual({
+      label: 'Lynae S2 (team all-DMG amp)',
+      source: 'Team',
+      mods: [{ stat: 'amplify', value: 0.25 }],
+      windowDurationSeconds: 14,
+    });
+    expect(met.warnings.some((w) => w.includes('Lynae'))).toBe(false);
+    const gated = resolveTeamBuffs(team(['lynae', 'verina', 'sanhua']), characterNameOf, {
+      lynae: 1,
+    });
+    expect(gated.buffs.some((b) => b.label.includes('Lynae S2'))).toBe(false);
+  });
 });

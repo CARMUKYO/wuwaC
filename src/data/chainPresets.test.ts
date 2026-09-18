@@ -114,6 +114,50 @@ describe('chain presets', () => {
     });
   });
 
+  it('transcribes Wave 3 Roccia/Qingxiao/Lynae conversions (snapshot + live prose)', () => {
+    // Roccia S4/S6: "Basic Attack Real Fantasy" is the forte skill's whole
+    // Stage 1–3 cycle (snapshot 1002707), so skillKind:'forte' with no name
+    // filter matches exactly it — verified against
+    // https://wuthering.gg/characters/roccia (S4 +60%/12s, S6 60% DEF
+    // ignore/12s + Reality Recreation extra form).
+    const rocciaS4 = CHAIN_PRESETS.filter((e) => e.characterId === 'roccia' && e.rank === 4);
+    expect(rocciaS4).toHaveLength(1);
+    expect(rocciaS4[0]).toMatchObject({ scope: 'motion', skillKind: 'forte', motionMultiplier: 1.6 });
+    const rocciaS6 = CHAIN_PRESETS.filter((e) => e.characterId === 'roccia' && e.rank === 6);
+    expect(rocciaS6).toHaveLength(1);
+    expect(rocciaS6[0]).toMatchObject({ scope: 'motion', skillKind: 'forte', defIgnoreExtra: 0.6 });
+    // Qingxiao S1 carries a flat +16% Crit Rate beside the Juque extra-hit
+    // riders; S3 carries +100% Liberation Crit DMG beside the World in
+    // Chorus stack scaling — both verified against
+    // https://www.lootbar.com/blog/en/wuthering-waves-qingxiao-build-guide-lb.html
+    const qingxiaoS1 = CHAIN_PRESETS.filter((e) => e.characterId === 'qingxiao' && e.rank === 1);
+    expect(qingxiaoS1).toHaveLength(1);
+    expect(qingxiaoS1[0]).toMatchObject({ scope: 'sheet', mods: [{ stat: 'critRate', value: 0.16 }] });
+    const qingxiaoS3 = CHAIN_PRESETS.filter((e) => e.characterId === 'qingxiao' && e.rank === 3);
+    expect(qingxiaoS3).toHaveLength(1);
+    expect(qingxiaoS3[0]).toMatchObject({ scope: 'motion', skillKind: 'liberation', critDmgExtra: 1 });
+    // Lynae S2's Outro rider is a rank-gated team amp (wielder sheet part
+    // already exists); S5 names Prismatic Overblast, not the To a Vivid
+    // Tomorrow follow-up — both verified against
+    // https://game8.co/games/Wuthering-Waves/archives/568211
+    const lynaeS2Team = CHAIN_PRESETS.find(
+      (e) => e.characterId === 'lynae' && e.rank === 2 && e.scope === 'team',
+    );
+    expect(lynaeS2Team).toMatchObject({
+      label: 'Lynae S2 (team all-DMG amp)',
+      windowSeconds: 14,
+      mods: [{ stat: 'amplify', value: 0.25 }],
+    });
+    const lynaeS5 = CHAIN_PRESETS.filter((e) => e.characterId === 'lynae' && e.rank === 5);
+    expect(lynaeS5).toHaveLength(1);
+    expect(lynaeS5[0]).toMatchObject({
+      scope: 'motion',
+      skillKind: 'liberation',
+      motionNameIncludes: 'prismatic overblast',
+      motionMultiplier: 1.7,
+    });
+  });
+
   it('keeps note reasons non-empty with cited modules', () => {
     for (const entry of CHAIN_PRESETS) {
       if (entry.scope !== 'note') continue;
@@ -145,6 +189,7 @@ describe('chain presets', () => {
       ['lumi@6', 20],
       ['lupa@2', 30],
       ['mortefi@6', 20],
+      ['lynae@2', 14],
       ['phoebe@2', 30],
       ['qingxiao@4', 8],
       ['rebecca@2', 30],

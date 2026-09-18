@@ -271,6 +271,115 @@ describe('characterStatusBlocks', () => {
     expect(characterStatusBlocks('zani')).toEqual(['spectroFrazzle']);
     expect(characterStatusBlocks('phoebe')).toEqual(['spectroFrazzle']);
     expect(characterStatusBlocks('rover-spectro')).toEqual(['spectroFrazzle']);
+  it('resolves Wave-3 Hiyuki S1 plunging and Lucy S6 Hack riders end to end', () => {
+    const run = (
+      characterId: string,
+      skillKind: string,
+      motionName: string,
+      resonanceChain: number,
+    ): number => {
+      const character = snapshot.characters.find((c) => c.id === characterId)!;
+      const skill = character.skills.find((s) => s.kind === skillKind)!;
+      return computeDamage({
+        sheet: emptySheet(),
+        baseAtk: { character: 100, weapon: 0 },
+        baseHp: { character: 10000 },
+        baseDef: { character: 100 },
+        attackerLevel: 90,
+        skill,
+        motionName,
+        forteLevel: 10,
+        enemy: standardMob(90),
+        crit: 'nonCrit',
+        characterId,
+        resonanceChain,
+      }).damage;
+    };
+    // Hiyuki S1 covers the whole Foreclaimed mid-air cycle, including the
+    // plunging motion the provider names differently (+120% each).
+    expect(
+      run('hiyuki', 'basic', 'Mid-air Plunging Attack - Foreclaimed Self DMG', 1) /
+        run('hiyuki', 'basic', 'Mid-air Plunging Attack - Foreclaimed Self DMG', 0),
+    ).toBeCloseTo(2.2, 10);
+    expect(
+      run('hiyuki', 'basic', 'Mid-air Attack - Foreclaimed Self Stage 1 DMG', 1) /
+        run('hiyuki', 'basic', 'Mid-air Attack - Foreclaimed Self Stage 1 DMG', 0),
+    ).toBeCloseTo(2.2, 10);
+    expect(
+      run('hiyuki', 'basic', 'Basic Attack - Present Self Stage 1 DMG', 1) /
+        run('hiyuki', 'basic', 'Basic Attack - Present Self Stage 1 DMG', 0),
+    ).toBeCloseTo(1, 10);
+    // Lucy S6: Hack-typed motions gain ×1.6 on top of the S3 parts (which
+    // cancel in the S6/S5 ratio); Cripple Movement also carries the ×1.4
+    // Heavy-taken rider via its provider Heavy typing.
+    expect(
+      run('lucy', 'liberation', 'Spoofing Program: Cripple Movement DMG', 6) /
+        run('lucy', 'liberation', 'Spoofing Program: Cripple Movement DMG', 5),
+    ).toBeCloseTo(1.4 * 1.6, 10);
+    expect(
+      run('lucy', 'forte', 'Hack Response - Data Crash DMG', 6) /
+        run('lucy', 'forte', 'Hack Response - Data Crash DMG', 5),
+    ).toBeCloseTo(1.6, 10);
+    // Sibling Heavy motion without Hack typing gains the Heavy rider only.
+    expect(
+      run('lucy', 'basic', 'Heavy Attack - Single Threading DMG', 6) /
+        run('lucy', 'basic', 'Heavy Attack - Single Threading DMG', 5),
+    ).toBeCloseTo(1.4, 10);
+  });
+
+  it('resolves Wave-4 Sanhua S5 burst crit and Rover Havoc S5 scoping end to end', () => {
+    const run = (
+      characterId: string,
+      skillKind: string,
+      motionName: string,
+      resonanceChain: number,
+      crit: 'expected' | 'nonCrit',
+      critRate: number,
+    ): number => {
+      const character = snapshot.characters.find((c) => c.id === characterId)!;
+      const skill = character.skills.find((s) => s.kind === skillKind)!;
+      const sheet = emptySheet();
+      sheet.critRate = critRate;
+      sheet.critDmg = 1.5;
+      return computeDamage({
+        sheet,
+        baseAtk: { character: 100, weapon: 0 },
+        baseHp: { character: 10000 },
+        baseDef: { character: 100 },
+        attackerLevel: 90,
+        skill,
+        motionName,
+        forteLevel: 10,
+        enemy: standardMob(90),
+        crit,
+        characterId,
+        resonanceChain,
+      }).damage;
+    };
+    // Sanhua S5: +100% crit DMG on the three Ice Burst motions only, with a
+    // guaranteed-crit sheet: (1.5 + 1.0) / 1.5.
+    for (const motion of ['Glacier Burst Damage', 'Ice Prism Burst Damage', 'Ice Thorn Burst Damage']) {
+      expect(
+        run('sanhua', 'forte', motion, 5, 'expected', 1) / run('sanhua', 'forte', motion, 4, 'expected', 1),
+      ).toBeCloseTo(2.5 / 1.5, 10);
+    }
+    // Detonate itself is not Ice Burst: untouched at S5.
+    expect(
+      run('sanhua', 'forte', 'Detonate Damage', 5, 'expected', 1) /
+        run('sanhua', 'forte', 'Detonate Damage', 4, 'expected', 1),
+    ).toBeCloseTo(1, 10);
+    // Rover Havoc S5 lives in Dark Surge, where Basic Attack is replaced by
+    // the Enhanced (Umbra) string: only the Umbra Stage 5 gains the +50%.
+    expect(
+      run('rover-havoc', 'forte', 'Umbra: Basic Attack Stage 5 DMG', 5, 'nonCrit', 0.05) /
+        run('rover-havoc', 'forte', 'Umbra: Basic Attack Stage 5 DMG', 4, 'nonCrit', 0.05),
+    ).toBeCloseTo(1.5, 10);
+    expect(
+      run('rover-havoc', 'basic', 'Stage 5 DMG', 5, 'nonCrit', 0.05) /
+        run('rover-havoc', 'basic', 'Stage 5 DMG', 4, 'nonCrit', 0.05),
+    ).toBeCloseTo(1, 10);
+  });
+
     expect(characterStatusBlocks('jiyan')).toEqual([]);
     expect(characterStatusBlocks('yangyang-xuanling')).toEqual([]);
     expect(characterStatusBlocks('aemeath')).toEqual([]);
@@ -464,3 +573,15 @@ describe('isParameterMotionRow', () => {
   });
 });
 
+  it('gates Lynae S5 to Prismatic Overblast, not the follow-up basic', () => {
+    expect(
+      characterSkillMods('lynae', 5, lLib, 'Prismatic Overblast DMG', 'liberation', 10).motionMultiplier,
+    ).toBeCloseTo(1.7, 10);
+    expect(
+      characterSkillMods('lynae', 5, lLib, 'Basic Attack - To a Vivid Tomorrow! DMG', 'basic', 10).motionMultiplier,
+    ).toBe(1);
+    expect(
+      characterSkillMods('lynae', 4, lLib, 'Prismatic Overblast DMG', 'liberation', 10).motionMultiplier,
+    ).toBe(1);
+  });
+});

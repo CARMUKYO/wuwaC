@@ -4,6 +4,7 @@ import { aemeathSkillMods } from './aemeath.ts';
 import { chisaSkillMods, isChisaParameterMotion, type ChisaModInputs } from './chisa.ts';
 import { galbrenaSkillMods } from './galbrena.ts';
 import { jiyanOutroLanceSpec } from './jiyan.ts';
+import { lynaeSkillMods } from './lynae.ts';
 import type { NegativeStatusType } from './negativeStatus.ts';
 import { xuanlingSkillMods, type XuanlingModInputs } from './xuanling.ts';
 import { zaniMotionMultiplier, type ZaniModInputs } from './zani.ts';
@@ -149,6 +150,16 @@ export function characterSkillMods(
     mods = {
       motionMultiplier: galbrena.motionMultiplier,
       dmgBonusExtra: galbrena.dmgBonusExtra,
+      amplifyExtra: 0,
+      critRateExtra: 0,
+      critDmgExtra: 0,
+      defIgnoreExtra: 0,
+    };
+  } else if (characterId === 'lynae') {
+    const lynae = lynaeSkillMods(characterId, resonanceChain, skill, motionName);
+    mods = {
+      motionMultiplier: lynae.motionMultiplier,
+      dmgBonusExtra: lynae.dmgBonusExtra,
       amplifyExtra: 0,
       critRateExtra: 0,
       critDmgExtra: 0,
