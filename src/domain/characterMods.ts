@@ -2,6 +2,7 @@ import { CHAIN_PRESETS, type ChainMotionPreset } from '../data/chainPresets.ts';
 import type { CharacterSkill, MotionBonusKind, SkillKind } from '../data/schema.ts';
 import { aemeathSkillMods } from './aemeath.ts';
 import { chisaSkillMods, type ChisaModInputs } from './chisa.ts';
+import { galbrenaSkillMods } from './galbrena.ts';
 import { jiyanOutroLanceSpec } from './jiyan.ts';
 import type { NegativeStatusType } from './negativeStatus.ts';
 import { xuanlingSkillMods, type XuanlingModInputs } from './xuanling.ts';
@@ -138,6 +139,16 @@ export function characterSkillMods(
     mods = {
       motionMultiplier: aemeath.motionMultiplier,
       dmgBonusExtra: aemeath.dmgBonusExtra,
+      amplifyExtra: 0,
+      critRateExtra: 0,
+      critDmgExtra: 0,
+      defIgnoreExtra: 0,
+    };
+  } else if (characterId === 'galbrena') {
+    const galbrena = galbrenaSkillMods(characterId, resonanceChain, motionName);
+    mods = {
+      motionMultiplier: galbrena.motionMultiplier,
+      dmgBonusExtra: galbrena.dmgBonusExtra,
       amplifyExtra: 0,
       critRateExtra: 0,
       critDmgExtra: 0,

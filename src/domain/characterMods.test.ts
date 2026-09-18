@@ -362,3 +362,95 @@ describe('coordinated-motion registry', () => {
     expect(isBuffOnlySkill('yinlin', yinlinOutro)).toBe(yinlinOutro.motionValues.length === 0);
   });
 });
+
+describe('wave 2 chain motion composition (Jingran/Phrolova/Augusta)', () => {
+  const jingran = snapshot.characters.find((c) => c.id === 'jingran')!;
+  const jSkill = jingran.skills.find((s) => s.kind === 'skill')!;
+  const jForte = jingran.skills.find((s) => s.kind === 'forte')!;
+  const jLib = jingran.skills.find((s) => s.kind === 'liberation')!;
+  const phrolova = snapshot.characters.find((c) => c.id === 'phrolova')!;
+  const pBasic = phrolova.skills.find((s) => s.kind === 'basic')!;
+  const pForte = phrolova.skills.find((s) => s.kind === 'forte')!;
+  const pLib = phrolova.skills.find((s) => s.kind === 'liberation')!;
+  const augusta = snapshot.characters.find((c) => c.id === 'augusta')!;
+  const aBasic = augusta.skills.find((s) => s.kind === 'basic')!;
+  const aForte = augusta.skills.find((s) => s.kind === 'forte')!;
+  const aLib = augusta.skills.find((s) => s.kind === 'liberation')!;
+
+  it('stacks Jingran S1+S6 on heavy-typed skill motions only', () => {
+    // S1: +80% on all four skill motions; S6: +40% taken on heavy-typed hits.
+    expect(characterSkillMods('jingran', 1, jSkill, 'Encroaching Yin DMG', 'skill', 10).motionMultiplier).toBeCloseTo(1.8, 10);
+    expect(characterSkillMods('jingran', 6, jSkill, 'Encroaching Yin DMG', 'skill', 10).motionMultiplier).toBeCloseTo(1.8, 10);
+    expect(characterSkillMods('jingran', 6, jSkill, 'Netherworld Traverse DMG', 'heavy', 10).motionMultiplier).toBeCloseTo(
+      1.8 * 1.4, 10,
+    );
+  });
+
+  it('covers Jingran S2 base +46% and Fire-of-Life +46% with one factor each', () => {
+    // 1.46 (S2 base) x 2.8 (Netherworld's Boon full uptime) = 4.088 on the
+    // base motion AND the per-HP Fire-of-Life motion (substring match).
+    for (const motion of [
+      'Heavy Attack - Soul Raid DMG',
+      'Heavy Attack - Soul Raid DMG Increase per 1,000 Max HP',
+      'Heavy Attack - Stardome Meander DMG',
+      'Heavy Attack - Stardome Meander DMG Increase per 1,000 Max HP',
+    ]) {
+      expect(characterSkillMods('jingran', 2, jForte, motion, 'heavy', 10).motionMultiplier).toBeCloseTo(4.088, 10);
+      expect(characterSkillMods('jingran', 1, jForte, motion, 'heavy', 10).motionMultiplier).toBe(1);
+    }
+    expect(characterSkillMods('jingran', 6, jForte, 'Heavy Attack - Soul Raid DMG', 'heavy', 10).motionMultiplier).toBeCloseTo(
+      4.088 * 1.4, 10,
+    );
+  });
+
+  it('stacks Jingran S6 Chimei +80% with the heavy taken amp', () => {
+    // Chimei: 1.8 x 1.4 = 2.52; the Liberation cast hit takes only the 1.4.
+    expect(characterSkillMods('jingran', 6, jLib, 'Chimei Wangliang DMG', 'heavy', 10).motionMultiplier).toBeCloseTo(2.52, 10);
+    expect(characterSkillMods('jingran', 5, jLib, 'Chimei Wangliang DMG', 'heavy', 10).motionMultiplier).toBe(1);
+    expect(characterSkillMods('jingran', 6, jLib, 'Burial of Thousand Souls DMG', 'heavy', 10).motionMultiplier).toBeCloseTo(
+      1.4, 10,
+    );
+  });
+
+  it('pins Phrolova S2 additive stacking on Scarlet Coda only', () => {
+    // 1 + 0.75 (base) + 0.75 (Aftersound flat) = 2.5; the per-stack motion
+    // keeps its base rate (S2 grants stacks, it does not raise the rate).
+    expect(characterSkillMods('phrolova', 2, pBasic, 'Scarlet Coda DMG', 'skill', 10).motionMultiplier).toBeCloseTo(2.5, 10);
+    expect(characterSkillMods('phrolova', 1, pBasic, 'Scarlet Coda DMG', 'skill', 10).motionMultiplier).toBe(1);
+    expect(
+      characterSkillMods('phrolova', 2, pBasic, 'DMG Multiplier Increase per Aftersound', 'skill', 10).motionMultiplier,
+    ).toBe(1);
+  });
+
+  it('gates Phrolova S1/S6 motion entries to their named motions', () => {
+    expect(characterSkillMods('phrolova', 1, pForte, 'Movement of Fate and Finality DMG', 'skill', 10).motionMultiplier).toBeCloseTo(
+      1.8, 10,
+    );
+    expect(characterSkillMods('phrolova', 1, pForte, 'Murmurs in a Haunting Dream DMG', 'skill', 10).motionMultiplier).toBeCloseTo(
+      1.8, 10,
+    );
+    expect(
+      characterSkillMods('phrolova', 6, pLib, 'Enhanced Attack - Hecate: Strings DMG', 'echo', 10).motionMultiplier,
+    ).toBeCloseTo(1.24, 10);
+    expect(characterSkillMods('phrolova', 6, pLib, 'Curtain Call DMG', 'liberation', 10).motionMultiplier).toBe(1);
+  });
+
+  it('covers every Augusta S3 motion including the dodge-counter backstep', () => {
+    for (const [skill, motion, dmgType] of [
+      [aBasic, 'Heavy Attack - Thunderoar: Backstep DMG', 'heavy'],
+      [aBasic, 'Dodge Counter - Thunderoar: Backstep DMG', 'heavy'],
+      [aBasic, 'Heavy Attack - Thunderoar: Spinslash DMG', 'heavy'],
+      [aBasic, 'Heavy Attack - Thunderoar: Uppercut DMG', 'heavy'],
+      [aForte, 'Resonance Skill - Undying Sunlight: Plunge DMG', 'heavy'],
+      [aLib, 'Sublime is the Sun - Sunborne DMG', 'heavy'],
+      [aLib, 'Sublime is the Sun - Everbright Protector DMG', 'heavy'],
+    ] as const) {
+      expect(characterSkillMods('augusta', 3, skill, motion, dmgType, 10).motionMultiplier).toBeCloseTo(1.25, 10);
+    }
+    // Siblings outside the S3 list stay neutral.
+    expect(characterSkillMods('augusta', 3, aBasic, 'Heavy Attack: Steelclash DMG', 'heavy', 10).motionMultiplier).toBe(1);
+    expect(
+      characterSkillMods('augusta', 3, aLib, 'Resonance Liberation - Sword of Eternal Oath DMG', 'heavy', 10).motionMultiplier,
+    ).toBe(1);
+  });
+});

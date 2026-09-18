@@ -117,6 +117,7 @@ describe('chain presets', () => {
       ['lumi@6', 20],
       ['lupa@2', 30],
       ['mortefi@6', 20],
+      ['phoebe@2', 30],
       ['qingxiao@4', 8],
       ['rebecca@2', 30],
       ['roccia@2', 30],

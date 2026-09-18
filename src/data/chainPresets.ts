@@ -463,7 +463,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     rank: 5,
     skillKind: 'intro',
     motionMultiplier: 4.03,
-    assumption: 'Outro Twining +68% unmodeled (outro has no scored motions).',
+    assumption: 'Outro Twining +68% scored in camellyaOutroTwiningSpec (base 329.24% only; primed +459.02% needs pre-outro Ephemeral state).',
   },
 
   // --- Cantarella -----------------------------------------------------------
@@ -680,6 +680,13 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     motionMultiplier: 1.6,
     assumption: 'While Eternal Hypostasis lasts.',
   },
+  {
+    scope: 'note',
+    characterId: 'galbrena',
+    rank: 6,
+    reason: 'Afterflame Fusion amp (+35% at max) in galbrenaSkillMods; x1.6 trio above.',
+    appliedElsewhere: 'galbrenaSkillMods',
+  },
 
   // --- Hiyuki ---------------------------------------------------------------
   {
@@ -826,7 +833,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     skillKind: 'forte',
     motionNameIncludes: 'soul raid',
     motionMultiplier: 1.46,
-    assumption: 'Fire-of-Life increase modifier unmodeled (unmodeled base); per-HP bonus motion scales with the base (composition assumption).',
+    assumption: 'Fire-of-Life +46% covered: the same 1.46 factor matches the per-HP bonus motion by substring; the per-HP stack count itself is unscored (no HP input).',
   },
   {
     scope: 'motion',
@@ -835,7 +842,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     skillKind: 'forte',
     motionNameIncludes: 'stardome meander',
     motionMultiplier: 1.46,
-    assumption: 'Fire-of-Life increase modifier unmodeled (unmodeled base); per-HP bonus motion scales with the base (composition assumption).',
+    assumption: 'Fire-of-Life +46% covered: the same 1.46 factor matches the per-HP bonus motion by substring; the per-HP stack count itself is unscored (no HP input).',
   },
   {
     scope: 'motion',
@@ -1748,7 +1755,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'augusta',
     rank: 2,
     mods: [{ stat: 'critRate', value: 0.4 }],
-    assumption: '2 Crown of Wills stacks (max); over-100% overflow unmodeled (needs computed-rate logic).',
+    assumption: '2 Crown of Wills stacks (max); over-100% overflow unmodeled (needs computed-rate logic: +2% CDMG per 1% crit over 100%, cap +100%).',
   },
   {
     scope: 'sheet',
@@ -1758,7 +1765,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
       { stat: 'critDmg', value: 0.3 },
       { stat: 'critRate', value: 0.4 },
     ],
-    assumption: 'Crown stacks 3-4 (cap raised to 4); over-150% overflow and Thunder Rage extra hits unmodeled.',
+    assumption: 'Crown stacks 3-4 (cap raised to 4); over-150% overflow unmodeled (additive S6 tier per wutheringlab S6 gloss: +2% CDMG per 1% crit over 150%, cap +50%) and Thunder Rage extra hits unmodeled.',
   },
 
   // --- Baizhi ---------------------------------------------------------------
@@ -2060,7 +2067,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
       { stat: 'atkPct', value: 0.6 },
       { stat: 'dmgBonus:Fusion', value: 0.6 },
     ],
-    assumption: 'While in Entropy Shift states; Fusion Burst / Tune Strain riders unmodeled (Tune pipeline).',
+    assumption: 'Full uptime while in Entropy Shift states; Fusion Burst / Tune Strain riders unmodeled (Tune pipeline).',
   },
 
   // --- Encore ---------------------------------------------------------------
@@ -2126,7 +2133,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'note',
     characterId: 'galbrena',
     rank: 2,
-    reason: 'Burning Drive buff magnitude unmodeled (unmodeled base) (2026-09-17).',
+    reason: 'Burning Drive buff magnitude unmodeled (unmodeled 20% ATK / 4s manual base; S2 raises it to 90%).',
   },
 
   // --- Iuno -----------------------------------------------------------------
@@ -2167,7 +2174,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'jingran',
     rank: 3,
     mods: [{ stat: 'atk', value: 2500 }],
-    assumption: 'Yin-Yang Everflow active (15s after Liberation); Max HP >= 50k for full +2500.',
+    assumption: 'Yin-Yang Everflow active (15s after Liberation); Max HP >= 50k for full +2500; replaces the unmodeled base Yang Changes, Yin Unites (+36 ATK per 1k HP, cap +1800).',
   },
 
   // --- Lingyang -------------------------------------------------------------
@@ -2314,7 +2321,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'phoebe',
     rank: 2,
     mods: [{ stat: 'negativeStatusAmplify', value: 1.2 }],
-    assumption: 'Confession state (Silent Prayer); outro Absolution amp unmodeled (outro has no scored motions).',
+    assumption: 'Confession state (Silent Prayer); covers Phoebe herself — teammates use the S2 team entry. Outro Absolution amp unmodeled (outro has no scored motions).',
   },
   {
     scope: 'sheet',
@@ -3195,6 +3202,17 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     reason: 'Unseen Snare Bane-pacing mechanic has no scoring (2026-09-17).',
   },
 
+  // --- Phoebe ---------------------------------------------------------------
+  {
+    scope: 'team',
+    characterId: 'phoebe',
+    rank: 2,
+    label: 'Phoebe S2 (Silent Prayer Frazzle amp)',
+    windowSeconds: 30,
+    mods: [{ stat: 'negativeStatusAmplify', value: 1.2 }],
+    assumption: 'Confession state; stacks with the base Phoebe Outro team buff (total 220%). Teammates part.',
+  },
+
   // --- Qiuyuan --------------------------------------------------------------
   {
     scope: 'sheet',
@@ -3809,6 +3827,12 @@ export const CHAIN_PRESETS: ChainPreset[] = [
   },
 
   // --- Denia ----------------------------------------------------------------
+  {
+    scope: 'note',
+    characterId: 'denia',
+    rank: 2,
+    reason: 'Fusion-Burst branch (50% team Fusion, 15s) and Tune-Strain branch (+20 team Tune Break Boost, 15s, 300s ICD) need mode-gated application: sheet auto-applies unconditionally and team entries require a sheet twin (2026-09-18).',
+  },
   {
     scope: 'note',
     characterId: 'denia',

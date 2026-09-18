@@ -21,6 +21,7 @@ import {
   type ResonanceMode,
 } from './characterMods.ts';
 import { jiyanOutroLanceSpec } from './jiyan.ts';
+import { camellyaOutroTwiningSpec } from './camellya.ts';
 import {
   havocBaneDefReduction,
   maxStatusStacks,
@@ -435,6 +436,49 @@ export function computeJiyanLanceDamage(ctx: JiyanLanceDamageContext): DamageRes
   return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
 }
 
+export interface CamellyaTwiningDamageContext {
+  sheet: StatSheet;
+  /** Twining motion value from `camellyaOutroTwiningSpec` (carries the S5 chain multiplier). */
+  motionValue: number;
+  baseAtk: { character: number; weapon: number };
+  attackerLevel: number;
+  enemy: EnemyProfile;
+  crit: CritMode;
+  /** Havoc Bane stacks on the target — percentage DEF reduction. */
+  targetHavocBaneStacks?: number;
+}
+
+/**
+ * Camellya's Outro (Twining) damage (camellya.ts prose spec). Havoc
+ * attribute bucket only — no action-type bucket is stated in kit, and
+ * Twining is not a coordinated attack (unlike the Jiyan lance); no kit
+ * mods; otherwise the standard formula tree.
+ */
+export function computeCamellyaTwiningDamage(ctx: CamellyaTwiningDamageContext): DamageResult {
+  const { sheet, enemy } = ctx;
+  const abilityStat = computeAtk(ctx.baseAtk.character, ctx.baseAtk.weapon, sheet);
+  const baseDamage = computeBaseAbilityDamage(abilityStat, ctx.motionValue);
+  const resTotal = enemy.baseResistance.Havoc + sheet.resistancePenetration;
+  const resistances =
+    computeResMultiplier(resTotal) *
+    computeDefMultiplier({
+      attackerLevel: ctx.attackerLevel,
+      enemyLevel: enemy.level,
+      enemyDefOverride: enemy.enemyDefOverride,
+      defIgnore: sheet.defIgnore,
+      defReduction: sheet.defReduction,
+      enemyDefPctReduction: havocBaneDefReduction(ctx.targetHavocBaneStacks ?? 0),
+    }) *
+    computeDmgReductionTotal(enemy.dmgReductionBase, enemy.dmgReductionAdditional) *
+    computeElemReductionTotal(enemy.elemReductionBase, enemy.elemReductionAdditional);
+  const bonuses =
+    computeDmgBonusPercent(sheet, 'Havoc', 'forte', 0, false) *
+    computeDmgAmplifyTotal(sheet.amplify, enemy.amplifyTarget) *
+    computeSpecialDmgPercent(sheet.specialBase, sheet.specialBonus) *
+    computeCritMultiplier(sheet.critRate, sheet.critDmg, ctx.crit);
+  return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
+}
+
 export function computeDamage(ctx: DamageContext): DamageResult {
   const { sheet, skill, enemy } = ctx;
   const lance = jiyanOutroLanceSpec(ctx.characterId, skill, ctx.motionName, ctx.resonanceChain ?? 0);
@@ -442,6 +486,18 @@ export function computeDamage(ctx: DamageContext): DamageResult {
     return computeJiyanLanceDamage({
       sheet,
       motionValue: lance.motionValue,
+      baseAtk: ctx.baseAtk,
+      attackerLevel: ctx.attackerLevel,
+      enemy,
+      crit: ctx.crit,
+      targetHavocBaneStacks: ctx.targetHavocBaneStacks,
+    });
+  }
+  const twining = camellyaOutroTwiningSpec(ctx.characterId, skill, ctx.motionName, ctx.resonanceChain ?? 0);
+  if (twining !== null) {
+    return computeCamellyaTwiningDamage({
+      sheet,
+      motionValue: twining.motionValue,
       baseAtk: ctx.baseAtk,
       attackerLevel: ctx.attackerLevel,
       enemy,
