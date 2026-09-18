@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadBundledSnapshot } from './index.ts';
-import { TEAM_BUFFS } from './teamBuffs.ts';
+import { TEAM_BUFFS, TEAM_BUFF_EXCLUSIONS } from './teamBuffs.ts';
 
 const snapshot = loadBundledSnapshot();
 
@@ -21,21 +21,22 @@ describe('team buffs table', () => {
   });
 
   it('documents every character either with an entry or an explicit exclusion', () => {
-    const excluded = new Set([
-      // No sheet-buff team effect in the snapshot wording (see module doc).
-      'yangyang', 'chixia', 'rover-spectro', 'encore', 'jiyan', 'camellya',
-      'calcharo', 'lingyang', 'yuanwu', 'rover-havoc', 'jinhsi', 'xiangli-yao',
-      'carlotta', 'galbrena', 'chisa', 'luuk-herssen', 'sigrika',
-      'rover-aero', 'qingxiao', 'jingran',
-    ]);
+    const excluded = new Set(Object.keys(TEAM_BUFF_EXCLUSIONS));
     const covered = new Set(TEAM_BUFFS.map((e) => e.characterId));
     const unaccounted = snapshot.characters
       .map((c) => c.id)
       .filter((id) => !covered.has(id) && !excluded.has(id));
     expect(unaccounted).toEqual([]);
-    // The exclusion list itself stays honest: every name must be a real character.
+    // The exclusion map stays honest in both directions: every name is a
+    // real character, and no excluded character has a table entry (a
+    // convert must delete its row).
     for (const id of excluded) {
       expect(snapshot.characters.some((c) => c.id === id)).toBe(true);
+      expect(covered.has(id)).toBe(false);
+    }
+    // Every reason cites its deciding skill id(s).
+    for (const [id, reason] of Object.entries(TEAM_BUFF_EXCLUSIONS)) {
+      expect(reason, `${id} reason cites no skill`).toMatch(/\(\d{7}[^)]*\)/);
     }
   });
 
@@ -53,5 +54,15 @@ describe('team buffs table', () => {
     expect(youhu.skillId).toBe('1002409');
     expect(youhu.target).toBe('incoming');
     expect(youhu.mods).toEqual([{ stat: 'dmgBonus:coordinated', value: 1.0 }]);
+  });
+
+  it('transcribes Roccia Liberation as capped flat team ATK (audit convert)', () => {
+    const roccia = TEAM_BUFFS.find((e) => e.characterId === 'roccia' && e.kind === 'other')!;
+    expect(roccia.skillId).toBe('1002703');
+    expect(roccia.target).toBe('team');
+    expect(roccia.windowSeconds).toBe(30);
+    // +1 ATK per 0.1% Crit Rate over 50%, up to 200 (needs 70% crit).
+    expect(roccia.mods).toEqual([{ stat: 'atk', value: 200 }]);
+    expect(roccia.assumption).toMatch(/70%/);
   });
 });

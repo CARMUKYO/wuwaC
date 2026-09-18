@@ -16,18 +16,21 @@ import type { StatKey } from './schema.ts';
  * doc §6 has a single global amplify term); unqualified "DMG Amplified"
  * / "All DMG Amplification" maps to `amplify`.
  *
- * Intentionally absent (recorded here so the gap is explicit, not
- * silent): energy-restore outros (Yangyang), heal-only outros, damage-only
- * outros (Chixia, Camellya, Carlotta, Galbrena, Luuk Herssen, Qingxiao,
- * Jingran), zone/coordinated/off-field outoros without a sheet buff
- * (Rover: Spectro, Encore, Lingyang, Yuanwu, Rover: Havoc, Jinhsi,
- * Xiangli Yao, Calcharo, Jiyan, Rover: Aero, Chisa, Sigrika),
- * Denia's Fusion-Burst branch (no bucket), Roccia's Liberation (flat
- * points scaling off her own Crit Rate — needs her stats, not
- * transcribable), and Suisui's status-cap rider. RES-shred riders
+ * Fully excluded characters live in `TEAM_BUFF_EXCLUSIONS` (id →
+ * dated reason, re-read 2026-09-17) so the gap is explicit, not silent;
+ * the coverage test asserts the map matches the uncovered roster exactly.
+ * Partial exclusions (characters WITH entries, one rider untranscribed):
+ * Denia's Fusion-Burst branch (Fusion Burst is unmodeled anywhere in the
+ * codebase — no bucket) and Suisui's status-cap rider on `1005703`
+ * (same skill as the transcribed Landscape entry; no cap bucket).
+ * Stack-cap raises (Rover: Aero, Chisa, Luuk/Qingxiao Tune +1) stay out:
+ * caps are a validation-only clamp with no `StatKey` and no team input
+ * path — a follow-up feature, not an audit fix. RES-shred riders
  * (Phoebe, Suisui) transcribe as negative `resistancePenetration` per
  * the shred-sign convention (schema.ts); Youhu's coordinated-attack amp
- * transcribes to `dmgBonus:coordinated` (Decision 3).
+ * transcribes to `dmgBonus:coordinated` (Decision 3). Flat team ATK with
+ * an ally-stat requirement transcribes at cap with the requirement
+ * disclosed (Shorekeeper Stellarealm, Roccia Liberation).
  */
 
 export type TeamBuffTarget = 'incoming' | 'team';
@@ -92,4 +95,35 @@ export const TEAM_BUFFS: TeamBuffEntry[] = [
   { characterId: 'lupa', kind: 'other', label: 'Lupa Pack Hunt base (team)', skillId: '1003603', windowSeconds: 35, target: 'team', mods: [{ stat: 'atkPct', value: 0.06 }], assumption: 'Base Pack Hunt; excludes the Intro enhancement and boss-gated Fusion bonus.' },
   { characterId: 'rover-electro', kind: 'other', label: 'Rover: Electro Overshock (team)', skillId: '1005507', windowSeconds: 20, target: 'team', mods: [{ stat: 'atkPct', value: 0.10 }], assumption: 'Overshock cast via the button.' },
   { characterId: 'suisui', kind: 'other', label: 'Suisui Landscape (team, Bane)', skillId: '1005703', windowSeconds: 30, target: 'team', mods: [{ stat: 'defIgnore', value: 0.06 }, { stat: 'resistancePenetration', value: -0.12 }], assumption: 'After consuming Havoc Bane; Havoc DEF-ignore + RES shred scored sheet-wide (penetration is element-agnostic).' },
+  { characterId: 'roccia', kind: 'other', label: 'Roccia Liberation (team, capped)', skillId: '1002703', windowSeconds: 30, target: 'team', mods: [{ stat: 'atk', value: 200 }], assumption: 'At cap (Roccia Crit Rate ≥70%): +1 ATK per 0.1% over 50%, up to 200.' },
 ];
+
+/**
+ * Fully excluded characters (no transcribable team buff anywhere in the
+ * kit): id → one-line reason quoting the deciding wording. Re-read
+ * 2026-09-17 against the coordinated/shred/DEF-ignore/amplify buckets;
+ * the coverage test fails if this map drifts from the uncovered roster
+ * in either direction, so converts must delete their row here.
+ */
+export const TEAM_BUFF_EXCLUSIONS: Record<string, string> = {
+  yangyang: 'Outro restores Resonance Energy (4/s for 5s) — no energy model. (1000109)',
+  chixia: 'Damage-only outro (530% Fusion). (1000209)',
+  'rover-spectro': 'Stasis zone (crowd control), no sheet buff. (1000609)',
+  encore: 'DoT-field off-field damage; Mayhem is self damage-reduction. (1000709/1000707)',
+  jiyan: 'Coordinated lance deals its own damage (313.40% ATK), not an amp. (1001109)',
+  camellya: 'Damage-only outro (329.24% + Ephemeral conditional). (1001309)',
+  calcharo: 'Phantom off-field damage. (1001409)',
+  lingyang: 'Damage-only outro (587.94% Glacio). (1001809)',
+  yuanwu: 'Outro is stagger utility; Liberation shares interrupt-resist only. (1001609/1001603/1001607)',
+  'rover-havoc': 'DoT-field off-field damage. (1001709)',
+  jinhsi: 'Eras in Unity feeds her own Incandescence; outro accelerates own gain. (1002007/1002009)',
+  'xiangli-yao': 'Triggered-laser off-field damage. (1002309)',
+  carlotta: 'Damage-only outro (794.2% Glacio). (1002809)',
+  galbrena: 'Damage-only outro. (1004009)',
+  chisa: 'Outro raises status caps (+3); no cap bucket. (1004209)',
+  'luuk-herssen': 'Damage-only outro; Golden Rule feeds own resources; Tune cap unmodeled. (1004709/1004707/1004710)',
+  sigrika: 'Damage-only outro + Stagnate utility (no bucket). (1005109)',
+  'rover-aero': 'Outro raises the Aero Erosion cap (+3); no cap bucket. Heals carry no numbers. (1003209)',
+  qingxiao: 'Damage-only outro; Mindlock amp is self-only; Tune cap unmodeled. (1005809/1005807/1005810)',
+  jingran: 'Damage-only outro; kit is self-state/self-Qi. (1005909)',
+};
