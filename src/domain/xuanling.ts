@@ -22,6 +22,26 @@ export interface XuanlingSkillMods {
 }
 
 /**
+ * Unbroken Vow (inherent skill 1005404, always on): attacker-side DMG
+ * Amplify from target Havoc Bane stacks — 1–3 stacks grant +10% per stack
+ * (cap 30%); 4–6 grant +12% per stack capped at 36% total, i.e. a flat
+ * 0.36 (4 × 12% already exceeds the cap). Applies to all her damage, so
+ * `computeDamage` adds it to the attacker-Amplify term next to S3's share.
+ * Reaching 4+ stacks needs the S3 cap extension (negativeStatus.ts).
+ */
+export function xuanlingBaneTargetAmplify(targetHavocBaneStacks: number): number {
+  if (
+    !Number.isInteger(targetHavocBaneStacks) ||
+    targetHavocBaneStacks < 0 ||
+    targetHavocBaneStacks > 6
+  ) {
+    throw new Error(`target Havoc Bane stacks must be an integer from 0 to 6, got ${targetHavocBaneStacks}`);
+  }
+  if (targetHavocBaneStacks <= 3) return targetHavocBaneStacks * 0.1;
+  return Math.min(targetHavocBaneStacks * 0.12, 0.36);
+}
+
+/**
  * - S2: the listed Heavy / Mid-air Feather Fall / Havoc-in-Bloom motions
  *   deal +100% damage (×2).
  * - S3: Liberation damage Amplified by 175% (attacker Amplify +1.75).

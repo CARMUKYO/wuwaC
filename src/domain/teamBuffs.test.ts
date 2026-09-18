@@ -140,6 +140,30 @@ describe('resolveTeamBuffs', () => {
     expect(gated.buffs.some((b) => b.label.includes('Xuanling S4'))).toBe(false);
   });
 
+  it('resolves Cartethyia S4 team all-attribute DMG at rank with its 20s window, silent below', () => {
+    const met = resolveTeamBuffs(team(['cartethyia', 'verina', 'sanhua']), characterNameOf, {
+      cartethyia: 4,
+    });
+    expect(met.buffs).toContainEqual({
+      label: 'Cartethyia S4 (team all-attribute DMG)',
+      source: 'Team',
+      mods: [
+        { stat: 'dmgBonus:Glacio', value: 0.2 },
+        { stat: 'dmgBonus:Fusion', value: 0.2 },
+        { stat: 'dmgBonus:Electro', value: 0.2 },
+        { stat: 'dmgBonus:Aero', value: 0.2 },
+        { stat: 'dmgBonus:Spectro', value: 0.2 },
+        { stat: 'dmgBonus:Havoc', value: 0.2 },
+      ],
+      windowDurationSeconds: 20,
+    });
+    expect(met.warnings.some((w) => w.includes('Cartethyia'))).toBe(false);
+    const gated = resolveTeamBuffs(team(['cartethyia', 'verina', 'sanhua']), characterNameOf, {
+      cartethyia: 3,
+    });
+    expect(gated.buffs.some((b) => b.label.includes('Cartethyia S4'))).toBe(false);
+  });
+
   it('resolves the Luuk Herssen S4 team amplify at rank and stays silent below', () => {
     const met = resolveTeamBuffs(team(['luuk-herssen', 'verina', 'sanhua']), characterNameOf, {
       'luuk-herssen': 4,

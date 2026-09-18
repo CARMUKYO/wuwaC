@@ -3,7 +3,7 @@ import { loadBundledSnapshot } from '../data/index.ts';
 import { computeDamage } from './damage.ts';
 import { standardMob } from './damage.ts';
 import { emptySheet } from './stats.ts';
-import { xuanlingSkillMods } from './xuanling.ts';
+import { xuanlingBaneTargetAmplify, xuanlingSkillMods } from './xuanling.ts';
 
 const snapshot = loadBundledSnapshot();
 const xuanling = snapshot.characters.find((c) => c.id === 'yangyang-xuanling')!;
@@ -66,5 +66,60 @@ describe('xuanling through computeDamage', () => {
     const base = computeDamage({ ...common, skill: liberation, motionName: 'Hush of a Thousand Voices DMG', forteLevel: 10, resonanceChain: 2 });
     const s3 = computeDamage({ ...common, skill: liberation, motionName: 'Hush of a Thousand Voices DMG', forteLevel: 10, resonanceChain: 3 });
     expect(s3.damage / base.damage).toBeCloseTo(2.75, 10);
+  });
+
+  it('amplifies all her damage by target Bane through the Amplify term (S0)', () => {
+    // enemyDefOverride 0 pins the DEF term at 1 so Bane's DEF shred cannot
+    // leak into the ratio; empty sheet + nonCrit isolate the Amplify term.
+    const flatEnemy = { ...standardMob(90), enemyDefOverride: 0 };
+    const scored = (stacks: number) =>
+      computeDamage({ ...common, enemy: flatEnemy, skill: liberation, motionName: 'Hush of a Thousand Voices DMG', forteLevel: 10, resonanceChain: 0, targetHavocBaneStacks: stacks });
+    // Unbroken Vow needs no chain: 3 stacks -> x1.3, 6 stacks -> x1.36.
+    expect(scored(3).damage / scored(0).damage).toBeCloseTo(1.3, 10);
+    expect(scored(6).damage / scored(0).damage).toBeCloseTo(1.36, 10);
+  });
+
+  it('stacks target-Bane Amplify additively with S3 Liberation Amplify', () => {
+    const flatEnemy = { ...standardMob(90), enemyDefOverride: 0 };
+    const scored = (stacks: number) =>
+      computeDamage({ ...common, enemy: flatEnemy, skill: liberation, motionName: 'Hush of a Thousand Voices DMG', forteLevel: 10, resonanceChain: 3, targetHavocBaneStacks: stacks });
+    // (1 + 1.75 + 0.36) / (1 + 1.75) = 3.11 / 2.75.
+    expect(scored(6).damage / scored(0).damage).toBeCloseTo(3.11 / 2.75, 10);
+  });
+
+  it('does not leak target-Bane Amplify to other characters', () => {
+    const jiyan = snapshot.characters.find((c) => c.id === 'jiyan')!;
+    const basic = jiyan.skills.find((s) => s.kind === 'basic')!;
+    const flatEnemy = { ...standardMob(90), enemyDefOverride: 0 };
+    const scored = (stacks: number) =>
+      computeDamage({ ...common, characterId: 'jiyan', enemy: flatEnemy, skill: basic, motionName: 'Stage 1 DMG', forteLevel: 1, resonanceChain: 0, targetHavocBaneStacks: stacks });
+    expect(scored(3).damage / scored(0).damage).toBe(1);
+  });
+});
+
+describe('xuanlingBaneTargetAmplify', () => {
+  // Unbroken Vow (snapshot inherent skill 1005404): 1-3 Bane stacks grant
+  // +10% DMG Amplify per stack (cap 30%); 4-6 grant +12% per stack (cap
+  // 36%). Cross-checked against two live transcriptions:
+  // https://game8.co/games/Wuthering-Waves/archives/605297 (per-stack table)
+  // https://www.lootbar.com/blog/en/wuthering-waves-yangyang-xuanling-kit.html (verbatim kit quote)
+  it('grants 10% per stack at 1-3 Bane, nothing at 0', () => {
+    expect(xuanlingBaneTargetAmplify(0)).toBe(0);
+    expect(xuanlingBaneTargetAmplify(1)).toBeCloseTo(0.1, 10);
+    expect(xuanlingBaneTargetAmplify(2)).toBeCloseTo(0.2, 10);
+    expect(xuanlingBaneTargetAmplify(3)).toBeCloseTo(0.3, 10);
+  });
+
+  it('caps the 12%-per-stack branch at 36% for 4-6 Bane', () => {
+    // 4 x 12% = 48% already exceeds the quoted 36% cap, so 4-6 all read 0.36.
+    expect(xuanlingBaneTargetAmplify(4)).toBeCloseTo(0.36, 10);
+    expect(xuanlingBaneTargetAmplify(5)).toBeCloseTo(0.36, 10);
+    expect(xuanlingBaneTargetAmplify(6)).toBeCloseTo(0.36, 10);
+  });
+
+  it('rejects stacks outside the reachable 0-6 range', () => {
+    for (const bad of [-1, 7, 9, 1.5, Number.NaN]) {
+      expect(() => xuanlingBaneTargetAmplify(bad)).toThrow(/integer from 0 to 6/);
+    }
   });
 });

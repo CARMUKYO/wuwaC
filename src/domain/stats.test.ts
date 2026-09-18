@@ -445,6 +445,29 @@ describe('computeStats', () => {
     ]);
   });
 
+  it('auto-applies Cartethyia S4 all-attribute +20% at S4 with disclosure', () => {
+    const cartethyia = snapshot.characters.find((c) => c.id === 'cartethyia')!;
+    const plain = snapshot.weapons.find((w) => w.id === 'beguiling-melody')!;
+    const at = (resonanceChain: number): ComputeStatsResult =>
+      computeStats({
+        character: cartethyia,
+        weapon: plain,
+        roster: { ...roster, characterId: 'cartethyia', weaponId: plain.id, resonanceChain },
+        echoes: [],
+        sonataSets: [],
+      });
+    // S1-S3 are module/note-covered (no sheet parts): S3 adds nothing over
+    // S0 on any attribute bucket; S4 adds exactly +0.2 to all six.
+    const buckets = ['dmgBonus:Glacio', 'dmgBonus:Fusion', 'dmgBonus:Electro', 'dmgBonus:Aero', 'dmgBonus:Spectro', 'dmgBonus:Havoc'] as const;
+    for (const bucket of buckets) {
+      expect(at(3).sheet[bucket] - at(0).sheet[bucket]).toBe(0);
+      expect(at(4).sheet[bucket] - at(0).sheet[bucket]).toBeCloseTo(0.2, 10);
+    }
+    expect(at(4).appliedAssumptions).toEqual([
+      expect.stringMatching(/Cartethyia S4 — .*full uptime/i),
+    ]);
+  });
+
   it('resolves Jiyan S2/S3/S4/S5 cumulatively with only S1 warning', () => {
     const at = (resonanceChain: number): ComputeStatsResult =>
       computeStats({

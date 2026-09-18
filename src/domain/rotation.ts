@@ -252,7 +252,6 @@ export function scoreRotationBlocks(
   const warnings: string[] = [];
   const buffsById = new Map(buffs.map((b) => [b.id, b]));
   const globalSheet = applyBuffs(baseSheet, buffsById, globalBuffIds, warnings);
-  let statusHasBeenInflicted = false;
 
   const starts = blockStartTimes(blocks);
 
@@ -285,10 +284,6 @@ export function scoreRotationBlocks(
         targetStatusStacks: block.targetStatusStacks,
         targetHavocBaneStacks: block.targetHavocBaneStacks,
       });
-      // A status-damage block is also the explicit point at which the
-      // rotation says the status was inflicted. This lets S4's all-attribute
-      // bonus affect later actions without pretending it was full uptime.
-      statusHasBeenInflicted = true;
       return {
         skillId: block.skillId,
         motionName: block.motionName,
@@ -396,12 +391,6 @@ export function scoreRotationBlocks(
       : null;
     if (skill.motionValues.length === 0 && lance === null && twining === null) {
       return { skillId: skill.id, motionName: block.motionName, label: skill.label, damage: 0, share: 0, buffCarrier: true, startSeconds };
-    }
-    if (characterId === 'cartethyia' && resonanceChain >= 4 && statusHasBeenInflicted) {
-      // S4: after a Negative Status is inflicted, Cartethyia grants 20% DMG
-      // Bonus for all Attributes. This calculator is single-character, so the
-      // active character receives the applicable Aero portion here.
-      sheet['dmgBonus:Aero'] += 0.2;
     }
     const { damage } = computeDamage({
       sheet,

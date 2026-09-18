@@ -1,7 +1,7 @@
 import { CHAIN_PRESETS, type ChainMotionPreset } from '../data/chainPresets.ts';
 import type { CharacterSkill, MotionBonusKind, SkillKind } from '../data/schema.ts';
 import { aemeathSkillMods } from './aemeath.ts';
-import { chisaSkillMods, type ChisaModInputs } from './chisa.ts';
+import { chisaSkillMods, isChisaParameterMotion, type ChisaModInputs } from './chisa.ts';
 import { galbrenaSkillMods } from './galbrena.ts';
 import { jiyanOutroLanceSpec } from './jiyan.ts';
 import type { NegativeStatusType } from './negativeStatus.ts';
@@ -263,6 +263,16 @@ export function characterUsesHavocBane(characterId: string): boolean {
  * Tune Rupture response per-trail-stack MV rate. Only Aemeath's +4% per
  * Rupturous Trail is verified (Forte "To Sculpt the Silence", encore.moe
  * character 1210) — other responders (Mornye, Lynae) have no published
+/**
+ * Whether a snapshot motion row is a scaling parameter rather than a
+ * scorable hit (offered by no rotation picker). Currently only Chisa's
+ * per-Ring row; routed here so components never hardcode character ids.
+ */
+export function isParameterMotionRow(characterId: string, motionName: string): boolean {
+  if (characterId === 'chisa') return isChisaParameterMotion(motionName);
+  return false;
+}
+
  * rate, so their blocks throw instead of guessing.
  */
 const TUNE_RESPONSE_RATES: Record<string, number> = {

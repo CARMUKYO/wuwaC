@@ -1876,7 +1876,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     assumption: 'Target inflicted with Deconstruction (gate-met).',
   },
 
-  // --- Cartethyia (module/rotation-covered) ---------------------------------
+  // --- Cartethyia -----------------------------------------------------------
   {
     scope: 'note',
     characterId: 'cartethyia',
@@ -1885,11 +1885,34 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     appliedElsewhere: 'cartethyiaConvictionCritDmg',
   },
   {
-    scope: 'note',
+    scope: 'sheet',
     characterId: 'cartethyia',
     rank: 4,
-    reason: 'Team Aero +0.20 in calculateRotation; other-attribute portions unmodeled (single-character calculator).',
-    appliedElsewhere: 'calculateRotation',
+    mods: [
+      { stat: 'dmgBonus:Glacio', value: 0.2 },
+      { stat: 'dmgBonus:Fusion', value: 0.2 },
+      { stat: 'dmgBonus:Electro', value: 0.2 },
+      { stat: 'dmgBonus:Aero', value: 0.2 },
+      { stat: 'dmgBonus:Spectro', value: 0.2 },
+      { stat: 'dmgBonus:Havoc', value: 0.2 },
+    ],
+    assumption: 'Full uptime on the 20s window after a team status inflict (wearer-total: wielder part).',
+  },
+  {
+    scope: 'team',
+    characterId: 'cartethyia',
+    rank: 4,
+    label: 'Cartethyia S4 (team all-attribute DMG)',
+    windowSeconds: 20,
+    mods: [
+      { stat: 'dmgBonus:Glacio', value: 0.2 },
+      { stat: 'dmgBonus:Fusion', value: 0.2 },
+      { stat: 'dmgBonus:Electro', value: 0.2 },
+      { stat: 'dmgBonus:Aero', value: 0.2 },
+      { stat: 'dmgBonus:Spectro', value: 0.2 },
+      { stat: 'dmgBonus:Havoc', value: 0.2 },
+    ],
+    assumption: 'After any team Resonator inflicts a Negative Status, 20s window; teammates part.',
   },
 
   // --- Changli --------------------------------------------------------------

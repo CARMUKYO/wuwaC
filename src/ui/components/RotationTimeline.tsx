@@ -9,6 +9,7 @@ import {
   characterUsesHavocBane,
   characterUsesTuneStrain,
   isBuffOnlySkill,
+  isParameterMotionRow,
   type ResonanceMode,
 } from '../../domain/characterMods.ts';
 import { resolveMotion } from '../../domain/damage.ts';
@@ -741,7 +742,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                       {skill.label} (buff carrier)
                     </button>
                   ) : (
-                    skill.motionValues.filter((motion) => !isHealingMotionRow(motion)).map((motion) => (
+                    skill.motionValues.filter((motion) => !isHealingMotionRow(motion) && !isParameterMotionRow(character.id, motion.name)).map((motion) => (
                       <button
                         key={`${skill.id}:${motion.name}`}
                         type="button"

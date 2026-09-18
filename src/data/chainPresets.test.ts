@@ -86,6 +86,34 @@ describe('chain presets', () => {
     }
   });
 
+  it('transcribes Cartethyia S4 as a 20% all-attribute sheet/team pair', () => {
+    // Snapshot S4 text ("Sacrifice Made for Salvation") + verbatim match on
+    // https://wuthering.gg/characters/cartethyia: after any team Resonator
+    // inflicts a Negative Status, all Resonators gain 20% DMG Bonus for all
+    // Attributes for 20s. The wielder part auto-applies via computeStats
+    // (full uptime); the team part resolves via resolveTeamBuffs.
+    const entries = CHAIN_PRESETS.filter((e) => e.characterId === 'cartethyia' && e.rank === 4);
+    expect(entries).toHaveLength(2);
+    const sheet = entries.find((e) => e.scope === 'sheet');
+    const team = entries.find((e) => e.scope === 'team');
+    expect(sheet).toBeDefined();
+    expect(team).toBeDefined();
+    const expected = [
+      { stat: 'dmgBonus:Glacio', value: 0.2 },
+      { stat: 'dmgBonus:Fusion', value: 0.2 },
+      { stat: 'dmgBonus:Electro', value: 0.2 },
+      { stat: 'dmgBonus:Aero', value: 0.2 },
+      { stat: 'dmgBonus:Spectro', value: 0.2 },
+      { stat: 'dmgBonus:Havoc', value: 0.2 },
+    ];
+    expect(sheet).toMatchObject({ mods: expected });
+    expect(team).toMatchObject({
+      label: 'Cartethyia S4 (team all-attribute DMG)',
+      windowSeconds: 20,
+      mods: expected,
+    });
+  });
+
   it('keeps note reasons non-empty with cited modules', () => {
     for (const entry of CHAIN_PRESETS) {
       if (entry.scope !== 'note') continue;
@@ -141,3 +169,4 @@ describe('chain presets', () => {
     expect(actual).toEqual(expected);
   });
 });
+      ['cartethyia@4', 20],

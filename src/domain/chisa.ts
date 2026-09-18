@@ -29,6 +29,15 @@ export interface ChisaSkillMods {
 
 const SAW_MOTIONS = /sawring - blitz|chainsaw mode - dodge counter|sawring - eradication/i;
 const RING_BONUS_MOTION = /bonus dmg multiplier per ring of chainsaw/i;
+
+/**
+ * Parameter rows that ship in the snapshot motion list but are not scorable
+ * hits: the per-Ring row is consumed by `chisaSkillMods` as Eradication's
+ * scaling input, so the rotation picker must not offer it as a block.
+ */
+export function isChisaParameterMotion(motionName: string): boolean {
+  return RING_BONUS_MOTION.test(motionName);
+}
 /** Max Rings counted toward one Eradication (Forte text: "Up to 100 points"). */
 const MAX_RINGS_COUNTED = 100;
 

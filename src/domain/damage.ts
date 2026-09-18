@@ -31,6 +31,7 @@ import {
   type NegativeStatusType,
 } from './negativeStatus.ts';
 
+import { xuanlingBaneTargetAmplify } from './xuanling.ts';
 /**
  * Domain layer: damage formula (reference doc §6, Fandom wiki Damage page).
  * One small pure function per named quantity, composed by `computeDamage`.
@@ -571,7 +572,14 @@ export function computeDamage(ctx: DamageContext): DamageResult {
       kitMods.dmgBonusExtra,
       isCoordinatedMotion(ctx.characterId, motion.name),
     ) *
-    computeDmgAmplifyTotal(sheet.amplify + kitMods.amplifyExtra, enemy.amplifyTarget) *
+    computeDmgAmplifyTotal(
+      sheet.amplify +
+        kitMods.amplifyExtra +
+        (ctx.characterId === 'yangyang-xuanling'
+          ? xuanlingBaneTargetAmplify(ctx.targetHavocBaneStacks ?? 0)
+          : 0),
+      enemy.amplifyTarget,
+    ) *
     computeTuneStrainMultiplier(sheet.tuneBreakBoost, ctx.tuneStrainStacks ?? 0) *
     computeSpecialDmgPercent(sheet.specialBase, sheet.specialBonus) *
     computeCritMultiplier(

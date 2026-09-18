@@ -5,13 +5,15 @@ import { loadBundledSnapshot } from '../../data/index.ts';
 import type { ActionBlock, BlockResult, RotationBuff } from '../../domain/rotation.ts';
 import { calculateRotation } from '../../domain/rotation.ts';
 import { buildEnemyProfile } from '../../domain/enemy.ts';
-import { ownedEchoSchema, type OwnedEcho, type RosterEntry } from '../../data/schema.ts';
+import { ownedEchoSchema, type CharacterData, type OwnedEcho, type RosterEntry } from '../../data/schema.ts';
 import { RotationTimeline, type MainEchoSkill } from './RotationTimeline.tsx';
 
 const character = loadBundledSnapshot().characters.find((c) => c.id === 'jiyan')!;
+const chisa = loadBundledSnapshot().characters.find((c) => c.id === 'chisa')!;
 
 function renderTimeline(
   overrides: {
+    character?: CharacterData;
     weaponRank?: number;
     onAddBuff?: (buff: Omit<RotationBuff, 'id'>) => void;
     mainEchoSkill?: MainEchoSkill | null;
@@ -33,7 +35,7 @@ function renderTimeline(
   const onClearBuffWindow = vi.fn();
   render(
     <RotationTimeline
-      character={character}
+      character={overrides.character ?? character}
       resonanceChain={0}
       forteLevels={{}}
       resonanceMode={null}
@@ -182,6 +184,18 @@ describe('RotationTimeline buff presets', () => {
       mods: [{ stat: 'atkPct', value: 0.225 }],
       windowDurationSeconds: 15,
     });
+  });
+});
+
+describe('RotationTimeline action picker', () => {
+  it('hides the Chisa per-Ring parameter row but keeps Eradication', () => {
+    // "Bonus DMG Multiplier per Ring of Chainsaw" is a scaling parameter
+    // consumed by chisaSkillMods, not a scorable hit — offering it as a
+    // block would score a phantom 1.30% hit.
+    renderTimeline({ character: chisa });
+
+    expect(screen.queryByRole('button', { name: /bonus dmg multiplier per ring/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sawring - eradication/i })).toBeInTheDocument();
   });
 });
 

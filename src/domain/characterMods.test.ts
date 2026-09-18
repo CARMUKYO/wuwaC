@@ -12,6 +12,7 @@ import {
   characterUsesTuneStrain,
   isBuffOnlySkill,
   isCoordinatedMotion,
+  isParameterMotionRow,
   tuneResponseStackRate,
 } from './characterMods.ts';
 import { computeDamage, standardMob } from './damage.ts';
@@ -454,3 +455,12 @@ describe('wave 2 chain motion composition (Jingran/Phrolova/Augusta)', () => {
     ).toBe(1);
   });
 });
+describe('isParameterMotionRow', () => {
+  it('flags Chisa per-Ring parameter row, nothing else', () => {
+    expect(isParameterMotionRow('chisa', 'Bonus DMG Multiplier per Ring of Chainsaw')).toBe(true);
+    expect(isParameterMotionRow('chisa', 'Sawring - Eradication DMG')).toBe(false);
+    expect(isParameterMotionRow('jiyan', 'Bonus DMG Multiplier per Ring of Chainsaw')).toBe(false);
+    expect(isParameterMotionRow('jiyan', 'Stage 1 DMG')).toBe(false);
+  });
+});
+

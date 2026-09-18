@@ -232,7 +232,10 @@ describe('isBlockStale', () => {
 });
 
 describe('Cartethyia status rotation rules', () => {
-  it('activates S4 all-attribute damage bonus after an explicit Aero Erosion event', () => {
+  it('leaves S4 to the sheet/team layers instead of inflict-gating it here', () => {
+    // S4's wielder part auto-applies via computeStats (full uptime) and the
+    // teammates part resolves via resolveTeamBuffs — the scorer must not add
+    // its own inflict-gated bonus on top (that would double-count Aero).
     const basic = cartethyia.skills.find((s) => s.kind === 'basic')!;
     const motion = basic.motionValues.find((m) => m.name === 'Stage 1 DMG')!;
     const base = emptySheet();
@@ -269,7 +272,7 @@ describe('Cartethyia status rotation rules', () => {
         basicBlock,
       ],
     });
-    expect(after.blocks[1].damage / before.blocks[0].damage).toBeCloseTo(1.2, 10);
+    expect(after.blocks[1].damage / before.blocks[0].damage).toBe(1);
   });
 });
 
