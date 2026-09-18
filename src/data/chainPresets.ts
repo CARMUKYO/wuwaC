@@ -767,28 +767,25 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'motion',
     characterId: 'iuno',
     rank: 3,
-    skillKind: 'basic',
     motionNameIncludes: 'moonbow - basic attack',
     motionMultiplier: 1.65,
-    assumption: 'While in Lunar Cycle; motion-scoped Amplify scores as a per-motion multiplier.',
+    assumption: 'While in Lunar Cycle; motion-scoped Amplify scores as a per-motion multiplier. Unscoped: also matches the forte Sentience-enhanced casts of the same attacks.',
   },
   {
     scope: 'motion',
     characterId: 'iuno',
     rank: 3,
-    skillKind: 'skill',
     motionNameIncludes: 'arc beyond the edge',
     motionMultiplier: 1.65,
-    assumption: 'While in Lunar Cycle; motion-scoped Amplify scores as a per-motion multiplier.',
+    assumption: 'While in Lunar Cycle; motion-scoped Amplify scores as a per-motion multiplier. Unscoped: also matches the forte Sentience-enhanced cast of the same attack.',
   },
   {
     scope: 'motion',
     characterId: 'iuno',
     rank: 3,
-    skillKind: 'basic',
     motionNameIncludes: 'moonbow - dodge counter',
     motionMultiplier: 1.65,
-    assumption: 'While in Lunar Cycle; motion-scoped Amplify scores as a per-motion multiplier.',
+    assumption: 'While in Lunar Cycle; motion-scoped Amplify scores as a per-motion multiplier. Unscoped: also matches the forte Sentience-enhanced cast of the same attack.',
   },
   {
     scope: 'motion',
@@ -1643,10 +1640,10 @@ export const CHAIN_PRESETS: ChainPreset[] = [
   },
   {
     scope: 'motion',
-    motionNameIncludes: 'prismatic overblast',
     characterId: 'lynae',
     rank: 5,
     skillKind: 'liberation',
+    motionNameIncludes: 'prismatic overblast',
     motionMultiplier: 1.7,
   },
   {
@@ -1896,7 +1893,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'cantarella',
     rank: 6,
     mods: [{ stat: 'defIgnore', value: 0.3 }],
-    assumption: '10s window after Liberation.',
+    assumption: '10s window after Liberation. Hazy Dream Jolt-suppression rider unmodeled (no trigger system).',
   },
 
   // --- Carlotta -------------------------------------------------------------
@@ -1975,7 +1972,8 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     rank: 5,
     skillKind: 'forte',
     motionNameIncludes: 'flaming sacrifice',
-    motionMultiplier: 1.5,
+    motionMultiplier: 2.25,
+    assumption: 'Multiplier +50% and DMG dealt +50% are distinct factors (cf. S1 damage-stage wording) — multiplicative.',
   },
   {
     scope: 'motion',
@@ -2262,6 +2260,8 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'sheet',
     characterId: 'lynae',
     rank: 2,
+    mods: [{ stat: 'amplify', value: 0.25 }],
+  },
   {
     scope: 'team',
     characterId: 'lynae',
@@ -2270,8 +2270,6 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     windowSeconds: 14,
     mods: [{ stat: 'amplify', value: 0.25 }],
     assumption: 'Outro additionally grants the incoming Resonator 25% All DMG Amp for 14s; teammates part.',
-  },
-    mods: [{ stat: 'amplify', value: 0.25 }],
   },
   {
     scope: 'sheet',
@@ -2543,10 +2541,29 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     assumption: '10s window after Basic Attack V.',
   },
   {
-    scope: 'note',
+    scope: 'motion',
     characterId: 'sanhua',
     rank: 5,
-    reason: 'Ice Burst has no snapshot motion (2026-09-17).',
+    skillKind: 'forte',
+    motionNameIncludes: 'glacier burst',
+    critDmgExtra: 1,
+    assumption: 'Ice Creations auto-explode even undetonated (rotation enabler).',
+  },
+  {
+    scope: 'motion',
+    characterId: 'sanhua',
+    rank: 5,
+    skillKind: 'forte',
+    motionNameIncludes: 'ice prism burst',
+    critDmgExtra: 1,
+  },
+  {
+    scope: 'motion',
+    characterId: 'sanhua',
+    rank: 5,
+    skillKind: 'forte',
+    motionNameIncludes: 'ice thorn burst',
+    critDmgExtra: 1,
   },
 
   // --- Shorekeeper ----------------------------------------------------------
@@ -2656,7 +2673,16 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'yuanwu',
     rank: 6,
     mods: [{ stat: 'defPct', value: 0.32 }],
-    assumption: '3s window near Thunder Wedge.',
+    assumption: '3s window near Thunder Wedge (wearer-total: wielder part).',
+  },
+  {
+    scope: 'team',
+    characterId: 'yuanwu',
+    rank: 6,
+    label: 'Yuanwu S6 (team DEF)',
+    windowSeconds: 3,
+    mods: [{ stat: 'defPct', value: 0.32 }],
+    assumption: '3s window near Thunder Wedge; teammates part.',
   },
 
   // --- Youhu ----------------------------------------------------------------
@@ -3672,15 +3698,6 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'rover-havoc',
     rank: 3,
     reason: 'Lost-HP-scaling heal has no scoring (2026-09-17).',
-  },
-  {
-    scope: 'motion',
-    characterId: 'rover-havoc',
-    rank: 5,
-    skillKind: 'basic',
-    motionNameIncludes: 'stage 5',
-    motionMultiplier: 1.5,
-    assumption: 'In Dark Surge state.',
   },
   {
     scope: 'motion',

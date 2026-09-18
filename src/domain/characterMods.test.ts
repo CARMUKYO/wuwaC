@@ -97,6 +97,56 @@ describe('chain motion entries', () => {
     ).toBeCloseTo(3.4, 10);
   });
 
+  it('stacks Changli S5 dual-clause Flaming Sacrifice bonus to x2.25', () => {
+    // S5: "Multiplier is increased by 50% and its DMG dealt is increased by
+    // 50%" — two distinct per-motion x1.5 factors (cf. S1's damage-stage
+    // wording), composing multiplicatively. S5-vs-S4 isolates S5 (S1's x1.1
+    // cancels; S2 crit/S4 ATK are sheet-scope, invisible to this hand sheet).
+    const changli = snapshot.characters.find((c) => c.id === 'changli')!;
+    const forte = changli.skills.find((s) => s.kind === 'forte')!;
+    const run = (resonanceChain: number): number =>
+      computeDamage({
+        sheet: emptySheet(),
+        baseAtk: { character: 100, weapon: 0 },
+        baseHp: { character: 10000 },
+        baseDef: { character: 100 },
+        attackerLevel: 90,
+        skill: forte,
+        motionName: 'Flaming Sacrifice DMG',
+        forteLevel: 10,
+        enemy: standardMob(90),
+        crit: 'nonCrit',
+        characterId: 'changli',
+        resonanceChain,
+      }).damage;
+    expect(run(5) / run(4)).toBeCloseTo(2.25, 10);
+  });
+
+  it('covers Iuno S3 Amplify on base and Sentience-enhanced Moonbow rows', () => {
+    // S3 amplifies the named Lunar Cycle attacks; the forte "Enhanced" rows
+    // are Sentience-empowered casts of the same attacks (forte prose), so
+    // both variants carry x1.65. S3-vs-S2 isolates S3 (S1 ATK/S2 crit/S5
+    // Liberation are sheet-scope, invisible to this hand sheet).
+    const iuno = snapshot.characters.find((c) => c.id === 'iuno')!;
+    const run = (skillKind: 'basic' | 'forte', motionName: string, resonanceChain: number): number =>
+      computeDamage({
+        sheet: emptySheet(),
+        baseAtk: { character: 100, weapon: 0 },
+        baseHp: { character: 10000 },
+        baseDef: { character: 100 },
+        attackerLevel: 90,
+        skill: iuno.skills.find((s) => s.kind === skillKind)!,
+        motionName,
+        forteLevel: 10,
+        enemy: standardMob(90),
+        crit: 'nonCrit',
+        characterId: 'iuno',
+        resonanceChain,
+      }).damage;
+    expect(run('basic', 'Moonbow - Basic Attack 1 DMG', 3) / run('basic', 'Moonbow - Basic Attack 1 DMG', 2)).toBeCloseTo(1.65, 10);
+    expect(run('forte', 'Enhanced Moonbow - Basic Attack 1 DMG', 3) / run('forte', 'Enhanced Moonbow - Basic Attack 1 DMG', 2)).toBeCloseTo(1.65, 10);
+  });
+
   it('guarantees Chixia S1 Boom Boom crits without touching sibling motions', () => {
     const forte = chixia.skills.find((s) => s.kind === 'forte')!;
     const boom = characterSkillMods('chixia', 1, forte, 'Boom Boom Damage', 'skill', 10);
@@ -221,56 +271,6 @@ describe('chain motion entries', () => {
     expect(run(3) / run(2)).toBeCloseTo(2.5, 10);
   });
 
-  it('resolves Taoqi S2 skill-crit extras without touching other skills', () => {
-    const taoqi = snapshot.characters.find((c) => c.id === 'taoqi')!;
-    const liberation = taoqi.skills.find((s) => s.kind === 'liberation')!;
-    const forte = taoqi.skills.find((s) => s.kind === 'forte')!;
-    const mods = characterSkillMods('taoqi', 2, liberation, 'Skill DMG', 'liberation', 10);
-    expect(mods.critRateExtra).toBeCloseTo(0.2, 10);
-    expect(mods.critDmgExtra).toBeCloseTo(0.2, 10);
-    expect(mods.defIgnoreExtra).toBe(0);
-    const sibling = characterSkillMods('taoqi', 2, forte, 'Timed Counters Stage 1 DMG', 'basic', 10);
-    expect(sibling.critRateExtra).toBe(0);
-    expect(sibling.critDmgExtra).toBe(0);
-  });
-
-  it('resolves motion-scoped DEF ignore end to end (Lumi S2, hand-computed)', () => {
-    const lumi = snapshot.characters.find((c) => c.id === 'lumi')!;
-    const forte = lumi.skills.find((s) => s.kind === 'forte')!;
-    const run = (motionName: string, resonanceChain: number): number =>
-      computeDamage({
-        sheet: emptySheet(),
-        baseAtk: { character: 100, weapon: 0 },
-        baseHp: { character: 10000 },
-        baseDef: { character: 100 },
-        attackerLevel: 90,
-        skill: forte,
-        motionName,
-        forteLevel: 10,
-        enemy: standardMob(90),
-        crit: 'nonCrit',
-        characterId: 'lumi',
-        resonanceChain,
-      }).damage;
-    // Level-90 curve: numerator 1520, enemy DEF 1512. Ignore 0:
-    // 1520/3032; ignore 0.2: 1520/(1520 + 1512×0.8) = 1520/2729.6.
-    // Everything else cancels, so the damage ratio is 3032/2729.6.
-    expect(run('Energized Pounce DMG', 2) / run('Energized Pounce DMG', 1)).toBeCloseTo(
-      3032 / 2729.6,
-      10,
-    );
-    expect(run('Glare DMG', 2) / run('Glare DMG', 1)).toBeCloseTo(1, 10);
-  });
-});
-
-describe('characterStatusBlocks', () => {
-  it('offers detonation blocks only where the pipeline is computable', () => {
-    expect(characterStatusBlocks('cartethyia')).toEqual(['aeroErosion']);
-    expect(characterStatusBlocks('ciaccona')).toEqual(['aeroErosion']);
-    expect(characterStatusBlocks('rover-aero')).toEqual(['aeroErosion']);
-    expect(characterStatusBlocks('zani')).toEqual(['spectroFrazzle']);
-    expect(characterStatusBlocks('phoebe')).toEqual(['spectroFrazzle']);
-    expect(characterStatusBlocks('rover-spectro')).toEqual(['spectroFrazzle']);
   it('resolves Wave-3 Hiyuki S1 plunging and Lucy S6 Hack riders end to end', () => {
     const run = (
       characterId: string,
@@ -380,6 +380,56 @@ describe('characterStatusBlocks', () => {
     ).toBeCloseTo(1, 10);
   });
 
+  it('resolves Taoqi S2 skill-crit extras without touching other skills', () => {
+    const taoqi = snapshot.characters.find((c) => c.id === 'taoqi')!;
+    const liberation = taoqi.skills.find((s) => s.kind === 'liberation')!;
+    const forte = taoqi.skills.find((s) => s.kind === 'forte')!;
+    const mods = characterSkillMods('taoqi', 2, liberation, 'Skill DMG', 'liberation', 10);
+    expect(mods.critRateExtra).toBeCloseTo(0.2, 10);
+    expect(mods.critDmgExtra).toBeCloseTo(0.2, 10);
+    expect(mods.defIgnoreExtra).toBe(0);
+    const sibling = characterSkillMods('taoqi', 2, forte, 'Timed Counters Stage 1 DMG', 'basic', 10);
+    expect(sibling.critRateExtra).toBe(0);
+    expect(sibling.critDmgExtra).toBe(0);
+  });
+
+  it('resolves motion-scoped DEF ignore end to end (Lumi S2, hand-computed)', () => {
+    const lumi = snapshot.characters.find((c) => c.id === 'lumi')!;
+    const forte = lumi.skills.find((s) => s.kind === 'forte')!;
+    const run = (motionName: string, resonanceChain: number): number =>
+      computeDamage({
+        sheet: emptySheet(),
+        baseAtk: { character: 100, weapon: 0 },
+        baseHp: { character: 10000 },
+        baseDef: { character: 100 },
+        attackerLevel: 90,
+        skill: forte,
+        motionName,
+        forteLevel: 10,
+        enemy: standardMob(90),
+        crit: 'nonCrit',
+        characterId: 'lumi',
+        resonanceChain,
+      }).damage;
+    // Level-90 curve: numerator 1520, enemy DEF 1512. Ignore 0:
+    // 1520/3032; ignore 0.2: 1520/(1520 + 1512×0.8) = 1520/2729.6.
+    // Everything else cancels, so the damage ratio is 3032/2729.6.
+    expect(run('Energized Pounce DMG', 2) / run('Energized Pounce DMG', 1)).toBeCloseTo(
+      3032 / 2729.6,
+      10,
+    );
+    expect(run('Glare DMG', 2) / run('Glare DMG', 1)).toBeCloseTo(1, 10);
+  });
+});
+
+describe('characterStatusBlocks', () => {
+  it('offers detonation blocks only where the pipeline is computable', () => {
+    expect(characterStatusBlocks('cartethyia')).toEqual(['aeroErosion']);
+    expect(characterStatusBlocks('ciaccona')).toEqual(['aeroErosion']);
+    expect(characterStatusBlocks('rover-aero')).toEqual(['aeroErosion']);
+    expect(characterStatusBlocks('zani')).toEqual(['spectroFrazzle']);
+    expect(characterStatusBlocks('phoebe')).toEqual(['spectroFrazzle']);
+    expect(characterStatusBlocks('rover-spectro')).toEqual(['spectroFrazzle']);
     expect(characterStatusBlocks('jiyan')).toEqual([]);
     expect(characterStatusBlocks('yangyang-xuanling')).toEqual([]);
     expect(characterStatusBlocks('aemeath')).toEqual([]);
@@ -418,6 +468,15 @@ describe('tune registries', () => {
     }
     expect(characterUsesTuneStrain('zani')).toBe(false);
     expect(characterUsesTuneStrain('jiyan')).toBe(false);
+  });
+});
+
+describe('isParameterMotionRow', () => {
+  it('flags Chisa per-Ring parameter row, nothing else', () => {
+    expect(isParameterMotionRow('chisa', 'Bonus DMG Multiplier per Ring of Chainsaw')).toBe(true);
+    expect(isParameterMotionRow('chisa', 'Sawring - Eradication DMG')).toBe(false);
+    expect(isParameterMotionRow('jiyan', 'Bonus DMG Multiplier per Ring of Chainsaw')).toBe(false);
+    expect(isParameterMotionRow('jiyan', 'Stage 1 DMG')).toBe(false);
   });
 });
 
@@ -564,14 +623,47 @@ describe('wave 2 chain motion composition (Jingran/Phrolova/Augusta)', () => {
     ).toBe(1);
   });
 });
-describe('isParameterMotionRow', () => {
-  it('flags Chisa per-Ring parameter row, nothing else', () => {
-    expect(isParameterMotionRow('chisa', 'Bonus DMG Multiplier per Ring of Chainsaw')).toBe(true);
-    expect(isParameterMotionRow('chisa', 'Sawring - Eradication DMG')).toBe(false);
-    expect(isParameterMotionRow('jiyan', 'Bonus DMG Multiplier per Ring of Chainsaw')).toBe(false);
-    expect(isParameterMotionRow('jiyan', 'Stage 1 DMG')).toBe(false);
+
+describe('wave 3 chain motion composition (Roccia/Qingxiao/Lynae)', () => {
+  const roccia = snapshot.characters.find((c) => c.id === 'roccia')!;
+  const rForte = roccia.skills.find((s) => s.kind === 'forte')!;
+  const rLib = roccia.skills.find((s) => s.kind === 'liberation')!;
+  const qingxiao = snapshot.characters.find((c) => c.id === 'qingxiao')!;
+  const qLib = qingxiao.skills.find((s) => s.kind === 'liberation')!;
+  const lynae = snapshot.characters.find((c) => c.id === 'lynae')!;
+  const lLib = lynae.skills.find((s) => s.kind === 'liberation')!;
+
+  it('covers the whole Real Fantasy forte cycle at Roccia S4, below rank stays neutral', () => {
+    for (const motion of ['Stage 1 DMG', 'Stage 2 DMG', 'Stage 3 DMG']) {
+      expect(characterSkillMods('roccia', 4, rForte, motion, 'heavy', 10).motionMultiplier).toBeCloseTo(1.6, 10);
+      expect(characterSkillMods('roccia', 3, rForte, motion, 'heavy', 10).motionMultiplier).toBe(1);
+    }
+    // The Liberation cast is not Real Fantasy.
+    expect(characterSkillMods('roccia', 4, rLib, 'Skill DMG', 'heavy', 10).motionMultiplier).toBe(1);
   });
-});
+
+  it('stacks Roccia S5 heavy-taken with the S4 Real Fantasy multiplier', () => {
+    // S5: liberation x1.2 + heavy-taken x1.8; S4: Real Fantasy x1.6.
+    // Real Fantasy Stage 1 at S5: 1.6 x 1.8 = 2.88 (no liberation part).
+    expect(characterSkillMods('roccia', 5, rForte, 'Stage 1 DMG', 'heavy', 10).motionMultiplier).toBeCloseTo(
+      2.88, 10,
+    );
+    // Liberation cast at S5: 1.2 x 1.8 = 2.16 (no S4 part).
+    expect(characterSkillMods('roccia', 5, rLib, 'Skill DMG', 'heavy', 10).motionMultiplier).toBeCloseTo(2.16, 10);
+  });
+
+  it('resolves Roccia S6 DEF ignore on Real Fantasy only', () => {
+    expect(characterSkillMods('roccia', 6, rForte, 'Stage 3 DMG', 'heavy', 10).defIgnoreExtra).toBeCloseTo(0.6, 10);
+    expect(characterSkillMods('roccia', 5, rForte, 'Stage 3 DMG', 'heavy', 10).defIgnoreExtra).toBe(0);
+    expect(characterSkillMods('roccia', 6, rLib, 'Skill DMG', 'heavy', 10).defIgnoreExtra).toBe(0);
+  });
+
+  it('resolves Qingxiao S3 Liberation crit DMG without touching the multiplier', () => {
+    const mods = characterSkillMods('qingxiao', 3, qLib, 'Skill DMG', 'liberation', 10);
+    expect(mods.critDmgExtra).toBeCloseTo(1, 10);
+    expect(mods.motionMultiplier).toBe(1);
+    expect(characterSkillMods('qingxiao', 2, qLib, 'Skill DMG', 'liberation', 10).critDmgExtra).toBe(0);
+  });
 
   it('gates Lynae S5 to Prismatic Overblast, not the follow-up basic', () => {
     expect(

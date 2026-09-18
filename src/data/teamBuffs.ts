@@ -123,7 +123,7 @@ export const TEAM_BUFF_EXCLUSIONS: Record<string, string> = {
   chisa: 'Outro raises status caps (+3); no cap bucket. (1004209)',
   'luuk-herssen': 'Damage-only outro; Golden Rule feeds own resources; Tune cap unmodeled. (1004709/1004707/1004710)',
   sigrika: 'Damage-only outro + Stagnate utility (no bucket). (1005109)',
-  'rover-aero': 'Outro raises the Aero Erosion cap (+3); no cap bucket. Heals carry no numbers. (1003209)',
+  'rover-aero': 'Outro raises the Aero Erosion cap (+3); no cap bucket. Kit heals have no scoring. (1003209)',
   qingxiao: 'Damage-only outro; Mindlock amp is self-only; Tune cap unmodeled. (1005809/1005807/1005810)',
   jingran: 'Damage-only outro; kit is self-state/self-Qi. (1005909)',
 };

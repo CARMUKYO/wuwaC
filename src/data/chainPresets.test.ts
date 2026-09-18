@@ -179,6 +179,7 @@ describe('chain presets', () => {
       ['calcharo@4', 30],
       ['camellya@4', 30],
       ['carlotta@4', 30],
+      ['cartethyia@4', 20],
       ['changli@4', 30],
       ['chixia@6', 15],
       ['danjin@6', 20],
@@ -188,8 +189,8 @@ describe('chain presets', () => {
       ['lingyang@4', 30],
       ['lumi@6', 20],
       ['lupa@2', 30],
-      ['mortefi@6', 20],
       ['lynae@2', 14],
+      ['mortefi@6', 20],
       ['phoebe@2', 30],
       ['qingxiao@4', 8],
       ['rebecca@2', 30],
@@ -202,6 +203,7 @@ describe('chain presets', () => {
       ['yangyang-xuanling@4', 20],
       ['yangyang@6', 20],
       ['yinlin@4', 12],
+      ['yuanwu@6', 3],
       ['zani@4', 30],
       ['zhezhi@4', 30],
     ];
@@ -214,4 +216,3 @@ describe('chain presets', () => {
     expect(actual).toEqual(expected);
   });
 });
-      ['cartethyia@4', 20],
