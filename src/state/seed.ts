@@ -26,11 +26,14 @@ export function buildSeedEchoes(
   defs: readonly EchoDefData[],
   count: number,
   rand: () => number = Math.random,
+  sonataId?: string,
 ): OwnedEcho[] {
   if (defs.length === 0) throw new Error('no echo defs available for seeding');
+  const candidates = sonataId === undefined ? defs : defs.filter((d) => d.sonataIds.includes(sonataId));
+  if (candidates.length === 0) throw new Error(`no echo defs belong to sonata set ${JSON.stringify(sonataId)}`);
   const rows: OwnedEcho[] = [];
   for (let i = 0; i < count; i += 1) {
-    const def = pick(defs, rand);
+    const def = pick(candidates, rand);
     const mainStat = pick(def.allowedMainStats, rand);
     const subCount = 3 + Math.floor(rand() * 3); // 3–5
     const pool = SUBSTAT_POOL.filter((s) => s !== mainStat);
@@ -45,7 +48,7 @@ export function buildSeedEchoes(
         id: crypto.randomUUID(),
         label: def.name,
         echoDefId: def.id,
-        sonataId: pick(def.sonataIds, rand),
+        sonataId: sonataId ?? pick(def.sonataIds, rand),
         cost: def.cost,
         level: 25,
         rarity: 5,
@@ -61,8 +64,8 @@ export function buildSeedEchoes(
 }
 
 /** Bulk-writes random echoes into the inventory store. DEV only. */
-export async function seedInventory(count = 30): Promise<number> {
-  const rows = buildSeedEchoes(loadBundledSnapshot().echoDefs, count);
+export async function seedInventory(count = 30, sonataId?: string): Promise<number> {
+  const rows = buildSeedEchoes(loadBundledSnapshot().echoDefs, count, Math.random, sonataId);
   await db.ownedEchoes.bulkAdd(rows);
   useInventoryStore.setState((s) => ({ echoes: [...s.echoes, ...rows], loaded: true }));
   return rows.length;

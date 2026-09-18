@@ -40,6 +40,7 @@ export function InventoryPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<OwnedEcho | null>(null);
   const [sonataFilter, setSonataFilter] = useState('');
+  const [seedSonata, setSeedSonata] = useState('');
 
   useEffect(() => {
     if (!loaded) void load();
@@ -64,14 +65,30 @@ export function InventoryPage() {
         {!adding && editing === null && (
           <div className="flex gap-2">
             {import.meta.env.DEV && (
-              <button
-                type="button"
-                onClick={() => void seedInventory(30)}
-                title="Adds 30 random echoes from synced defs for optimizer testing"
-                className="rounded-md border border-dashed border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
-              >
-                Seed 30 random
-              </button>
+              <>
+                <select
+                  aria-label="Seed echo set"
+                  value={seedSonata}
+                  onChange={(e) => setSeedSonata(e.target.value)}
+                  title="Restrict seeded echoes to one Sonata set"
+                  className="rounded-md border border-dashed border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-slate-300"
+                >
+                  <option value="">Any set</option>
+                  {snapshot.sonataSets.map((set) => (
+                    <option key={set.id} value={set.id}>
+                      {set.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => void seedInventory(30, seedSonata === '' ? undefined : seedSonata)}
+                  title="Adds 30 random echoes from synced defs for optimizer testing"
+                  className="rounded-md border border-dashed border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+                >
+                  Seed 30 random
+                </button>
+              </>
             )}
             <button
               type="button"
