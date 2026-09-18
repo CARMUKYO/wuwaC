@@ -10,7 +10,7 @@ const draft: EchoDraft = {
   cost: 1,
   level: 25,
   rarity: 5,
-  mainStat: { stat: 'dmgBonus:Aero', value: 0.3 },
+  mainStat: { stat: 'atkPct', value: 0.18 },
   secondMainStat: { stat: 'atk', value: 100 },
   substats: [{ stat: 'critRate', value: 0.063 }],
   equippedTo: null,
@@ -84,11 +84,11 @@ describe('inventory store', () => {
   it('updateEcho patches fields and persists', async () => {
     const created = await useInventoryStore.getState().addEcho(draft);
     const updated = await useInventoryStore.getState().updateEcho(created.id, {
-      mainStat: { stat: 'dmgBonus:Aero', value: 0.33 },
+      mainStat: { stat: 'atkPct', value: 0.1 },
     });
-    expect(updated.mainStat.value).toBeCloseTo(0.33, 10);
+    expect(updated.mainStat.value).toBeCloseTo(0.1, 10);
     expect(await db.ownedEchoes.get(created.id)).toMatchObject({
-      mainStat: { stat: 'dmgBonus:Aero', value: 0.33 },
+      mainStat: { stat: 'atkPct', value: 0.1 },
     });
   });
 

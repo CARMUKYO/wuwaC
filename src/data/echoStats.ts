@@ -6,7 +6,7 @@ import type { StatKey } from './schema.ts';
  * sliders — never for damage math, which only reads stored echo rows.
  *
  * Coverage is intentionally partial: pairs the reference does not list
- * (1-cost flats, `dmgBonus:physical`, …) fall back to free numeric input
+ * (1-cost flats, `dmgBonus:coordinated`, …) fall back to free numeric input
  * in the form. Ratios are decimals, flats are raw.
  */
 

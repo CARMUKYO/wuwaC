@@ -13,7 +13,7 @@ import { z } from 'zod';
  */
 
 /** Increment on any breaking change to the snapshot file layout. */
-export const SNAPSHOT_VERSION = 3;
+export const SNAPSHOT_VERSION = 4;
 
 const slug = z
   .string()
@@ -87,11 +87,6 @@ export const statKeySchema = z.enum([
   'dmgBonus:intro',
   'dmgBonus:outro',
   'dmgBonus:echo',
-  /**
-   * Physical DMG (echo skills such as Diamondclaw's; no character attribute
-   * maps to it). Aggregates like any bucket; unscored by character skills.
-   */
-  'dmgBonus:physical',
   /**
    * Coordinated Attack DMG Bonus. Joins `AllDmgBonus` additively, but ONLY
    * for hits flagged as coordinated attacks (registry in
@@ -345,9 +340,12 @@ export type SonataSetData = z.infer<typeof sonataSetSchema>;
 /**
  * What an Echo *can* be. Per-copy rolls live in `OwnedEcho`.
  * Sourced from encore.moe `/echo/<id>` detail records: cost from
- * `Handbook.Intensity`, pools from `Handbook.Descrtption1`, sonatas from
- * `FetterGroup`. Records without Handbook data are skipped by the sync
- * (reported, never guessed); cost-tier pool rules live in `placeholders.ts`.
+ * `Handbook.Intensity` (detail-Rarity fallback), sonatas from
+ * `FetterGroup`. Main-stat pools are cost-tier pools from
+ * `placeholders.ts` (docs/echostats.md), identical for every Echo of a
+ * cost — the per-Echo Handbook pool text is unreliable and is not parsed.
+ * Records without Handbook data are skipped by the sync (reported, never
+ * guessed).
  */
 export const echoDefSchema = z.object({
   id: slug,
@@ -355,11 +353,12 @@ export const echoDefSchema = z.object({
   /** Remote icon URL (provider CDN, small variant). Display only — UI falls back to initials. */
   iconUrl: z.string().url().optional(),
   /**
-   * Echo element. The six character attributes plus Physical, which exists
-   * only on a handful of 1-cost echoes (their skills deal physical DMG).
-   * Display only — no character attribute maps to it.
+   * Echo element (display only — no logic keys off it). The six character
+   * attributes; ABSENT for element-less echoes. The provider labels those
+   * "Physical" (element Id 0, Zero icon), but the game has no Physical
+   * element, so no element is stored.
    */
-  element: z.union([attributeSchema, z.literal('Physical')]),
+  element: attributeSchema.optional(),
   sonataIds: z.array(z.string().min(1)).min(1),
   cost: z.union([z.literal(1), z.literal(3), z.literal(4)]),
   allowedMainStats: z.array(statKeySchema).min(1),

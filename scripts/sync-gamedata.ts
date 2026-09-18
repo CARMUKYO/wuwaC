@@ -17,8 +17,10 @@
  * snapshot, so `--echoes` never empties characters/weapons.
  * Echo coverage: cost prefers Handbook intensity with a detail-Rarity
  * fallback ({0:1, 1:3, 2:4, 3:4}, cross-checked against Handbook costs
- * and RandGroupId pool families); pools prefer Handbook tokens
- * with a cost-tier fallback. Fallback records are logged, never silent.
+ * and RandGroupId pool families); main-stat pools are cost-tier pools
+ * (placeholders.ts, transcribed from docs/echostats.md) written verbatim —
+ * the per-Echo Handbook pool text is unreliable and is not parsed.
+ * Fallback records are logged, never silent.
  * Excluded up front (skipped before the detail fetch): `Phantom: ...`
  * shiny variants and unreleased `MonsterInfo_<id>_Name` placeholders —
  * neither is a separately farmable echo (see echoSkipReasonForName).
@@ -48,7 +50,6 @@ import {
   statEffectFromBonusLine,
   statKeyFromForteTitle,
   statKeyFromPropertyName,
-  statKeysFromMainStatToken,
   stripHtml,
 } from '../src/data/encore.ts';
 import { MAIN_STAT_POOLS } from '../src/data/placeholders.ts';
@@ -74,7 +75,7 @@ function warn(message: string): void {
 
 /** Expected gaps (reported, exit code unaffected). */
 const skips: { name: string; reason: string }[] = [];
-/** Records included via fallback data (tier pools, Rarity costs) — auditable, exit code unaffected. */
+/** Records included via fallback data (Rarity costs) — auditable, exit code unaffected. */
 const fallbacks: { name: string; reason: string }[] = [];
 /** Unexpected per-record failures (reported, exit code 1). */
 const failures: { name: string; error: string }[] = [];
@@ -450,8 +451,8 @@ interface EchoListEntry {
  * Cost prefers Handbook intensity; detail Rarity ({0:1, 1:3, 2:4, 3:4},
  * cross-checked against every Handbook-derived cost and against
  * MainProp.RandGroupId pool families) fills the gap, and Rarity 4+ still
- * skips. Pools prefer Handbook tokens; without them the cost-tier
- * reference pool applies and the record is logged to `fallbacks`.
+ * skips. Main-stat pools are the cost-tier pools from placeholders.ts
+ * (docs/echostats.md) — the Handbook pool text is not parsed.
  */
 function normalizeEchoDef(
   entry: EchoListEntry,
@@ -496,24 +497,7 @@ function normalizeEchoDef(
   } else if (randGroup === 502 && cost !== 3) {
     warn(`${entry.Name}: RandGroupId 502 (3-cost pool) vs resolved cost ${cost}`);
   }
-  const handbook = detail.Handbook;
-  const tokens = handbook ? [...handbook.Descrtption1.matchAll(/\[([^\]]+)\]/g)].map((m) => m[1].trim()) : [];
-  let allowed: StatKey[];
-  if (tokens.length === 0) {
-    allowed = [...MAIN_STAT_POOLS[cost].primary];
-    fallbacks.push({ name: entry.Name, reason: `main-stat pool from cost-${cost} tier fallback (no Handbook pool)` });
-  } else {
-    allowed = [];
-    for (const token of tokens) {
-      const keys = statKeysFromMainStatToken(token);
-      if (keys === null) {
-        return { status: 'skip', reason: `unknown pool token ${JSON.stringify(token)}` };
-      }
-      for (const key of keys) {
-        if (!allowed.includes(key)) allowed.push(key);
-      }
-    }
-  }
+  const allowed: StatKey[] = [...MAIN_STAT_POOLS[cost].primary];
   if (detail.FetterGroup.length === 0) {
     return { status: 'skip', reason: 'no sonata groups' };
   }
@@ -530,8 +514,9 @@ function normalizeEchoDef(
   try {
     element = parseAttribute(elementName);
   } catch {
-    // Physical exists only on a handful of 1-cost echoes (see schema docs).
-    if (elementName === 'Physical') element = 'Physical';
+    // Provider "Physical" (element Id 0, Zero icon) marks element-less
+    // echoes — the game has no Physical element, so none is stored.
+    if (elementName === 'Physical') element = undefined;
     else throw new Error(`unknown element: ${JSON.stringify(elementName)}`);
   }
   let id = slugify(entry.Name);
@@ -546,7 +531,7 @@ function normalizeEchoDef(
     id,
     name: entry.Name,
     ...(iconUrl ? { iconUrl } : {}),
-    element,
+    ...(element !== undefined ? { element } : {}),
     sonataIds,
     cost,
     allowedMainStats: allowed,

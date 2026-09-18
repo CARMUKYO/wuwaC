@@ -64,7 +64,6 @@ describe('statLabel', () => {
     expect(statLabel('critRate')).toBe('Crit Rate');
     expect(statLabel('dmgBonus:Aero')).toBe('Aero DMG');
     expect(statLabel('dmgBonus:skill')).toBe('Resonance Skill DMG');
-    expect(statLabel('dmgBonus:physical')).toBe('Physical DMG');
     expect(statLabel('dmgBonus:coordinated')).toBe('Coordinated Attack DMG');
   });
 });

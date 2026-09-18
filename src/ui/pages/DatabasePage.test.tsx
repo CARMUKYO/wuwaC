@@ -60,7 +60,19 @@ describe('DatabasePage', () => {
 
     await user.click(await screen.findByText('Hooscamp'));
     expect(await screen.findByText(/cost 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/crit rate/i)).toBeInTheDocument();
+    // 1-cost tier pool: small stats only, no Crit stats (docs/echostats.md §1).
+    expect(screen.getByText(/ATK%/)).toBeInTheDocument();
+    expect(screen.queryByText(/crit rate/i)).not.toBeInTheDocument();
+  });
+
+  it('shows element-less echoes without an element', async () => {
+    const user = userEvent.setup();
+    render(<DatabasePage />);
+    await user.click(screen.getByRole('tab', { name: /echoes/i }));
+
+    // Diamondclaw is element-less (provider element Id 0, not a real element).
+    await user.click(await screen.findByText('Diamondclaw'));
+    expect(await screen.findByText(/no element/i)).toBeInTheDocument();
   });
 
   it('browses sonata sets with structured badges', async () => {

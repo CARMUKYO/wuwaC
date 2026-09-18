@@ -106,7 +106,7 @@ function EchoDetail({ echo, sonataNameOf }: { echo: EchoDefData; sonataNameOf: (
         <div>
           <h3 className="text-base font-semibold">{echo.name}</h3>
           <p className="text-xs text-slate-400">
-            Cost {echo.cost} · {echo.element}
+            Cost {echo.cost} · {echo.element ?? 'No element'}
           </p>
         </div>
       </div>

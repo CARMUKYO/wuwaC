@@ -258,7 +258,8 @@ Bonuses = DmgBonusPercent × DmgAmplifyTotal × SpecialDmgPercent × CritMultipl
   motion value, damage element, and scaling (`computeEchoSkillDamage`):
   the echo's own attribute bucket plus the `dmgBonus:echo` bucket, one
   block per hit. Cooldowns are carried for display only — blocks have no
-  timestamps. Physical-DMG echoes are unscorable (no Physical RES term).
+  timestamps. Element-less echoes whose skill text reads Physical DMG
+  are unscorable (no Physical RES term exists).
 - `DmgAmplifyTotal = 1 + (dmgAmplifyTarget + dmgAmplifyAttacker)` — a
   separate multiplier from an uncommon buff type ("DMG Amplify"), which
   can be negative (a reduction) as well as positive. Keep this as its

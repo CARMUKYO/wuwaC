@@ -476,9 +476,9 @@ export function echoCostFromRarity(rarity: number): 1 | 3 | 4 | null {
  * candidate StatKeys. `[Element] DMG Bonus`, Crit, Energy Regen and Healing
  * Bonus map 1:1; bare ATK/HP/DEF map to BOTH flat and percent variants
  * because the pool text does not distinguish them (e.g. a 4-cost's ATK%
- * main vs a 1-cost's flat ATK). The pool is an allowlist for manual entry,
- * so over-inclusion here errs toward usability, documented as such.
- * Returns null for unknown tokens (caller skips the record, never guesses).
+ * main vs a 1-cost's flat ATK).
+ * Returns null for unknown tokens. Kept as a tested parser only — the sync
+ * writes cost-tier pools instead of parsing Handbook text.
  */
 export function statKeysFromMainStatToken(token: string): StatKey[] | null {
   switch (token) {
@@ -501,7 +501,8 @@ export function statKeysFromMainStatToken(token: string): StatKey[] | null {
     default: {
       const element = /^(Glacio|Fusion|Electro|Aero|Spectro|Havoc) DMG Bonus$/.exec(token);
       if (element) return [`dmgBonus:${element[1] as Attribute}`];
-      if (token === 'Physical DMG Bonus') return ['dmgBonus:physical'];
+      // 'Physical DMG Bonus' is intentionally unmapped: the game has no
+      // Physical element, so no such stat exists.
       return null;
     }
   }

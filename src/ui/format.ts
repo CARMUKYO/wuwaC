@@ -104,7 +104,6 @@ export function statLabel(stat: StatKey): string {
         if (bucket in DAMAGE_TYPE_LABELS) {
           return `${DAMAGE_TYPE_LABELS[bucket as DamageType]} DMG`;
         }
-        if (bucket === 'physical') return 'Physical DMG';
         if (bucket === 'coordinated') return 'Coordinated Attack DMG';
         return `${ATTRIBUTE_LABELS[bucket as Attribute]} DMG`;
       }

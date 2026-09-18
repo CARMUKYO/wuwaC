@@ -3,9 +3,11 @@ import { loadBundledSnapshot } from './index.ts';
 import {
   buildSchema,
   characterSchema,
+  echoDefSchema,
   ownedEchoSchema,
   SNAPSHOT_VERSION,
   snapshotSchema,
+  statKeySchema,
   teamSchema,
 } from './schema.ts';
 
@@ -115,5 +117,19 @@ describe('bundled snapshot', () => {
     expect(snapshotSchema.parse(JSON.parse(JSON.stringify(loadBundledSnapshot())))).toEqual(
       loadBundledSnapshot(),
     );
+  });
+
+  it('has no Physical element or Physical DMG bucket (the game has neither)', () => {
+    expect(statKeySchema.options).not.toContain('dmgBonus:physical');
+    const snapshot = loadBundledSnapshot();
+    for (const def of snapshot.echoDefs) {
+      expect(def.element, `${def.name} element`).not.toBe('Physical');
+    }
+    // Element-less echoes (provider element Id 0) carry no element at all.
+    const diamondclaw = snapshot.echoDefs.find((d) => d.id === 'diamondclaw')!;
+    expect(diamondclaw.element).toBeUndefined();
+    const { element: _DROPPED, ...bare } = snapshot.echoDefs.find((d) => d.id === 'hooscamp')!;
+    expect(_DROPPED).toBeDefined();
+    expect(echoDefSchema.parse(bare).element).toBeUndefined();
   });
 });

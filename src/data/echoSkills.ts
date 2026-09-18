@@ -23,8 +23,9 @@ import type { Attribute } from './schema.ts';
  *   damage) via the Bonus lookahead.
  *
  * Deliberate gaps (see the sweep test's pinned zero-hit set):
- * - Physical-DMG echoes (11): no Physical RES term exists anywhere in
- *   the formula tree, so nothing scorable can be built.
+ * - Element-less echoes whose skill text reads Physical DMG (11): no
+ *   Physical RES term exists anywhere in the formula tree, so nothing
+ *   scorable can be built.
  * - Non-damage skills (heals, shields, utility): correctly zero hits.
  * - Multi-stage / per-second / repeated skills parse once per distinct
  *   damage shape — the user adds one block per hit/stage/second (blocks

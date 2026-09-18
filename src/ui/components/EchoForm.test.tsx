@@ -129,7 +129,7 @@ describe('EchoForm', () => {
           sonataId: 'sierra-gale',
           level: '25',
           rarity: '5',
-          mainStat: { stat: 'dmgBonus:Aero', valueText: '30' },
+          mainStat: { stat: 'atkPct', valueText: '15' },
           substats: [],
         }}
       />,

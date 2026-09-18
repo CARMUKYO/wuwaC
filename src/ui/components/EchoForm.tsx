@@ -264,7 +264,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
           <div className="mt-2 rounded-md bg-slate-950 p-2 text-xs text-slate-300">
             <p>
               <span className="font-medium text-slate-100">{def.name}</span>
-              {' · '}{def.element} · Cost {def.cost} · {def.sonataIds.map(sonataName).join(' / ')}
+              {' · '}{def.element ?? 'No element'} · Cost {def.cost} · {def.sonataIds.map(sonataName).join(' / ')}
             </p>
             {def.skillDescription && <p className="mt-1 text-slate-400">{def.skillDescription}</p>}
           </div>

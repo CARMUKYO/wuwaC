@@ -288,7 +288,6 @@ describe('statKeysFromMainStatToken', () => {
     expect(statKeysFromMainStatToken('Healing Bonus')).toEqual(['healingBonus']);
     expect(statKeysFromMainStatToken('Aero DMG Bonus')).toEqual(['dmgBonus:Aero']);
     expect(statKeysFromMainStatToken('Havoc DMG Bonus')).toEqual(['dmgBonus:Havoc']);
-    expect(statKeysFromMainStatToken('Physical DMG Bonus')).toEqual(['dmgBonus:physical']);
     expect(statKeysFromMainStatToken('Tune Break Boost')).toEqual(['tuneBreakBoost']);
   });
 
@@ -301,5 +300,7 @@ describe('statKeysFromMainStatToken', () => {
 
   it('returns null for unknown tokens', () => {
     expect(statKeysFromMainStatToken('')).toBeNull();
+    // No Physical element exists in-game, so this Handbook token has no stat.
+    expect(statKeysFromMainStatToken('Physical DMG Bonus')).toBeNull();
   });
 });
