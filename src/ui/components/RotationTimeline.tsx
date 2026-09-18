@@ -578,7 +578,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         )}
                         {!specialKind && character.id === 'zani' && skillKind === 'forte' && (
                           <div>
-                            <label htmlFor={`nightfall-blazes-${block.id}`} className={labelClass}>Blazes on Nightfall hit (S6)</label>
+                            <label htmlFor={`nightfall-blazes-${block.id}`} className={labelClass}>Blazes on Nightfall hit</label>
                             <input
                               id={`nightfall-blazes-${block.id}`}
                               type="number"

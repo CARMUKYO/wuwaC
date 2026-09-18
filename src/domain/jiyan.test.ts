@@ -23,6 +23,7 @@ describe('jiyanOutroLanceSpec', () => {
 
   it('folds the S5 +120% outro multiplier into the motion value', () => {
     expect(JIYAN_S5_OUTRO_MULTIPLIER).toBeCloseTo(2.2, 10);
+    expect(jiyan.resonanceChain.find((r) => r.rank === 5)!.description).toContain('additional DMG Multiplier of 120%');
     expect(jiyanOutroLanceSpec('jiyan', outro, '', 4)).toEqual({ motionValue: JIYAN_OUTRO_LANCE_MV });
     expect(jiyanOutroLanceSpec('jiyan', outro, '', 5)?.motionValue).toBeCloseTo(
       JIYAN_OUTRO_LANCE_MV * 2.2,

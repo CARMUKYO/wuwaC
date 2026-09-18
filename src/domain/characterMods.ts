@@ -111,7 +111,7 @@ export function characterSkillMods(
   if (characterId === 'zani') {
     mods = {
       ...NEUTRAL_MODS,
-      motionMultiplier: zaniMotionMultiplier(characterId, resonanceChain, skill.kind, motionName, inputs),
+      motionMultiplier: zaniMotionMultiplier(characterId, resonanceChain, skill.kind, motionName, { ...inputs, forteLevel }),
     };
   } else if (characterId === 'yangyang-xuanling') {
     const xuanling = xuanlingSkillMods(characterId, resonanceChain, skill.kind, motionName, motionDmgType, inputs);

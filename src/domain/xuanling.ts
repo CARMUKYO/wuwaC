@@ -27,10 +27,18 @@ export interface XuanlingSkillMods {
  * - S3: Liberation damage Amplified by 175% (attacker Amplify +1.75).
  * - S6: while Voice Flux is active, her Heavy Attack DMG +40% (×1.4).
  *
- * NOT modeled: S1's Shadow of Xuanling summon (337.98% ATK as Heavy —
- * no motion data in the snapshot, TODO), S4's team ATK (team layer),
- * Still as Withered Wood (effect unknown from the truncated chain text,
- * TODO).
+ * Summon hits score as their own rotation blocks: "Shadow of Xuanling
+ * DMG" (liberation skill) carries full motion values — 3.3798 at forte
+ * 10, exactly the quoted 337.98% ATK as Heavy — covering the S1
+ * Unfaltering, S2 Strung Notes, and S6 Still as Withered Wood summons.
+ * Trigger timing (after Sword Stance Flow casts; after teammate status
+ * inflicts for S6) is rotation-layer. S6's guaranteed crit is
+ * unexpressible (rotation crit is global, no per-block override), so
+ * that variant scores uncritted. S4's team ATK resolves through the
+ * team layer (chainPresets sheet + team entries via resolveTeamBuffs),
+ * not this module. Still as Withered Wood's full rules are known
+ * (snapshot S6 text: 30s state, 1s ICD, 5 charges, 25s CD) but
+ * off-field triggers + charges have no rotation model.
  */
 export function xuanlingSkillMods(
   characterId: string | undefined,

@@ -3,7 +3,7 @@ import { loadBundledSnapshot } from '../data/index.ts';
 import { computeDamage } from './damage.ts';
 import { elementalBoss, standardMob } from './damage.ts';
 import { emptySheet } from './stats.ts';
-import { ZANI_MAX_BLAZES, zaniMotionCountsAs, zaniMotionMultiplier } from './zani.ts';
+import { ZANI_MAX_BLAZES, ZANI_NIGHTFALL_PER_BLAZE, zaniMotionCountsAs, zaniMotionMultiplier } from './zani.ts';
 
 const snapshot = loadBundledSnapshot();
 const zani = snapshot.characters.find((c) => c.id === 'zani')!;
@@ -42,10 +42,31 @@ describe('zaniMotionMultiplier', () => {
   it('applies S6 to Heavy Slashes plus per-hit Nightfall scaling', () => {
     expect(zaniMotionMultiplier('zani', 6, 'forte', 'Heavy Slash - Daybreak DMG')).toBeCloseTo(1.4, 10);
     expect(zaniMotionMultiplier('zani', 5, 'forte', 'Heavy Slash - Daybreak DMG')).toBe(1);
-    // Nightfall with 40 Blazes on hit: 1.4 × (1 + 0.4 × 40) = 23.8.
-    expect(zaniMotionMultiplier('zani', 6, 'forte', 'Heavy Slash - Nightfall DMG', { nightfallBlazes: 40 })).toBeCloseTo(23.8, 8);
-    expect(zaniMotionMultiplier('zani', 6, 'forte', 'Heavy Slash - Nightfall DMG', { nightfallBlazes: 999 })).toBeCloseTo(23.8, 8);
+    // Nightfall with 40 Blazes on hit at forte 10: base (1 + 0.0995 × 40) × S6 1.4 × (1 + 0.4 × 40).
+    expect(zaniMotionMultiplier('zani', 6, 'forte', 'Heavy Slash - Nightfall DMG', { nightfallBlazes: 40 })).toBeCloseTo(118.524, 8);
+    expect(zaniMotionMultiplier('zani', 6, 'forte', 'Heavy Slash - Nightfall DMG', { nightfallBlazes: 999 })).toBeCloseTo(118.524, 8);
     expect(zaniMotionMultiplier('zani', 6, 'forte', 'Heavy Slash - Nightfall DMG')).toBeCloseTo(1.4, 10);
+  });
+
+  it('scales base-kit Nightfall per Blaze at any chain rank (live forte table)', () => {
+    const nightfall = 'Heavy Slash - Nightfall DMG';
+    // Forte 10 default: 1 + 0.0995 × 40 = 4.98 — no chain required.
+    expect(zaniMotionMultiplier('zani', 0, 'forte', nightfall, { nightfallBlazes: 40 })).toBeCloseTo(4.98, 10);
+    // Forte 1 rate is 5%: 1 + 0.05 × 40 = 3.0.
+    expect(zaniMotionMultiplier('zani', 0, 'forte', nightfall, { nightfallBlazes: 40, forteLevel: 1 })).toBeCloseTo(3, 10);
+    // Blaze count clamps to 40; forte level clamps to 1–10.
+    expect(zaniMotionMultiplier('zani', 0, 'forte', nightfall, { nightfallBlazes: 999 })).toBeCloseTo(4.98, 10);
+    expect(zaniMotionMultiplier('zani', 0, 'forte', nightfall, { nightfallBlazes: 40, forteLevel: 99 })).toBeCloseTo(4.98, 10);
+    expect(zaniMotionMultiplier('zani', 0, 'forte', nightfall, { nightfallBlazes: 40, forteLevel: 0 })).toBeCloseTo(3, 10);
+    // Zero Blazes is neutral; other slashes ignore the input.
+    expect(zaniMotionMultiplier('zani', 0, 'forte', nightfall)).toBe(1);
+    expect(zaniMotionMultiplier('zani', 0, 'forte', 'Heavy Slash - Daybreak DMG', { nightfallBlazes: 40 })).toBe(1);
+  });
+
+  it('pins the per-Blaze table ends against the live source', () => {
+    expect(ZANI_NIGHTFALL_PER_BLAZE).toHaveLength(10);
+    expect(ZANI_NIGHTFALL_PER_BLAZE[0]).toBeCloseTo(0.05, 10);
+    expect(ZANI_NIGHTFALL_PER_BLAZE[9]).toBeCloseTo(0.0995, 10);
   });
 });
 
@@ -94,5 +115,12 @@ describe('zani through computeDamage', () => {
   it('covers the forte Nightfall input path', () => {
     const hit = computeDamage({ ...common, skill: forte, motionName: 'Heavy Slash - Nightfall DMG', forteLevel: 10, resonanceChain: 6, nightfallBlazes: 10 });
     expect(hit.damage).toBeGreaterThan(0);
+  });
+
+  it('resolves base-kit Nightfall Blaze scaling end to end (S0, forte 10)', () => {
+    const base = computeDamage({ ...common, skill: forte, motionName: 'Heavy Slash - Nightfall DMG', forteLevel: 10, resonanceChain: 0 });
+    const blazed = computeDamage({ ...common, skill: forte, motionName: 'Heavy Slash - Nightfall DMG', forteLevel: 10, resonanceChain: 0, nightfallBlazes: 10 });
+    // 1 + 0.0995 × 10 = 1.995 — proves the forte level threads through characterSkillMods.
+    expect(blazed.damage / base.damage).toBeCloseTo(1.995, 10);
   });
 });

@@ -123,6 +123,23 @@ describe('resolveTeamBuffs', () => {
     expect(met.warnings.some((w) => w.includes('Chixia'))).toBe(false);
   });
 
+  it('resolves Xuanling S4 team ATK at rank with its 20s window, silent below', () => {
+    const met = resolveTeamBuffs(team(['yangyang-xuanling', 'verina', 'sanhua']), characterNameOf, {
+      'yangyang-xuanling': 4,
+    });
+    expect(met.buffs).toContainEqual({
+      label: 'Xuanling S4 (team ATK)',
+      source: 'Team',
+      mods: [{ stat: 'atkPct', value: 0.2 }],
+      windowDurationSeconds: 20,
+    });
+    expect(met.warnings.some((w) => w.includes('Xuanling'))).toBe(false);
+    const gated = resolveTeamBuffs(team(['yangyang-xuanling', 'verina', 'sanhua']), characterNameOf, {
+      'yangyang-xuanling': 3,
+    });
+    expect(gated.buffs.some((b) => b.label.includes('Xuanling S4'))).toBe(false);
+  });
+
   it('resolves the Luuk Herssen S4 team amplify at rank and stays silent below', () => {
     const met = resolveTeamBuffs(team(['luuk-herssen', 'verina', 'sanhua']), characterNameOf, {
       'luuk-herssen': 4,

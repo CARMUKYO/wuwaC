@@ -461,10 +461,10 @@ export const rotationBlockSpecSchema = z.object({
   conviction: z.number().int().min(0).max(120).optional(),
   /** Cumulative Blazes consumed — Zani S3 scales The Last Stand off it. */
   blazesConsumed: z.number().int().min(0).max(150).optional(),
-  /** Blazes consumed by this Nightfall hit — Zani S6 scales off it. */
+  /** Blazes consumed by this Nightfall hit — Zani base kit and S6 scale off it. */
   nightfallBlazes: z.number().int().min(0).max(40).optional(),
-  /** Rings of Chainsaw consumed for this Eradication hit (Chisa). */
-  ringsConsumed: z.number().int().min(0).max(99).optional(),
+  /** Rings of Chainsaw consumed for this Eradication hit (Chisa, kit counts up to 100). */
+  ringsConsumed: z.number().int().min(0).max(100).optional(),
   /** Voice Flux active — Xuanling S6 Heavy bonus. */
   voiceFlux: z.boolean().optional(),
   /** Woven Myriad - Convergence active — Chisa liberation state. */

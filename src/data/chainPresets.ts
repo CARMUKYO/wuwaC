@@ -1956,6 +1956,12 @@ export const CHAIN_PRESETS: ChainPreset[] = [
   {
     scope: 'note',
     characterId: 'chisa',
+    rank: 2,
+    reason: "Teammates' 50% All-Attribute Bonus (Thread of Bane holders) needs per-recipient attributes (2026-09-18).",
+  },
+  {
+    scope: 'note',
+    characterId: 'chisa',
     rank: 5,
     reason: 'Liberation +100% DMG Bonus in chisaSkillMods.',
     appliedElsewhere: 'chisaSkillMods',
@@ -2692,7 +2698,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'note',
     characterId: 'aemeath',
     rank: 6,
-    reason: 'Liberation +40% bucket in aemeathSkillMods; fixed Tune crit unmodeled (Phase 5 hook); trail stack riders unmodeled.',
+    reason: 'Liberation +40% bucket in aemeathSkillMods; S6 fixed crit consumed by Starburst responses only (Seraphic Duet per-instance hits unmodeled); trail stack/cap riders unmodeled.',
     appliedElsewhere: 'aemeathSkillMods',
   },
 
@@ -3889,7 +3895,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'note',
     characterId: 'yangyang-xuanling',
     rank: 1,
-    reason: 'Shadow of Xuanling summon has no snapshot motion (2026-09-17).',
+    reason: 'Shadow of Xuanling summon scores as its own liberation block (snapshot motion data); trigger timing is rotation-layer.',
   },
   {
     scope: 'note',
@@ -3909,7 +3915,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'note',
     characterId: 'yangyang-xuanling',
     rank: 6,
-    reason: 'Voice Flux Heavy x1.4 in xuanlingSkillMods.',
+    reason: 'Voice Flux Heavy x1.4 in xuanlingSkillMods; Still-as-Withered-Wood summon unmodeled (off-field trigger, charges, per-hit crit).',
     appliedElsewhere: 'xuanlingSkillMods',
   },
 

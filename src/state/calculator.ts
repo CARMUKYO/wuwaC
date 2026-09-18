@@ -260,7 +260,7 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
           next.nightfallBlazes = Math.min(40, Math.max(0, patch.nightfallBlazes));
         }
         if (patch.ringsConsumed !== undefined && Number.isInteger(patch.ringsConsumed)) {
-          next.ringsConsumed = Math.min(99, Math.max(0, patch.ringsConsumed));
+          next.ringsConsumed = Math.min(100, Math.max(0, patch.ringsConsumed));
         }
         if (typeof patch.voiceFlux === 'boolean') next.voiceFlux = patch.voiceFlux;
         if (typeof patch.wovenMyriad === 'boolean') next.wovenMyriad = patch.wovenMyriad;

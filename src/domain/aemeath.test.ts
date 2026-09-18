@@ -21,6 +21,7 @@ describe('aemeathSkillMods', () => {
     expect(aemeathSkillMods('aemeath', 2, forte, 'Seraphic Duet: Encore DMG', 'forte').motionMultiplier).toBe(2);
     expect(aemeathSkillMods('aemeath', 2, forte, 'Seraphic Duet: Overture DMG', 'forte').motionMultiplier).toBe(2);
     expect(aemeathSkillMods('aemeath', 1, forte, 'Seraphic Duet: Encore DMG', 'forte').motionMultiplier).toBe(1);
+    expect(aemeathSkillMods('aemeath', 1, forte, 'Seraphic Duet: Overture DMG', 'forte').motionMultiplier).toBe(1);
     expect(aemeathSkillMods('aemeath', 2, forte, 'Seraphic Duet Bonus DMG (Per Instance) DMG', 'forte').motionMultiplier).toBe(1);
   });
 
@@ -34,8 +35,19 @@ describe('aemeathSkillMods', () => {
   it('adds the S6 Liberation bucket to liberation-kind and liberation-considered motions', () => {
     expect(aemeathSkillMods('aemeath', 6, liberation, 'Heavenfall Edict: Finale DMG', 'liberation').dmgBonusExtra).toBe(0.4);
     expect(aemeathSkillMods('aemeath', 6, basic, 'Heavy Attack - Aemeath Charged I DMG', 'liberation').dmgBonusExtra).toBe(0.4);
+    // Forte-kind but "considered Resonance Liberation DMG" (provider
+    // Liberation typing) — the S6 bucket applies.
+    expect(aemeathSkillMods('aemeath', 6, forte, 'Seraphic Duet: Overture DMG', 'liberation').dmgBonusExtra).toBe(0.4);
     expect(aemeathSkillMods('aemeath', 6, basic, 'Basic Attack - Aemeath Stage 1 DMG', 'basic').dmgBonusExtra).toBe(0);
     expect(aemeathSkillMods('aemeath', 5, liberation, 'Heavenfall Edict: Finale DMG', 'liberation').dmgBonusExtra).toBe(0);
+  });
+
+  it('applies the S6 bucket to Starburst-as-plain-block via provider typing (flagged boundary)', () => {
+    // Starburst is "considered Tune Rupture DMG" in kit text, but its
+    // provider typing is Liberation — the degenerate plain-block path
+    // inherits provider typing wholesale (see module docs; the intended
+    // Tune-pipeline path never consults this module).
+    expect(aemeathSkillMods('aemeath', 6, forte, 'Tune Rupture Response - Starburst DMG', 'liberation').dmgBonusExtra).toBe(0.4);
   });
 
   it('pins the S6 fixed-crit values for the Phase 5 Tune/Status pipeline', () => {
@@ -66,5 +78,21 @@ describe('aemeath through computeDamage', () => {
     const s6 = computeDamage({ ...common, skill: liberation, motionName: 'Heavenfall Edict: Finale DMG', forteLevel: 10, resonanceChain: 6 });
     // S5→S6 changes nothing else on this motion, isolating the +0.40 bucket.
     expect(s6.damage / base.damage).toBeCloseTo(1.4, 10);
+  });
+
+  it('resolves S3 Overdrive at exactly ×1.4 end to end', () => {
+    const base = computeDamage({ ...common, skill: liberation, motionName: 'Heavenfall Edict: Overdrive DMG', forteLevel: 10, resonanceChain: 2 });
+    const s3 = computeDamage({ ...common, skill: liberation, motionName: 'Heavenfall Edict: Overdrive DMG', forteLevel: 10, resonanceChain: 3 });
+    // S2→S3 changes only the Overdrive MV (the Between-Stars replacement
+    // and infliction riders are manual/unmodeled).
+    expect(s3.damage / base.damage).toBeCloseTo(1.4, 10);
+  });
+
+  it('stacks S3 Finale ×2 with the S6 bucket at exactly ×2.8 end to end', () => {
+    const base = computeDamage({ ...common, skill: liberation, motionName: 'Heavenfall Edict: Finale DMG', forteLevel: 10, resonanceChain: 2 });
+    const stacked = computeDamage({ ...common, skill: liberation, motionName: 'Heavenfall Edict: Finale DMG', forteLevel: 10, resonanceChain: 6 });
+    // S2→S6 on this motion: S3 doubles the MV, S6 adds +0.40 to the empty
+    // Liberation bucket (S4 is sheet-side, S5 is revive — both inert here).
+    expect(stacked.damage / base.damage).toBeCloseTo(2.8, 10);
   });
 });

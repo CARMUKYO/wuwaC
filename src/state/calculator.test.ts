@@ -257,7 +257,7 @@ describe('calculator store', () => {
     expect(b.targetHavocBaneStacks).toBe(9);
     expect(b.blazesConsumed).toBe(150);
     expect(b.nightfallBlazes).toBe(0);
-    expect(b.ringsConsumed).toBe(99);
+    expect(b.ringsConsumed).toBe(100);
     expect(b.voiceFlux).toBe(true);
     expect(b.wovenMyriad).toBe(true);
     useCalculatorStore.getState().setBlockKitState(row.id, {

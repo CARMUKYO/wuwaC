@@ -5,8 +5,8 @@ import { maxStatusStacks, negativeStatusDef } from './negativeStatus.ts';
 export const CARTETHYIA_STATUS = 'aeroErosion' as const;
 
 /**
- * Base cap, plus Cartethyia S2's three-stack increase (verified against
- * the full S2 chain text — the committed snapshot truncates it).
+ * Base cap, plus Cartethyia S2's three-stack increase (snapshot S2 chain
+ * text + wiki Blade Broken by Tempest page).
  */
 export function maxAeroErosionStacks(resonanceChain: number): number {
   return maxStatusStacks(CARTETHYIA_STATUS, 'cartethyia', resonanceChain);
@@ -41,9 +41,9 @@ export function cartethyiaStatusTargetMultiplier(targetStacks: number): number {
 
 /**
  * S1: +25% Crit DMG at each 30 Conviction threshold, up to four stacks
- * (verified against the full S1 chain text — the snapshot truncates it
- * after the Zeal clause). The 15s per-threshold duration is the caller's
- * responsibility: pass the Conviction value at the moment of the block.
+ * (snapshot S1 chain text + wiki Crown Destined by Fate page). The 15s
+ * per-threshold duration is the caller's responsibility: pass the
+ * Conviction value at the moment of the block.
  */
 export function cartethyiaConvictionCritDmg(
   characterId: string | undefined,
