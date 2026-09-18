@@ -31,8 +31,8 @@ import {
   statusStackMultiplier,
   type NegativeStatusType,
 } from './negativeStatus.ts';
-
 import { xuanlingBaneTargetAmplify } from './xuanling.ts';
+
 /**
  * Domain layer: damage formula (reference doc §6, Fandom wiki Damage page).
  * One small pure function per named quantity, composed by `computeDamage`.

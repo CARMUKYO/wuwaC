@@ -263,6 +263,16 @@ export function isBuffOnlySkill(characterId: string, skill: CharacterSkill): boo
   return jiyanOutroLanceSpec(characterId, skill, '') === null;
 }
 
+/**
+ * Whether a snapshot motion row is a scaling parameter rather than a
+ * scorable hit (offered by no rotation picker). Currently only Chisa's
+ * per-Ring row; routed here so components never hardcode character ids.
+ */
+export function isParameterMotionRow(characterId: string, motionName: string): boolean {
+  if (characterId === 'chisa') return isChisaParameterMotion(motionName);
+  return false;
+}
+
 /** Characters whose rotations want a target Havoc Bane stack input. */
 const HAVOC_BANE_CHARACTERS = new Set(['yangyang-xuanling', 'chisa']);
 
@@ -274,16 +284,6 @@ export function characterUsesHavocBane(characterId: string): boolean {
  * Tune Rupture response per-trail-stack MV rate. Only Aemeath's +4% per
  * Rupturous Trail is verified (Forte "To Sculpt the Silence", encore.moe
  * character 1210) — other responders (Mornye, Lynae) have no published
-/**
- * Whether a snapshot motion row is a scaling parameter rather than a
- * scorable hit (offered by no rotation picker). Currently only Chisa's
- * per-Ring row; routed here so components never hardcode character ids.
- */
-export function isParameterMotionRow(characterId: string, motionName: string): boolean {
-  if (characterId === 'chisa') return isChisaParameterMotion(motionName);
-  return false;
-}
-
  * rate, so their blocks throw instead of guessing.
  */
 const TUNE_RESPONSE_RATES: Record<string, number> = {
