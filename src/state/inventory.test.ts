@@ -113,6 +113,34 @@ describe('inventory store', () => {
     await expect(useInventoryStore.getState().updateEcho('missing', {})).rejects.toThrow(/unknown echo/);
   });
 
+  it('importEchoes bulk-adds with the import origin, keeping existing rows', async () => {
+    const store = useInventoryStore.getState();
+    const before = await store.addEcho(draft);
+    const imported = await store.importEchoes(
+      [
+        { ...draft, label: 'Imported One' },
+        { ...draft, label: 'Imported Two' },
+      ],
+      'import:wuwa-inventory-kamera',
+    );
+    expect(imported.map((r) => r.origin)).toEqual([
+      'import:wuwa-inventory-kamera',
+      'import:wuwa-inventory-kamera',
+    ]);
+    expect(new Set(imported.map((r) => r.id)).size).toBe(2);
+    expect(useInventoryStore.getState().echoes.map((e) => e.id)).toContain(before.id);
+    expect(await db.ownedEchoes.count()).toBe(3);
+  });
+
+  it('importEchoes rejects a bad row with its index and writes nothing', async () => {
+    const store = useInventoryStore.getState();
+    await expect(
+      store.importEchoes([{ ...draft }, { ...draft, echoDefId: 'no-such-echo' }], 'import:test'),
+    ).rejects.toThrow(/import row 2: unknown echo definition/);
+    expect(useInventoryStore.getState().echoes).toEqual([]);
+    expect(await db.ownedEchoes.count()).toBe(0);
+  });
+
   it('removeEcho deletes from state and Dexie, and throws for unknown ids', async () => {
     const created = await useInventoryStore.getState().addEcho(draft);
     await useInventoryStore.getState().removeEcho(created.id);

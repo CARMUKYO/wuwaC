@@ -1,21 +1,18 @@
 import { loadBundledSnapshot } from '../data/index.ts';
-import { ownedEchoSchema, type EchoDefData, type OwnedEcho, type StatKey } from '../data/schema.ts';
+import { MAIN_STAT_RANGES, SUB_STAT_TIERS } from '../data/echoStats.ts';
+import { ownedEchoSchema, type EchoDefData, type OwnedEcho } from '../data/schema.ts';
 import { SUBSTAT_POOL } from '../data/placeholders.ts';
 import { db } from './db.ts';
 import { useInventoryStore } from './inventory.ts';
 
 /**
  * DEV-only inventory seeder (random echoes for optimizer testing).
- * Builds rows from real synced echo defs (cost/sonata/pools) with random
- * values — never shipped to production UI except behind `import.meta.env.DEV`.
+ * Builds rows from real synced echo defs (cost/sonata/pools) with LEGAL
+ * maxed values — mains at the cost-tier 5★ Lv25 maximum (mains scale
+ * deterministically, so max is the only legal Lv25 value) and substats
+ * snapped to rolled tiers (docs/echostats.md) — never shipped to
+ * production UI except behind `import.meta.env.DEV`.
  */
-
-const FLAT_STATS: ReadonlySet<StatKey> = new Set(['hp', 'atk', 'def']);
-
-function randomValue(stat: StatKey, rand: () => number): number {
-  if (FLAT_STATS.has(stat)) return Math.round(50 + rand() * 950);
-  return Math.round((0.05 + rand() * 0.3) * 10000) / 10000;
-}
 
 function pick<T>(items: readonly T[], rand: () => number): T {
   return items[Math.floor(rand() * items.length)];
@@ -34,14 +31,18 @@ export function buildSeedEchoes(
   const rows: OwnedEcho[] = [];
   for (let i = 0; i < count; i += 1) {
     const def = pick(candidates, rand);
-    const mainStat = pick(def.allowedMainStats, rand);
+    // Only mains with a documented Lv25 value are seedable — 1-cost flats
+    // have no reference entry, so 1-cost seeds roll the % mains.
+    const mainPool = def.allowedMainStats.filter((s) => MAIN_STAT_RANGES[def.cost][s] !== undefined);
+    if (mainPool.length === 0) throw new Error(`no documented main stats for ${def.name} (cost ${def.cost})`);
+    const mainStat = pick(mainPool, rand);
     const subCount = 3 + Math.floor(rand() * 3); // 3–5
-    const pool = SUBSTAT_POOL.filter((s) => s !== mainStat);
+    const pool = SUBSTAT_POOL.filter((s) => s !== mainStat && SUB_STAT_TIERS[s] !== undefined);
     const substats: OwnedEcho['substats'] = [];
     for (let s = 0; s < subCount && pool.length > 0; s += 1) {
       const idx = Math.floor(rand() * pool.length);
       const [stat] = pool.splice(idx, 1);
-      substats.push({ stat, value: randomValue(stat, rand) });
+      substats.push({ stat, value: pick(SUB_STAT_TIERS[stat]!, rand) });
     }
     rows.push(
       ownedEchoSchema.parse({
@@ -52,8 +53,9 @@ export function buildSeedEchoes(
         cost: def.cost,
         level: 25,
         rarity: 5,
-        mainStat: { stat: mainStat, value: randomValue(mainStat, rand) },
-        ...(def.cost > 1 ? { secondMainStat: { stat: 'atk', value: Math.round(40 + rand() * 110) } } : {}),
+        mainStat: { stat: mainStat, value: MAIN_STAT_RANGES[def.cost][mainStat]!.max },
+        // TODO: the flat-ATK secondary has no documented Lv25 value in
+        // docs/echostats.md — omitted until a real source is verified.
         substats,
         equippedTo: null,
         origin: 'seed',

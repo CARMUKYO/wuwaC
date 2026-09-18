@@ -73,6 +73,46 @@ describe('EchoForm', () => {
     expect(draft.label).toBeUndefined();
   });
 
+  it('warns on above-reference values without blocking submit', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<EchoForm submitLabel="Add Echo" onSubmit={onSubmit} />);
+
+    await pickDef(user, 'hooscamp');
+    await user.selectOptions(screen.getByLabelText(/main stat$/i), 'atkPct');
+    await user.type(screen.getByLabelText(/main stat value/i), '30');
+    // 1-cost ATK% tops out at 18 (docs/echostats.md) — impossible at any level.
+    expect(await screen.findByText(/main stat 30 is above the 1-cost reference maximum 18/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /add substat/i }));
+    await user.selectOptions(screen.getByLabelText(/substat 1 stat/i), 'critDmg');
+    await user.clear(screen.getByLabelText(/substat 1 value/i));
+    await user.type(screen.getByLabelText(/substat 1 value/i), '30.59');
+    // Crit DMG subs top out at tier 21.0 — the screenshot's exact case.
+    expect(await screen.findByText(/substat 1 \(crit dmg\) 30\.59 is above the reference maximum 21/i)).toBeInTheDocument();
+
+    // Warnings never block: the draft still submits.
+    await user.click(screen.getByRole('button', { name: 'Add Echo' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0].substats).toEqual([{ stat: 'critDmg', value: 0.3059 }]);
+  });
+
+  it('stays silent for below-minimum values (low-level echoes stay enterable)', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<EchoForm submitLabel="Add Echo" onSubmit={onSubmit} />);
+
+    await pickDef(user, 'hooscamp');
+    await user.selectOptions(screen.getByLabelText(/main stat$/i), 'atkPct');
+    // 3% is below the 3.6% 5★ reference floor — legitimate on an unleveled echo.
+    await user.type(screen.getByLabelText(/main stat value/i), '3');
+    await user.click(screen.getByRole('button', { name: 'Add Echo' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0].mainStat).toEqual({ stat: 'atkPct', value: 0.03 });
+    expect(screen.queryByText(/above the .*reference maximum/i)).not.toBeInTheDocument();
+  });
+
   it('announces force-fixes when the picked Echo changes', async () => {
     const user = userEvent.setup();
     render(<EchoForm submitLabel="Add Echo" onSubmit={() => {}} />);

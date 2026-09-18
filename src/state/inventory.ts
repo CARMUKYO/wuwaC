@@ -57,11 +57,17 @@ interface InventoryState {
   addEcho: (draft: EchoDraft) => Promise<OwnedEcho>;
   updateEcho: (id: string, patch: Partial<EchoDraft>) => Promise<OwnedEcho>;
   removeEcho: (id: string) => Promise<void>;
+  /**
+   * Bulk-add pre-validated import drafts (additive — existing rows are
+   * untouched). Every draft still passes the strict write path, so a bad
+   * row throws with its index instead of landing half-imported.
+   */
+  importEchoes: (drafts: EchoDraft[], origin: string) => Promise<OwnedEcho[]>;
 }
 
-function toRow(draft: EchoDraft, id: string): OwnedEcho {
+function toRow(draft: EchoDraft, id: string, origin = 'manual'): OwnedEcho {
   assertDefConsistent(draft);
-  return ownedEchoSchema.parse({ ...draft, id, origin: 'manual' });
+  return ownedEchoSchema.parse({ ...draft, id, origin });
 }
 
 export const useInventoryStore = create<InventoryState>()((set, get) => ({
@@ -96,5 +102,18 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     if (!existing) throw new Error(`unknown echo: ${JSON.stringify(id)}`);
     await db.ownedEchoes.delete(id);
     set((s) => ({ echoes: s.echoes.filter((e) => e.id !== id) }));
+  },
+
+  importEchoes: async (drafts, origin) => {
+    const rows = drafts.map((draft, i) => {
+      try {
+        return toRow(draft, crypto.randomUUID(), origin);
+      } catch (err) {
+        throw new Error(`import row ${i + 1}: ${err instanceof Error ? err.message : 'invalid'}`);
+      }
+    });
+    await db.ownedEchoes.bulkAdd(rows);
+    set((s) => ({ echoes: [...s.echoes, ...rows] }));
+    return rows;
   },
 }));

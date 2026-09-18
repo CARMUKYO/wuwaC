@@ -1,5 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadBundledSnapshot } from '../../data/index.ts';
+import {
+  exportKameraEchoes,
+  KAMERA_ORIGIN,
+  mapKameraEchoes,
+  parseKameraEchoFile,
+  type KameraImportResult,
+} from '../../data/kamera.ts';
 import type { OwnedEcho } from '../../data/schema.ts';
 import { echoDefIssues, useInventoryStore } from '../../state/inventory.ts';
 import { seedInventory } from '../../state/seed.ts';
@@ -37,16 +44,53 @@ export function InventoryPage() {
   const addEcho = useInventoryStore((s) => s.addEcho);
   const updateEcho = useInventoryStore((s) => s.updateEcho);
   const removeEcho = useInventoryStore((s) => s.removeEcho);
+  const importEchoes = useInventoryStore((s) => s.importEchoes);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<OwnedEcho | null>(null);
   const [sonataFilter, setSonataFilter] = useState('');
   const [seedSonata, setSeedSonata] = useState('');
+  const [preview, setPreview] = useState<(KameraImportResult & { fileName: string }) | null>(null);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loaded) void load();
   }, [loaded, load]);
 
   const snapshot = loadBundledSnapshot();
+
+  const defName = (echoDefId: string): string =>
+    snapshot.echoDefs.find((d) => d.id === echoDefId)?.name ?? echoDefId;
+  const setName = (sonataId: string): string =>
+    snapshot.sonataSets.find((s) => s.id === sonataId)?.name ?? sonataId;
+
+  const handleFile = async (file: File | undefined): Promise<void> => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const rows = parseKameraEchoFile(text);
+      setPreview({ fileName: file.name, ...mapKameraEchoes(rows, snapshot) });
+      setTransferError(null);
+    } catch (err) {
+      setPreview(null);
+      setTransferError(err instanceof Error ? err.message : 'Could not read that file.');
+    }
+  };
+
+  const handleExport = (): void => {
+    try {
+      const json = JSON.stringify(exportKameraEchoes(echoes, snapshot), null, 2);
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'echoes_wuwainventorykamera.json';
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setTransferError(null);
+    } catch (err) {
+      setTransferError(err instanceof Error ? err.message : 'Could not export the inventory.');
+    }
+  };
   const flagged = echoes.filter((e) => echoDefIssues(e, snapshot.echoDefs).length > 0);
   const visible = sonataFilter === '' ? echoes : echoes.filter((e) => e.sonataId === sonataFilter);
   const countBySonata = new Map<string, number>();
@@ -97,9 +141,97 @@ export function InventoryPage() {
             >
               Add Echo
             </button>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              title="Import echoes from a WuWa Inventory Kamera JSON file"
+              className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
+            >
+              Import
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={echoes.length === 0}
+              title={
+                echoes.length === 0
+                  ? 'Nothing to export yet'
+                  : 'Download the inventory as a Kamera-shaped JSON file'
+              }
+              className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Export
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json,application/json"
+              aria-label="Import echoes file"
+              className="sr-only"
+              onChange={(e) => {
+                void handleFile(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
           </div>
         )}
       </div>
+
+      {transferError !== null && (
+        <div role="alert" className="mt-4 rounded-md border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
+          {transferError}
+        </div>
+      )}
+
+      {preview !== null && (
+        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900 p-4">
+          <h3 className="text-sm font-semibold text-slate-100">Import {preview.fileName}</h3>
+          <p className="mt-1 text-sm text-slate-300">
+            {`${preview.drafts.length} ${preview.drafts.length === 1 ? 'echo' : 'echoes'} ready to add, ${preview.issues.length} skipped. Adding is additive — existing rows are untouched.`}
+          </p>
+          {preview.drafts.length > 0 && (
+            <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-xs text-slate-400">
+              {preview.drafts.slice(0, 20).map((d, i) => (
+                <li key={i}>{`${defName(d.echoDefId)} · ${setName(d.sonataId)} · Lv${d.level}`}</li>
+              ))}
+              {preview.drafts.length > 20 && <li>{`…and ${preview.drafts.length - 20} more`}</li>}
+            </ul>
+          )}
+          {preview.issues.length > 0 && (
+            <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-xs text-amber-200">
+              {preview.issues.map((issue, i) => (
+                <li key={i}>{`Row ${issue.row} (${issue.key}): ${issue.message}`}</li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={preview.drafts.length === 0}
+              onClick={() => {
+                void importEchoes(preview.drafts, KAMERA_ORIGIN)
+                  .then(() => {
+                    setPreview(null);
+                    setTransferError(null);
+                  })
+                  .catch((err: unknown) =>
+                    setTransferError(err instanceof Error ? err.message : 'Import failed.'),
+                  );
+              }}
+              className="rounded-md bg-slate-100 px-4 py-1.5 text-sm font-semibold text-slate-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {`Add ${preview.drafts.length} ${preview.drafts.length === 1 ? 'echo' : 'echoes'}`}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreview(null)}
+              className="rounded-md px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {flagged.length > 0 && (
         <div role="alert" className="mt-4 rounded-md border border-amber-800 bg-amber-950 px-3 py-2 text-sm text-amber-200">

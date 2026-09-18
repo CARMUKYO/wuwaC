@@ -78,6 +78,44 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
     return true;
   });
 
+  // Over-maximum warnings (non-blocking): reference maxima are 5★ Lv25
+  // values, so anything above max is impossible at any level/rarity —
+  // while below-min is legitimate for unleveled echoes (hence only the
+  // top is checked, and submit is never blocked). Pairs the reference
+  // does not list (1-cost flats, flat-ATK secondary, healingBonus subs)
+  // are unchecked.
+  const overMax: string[] = [];
+  if (def) {
+    const mainMax = MAIN_STAT_RANGES[def.cost][values.mainStat.stat]?.max;
+    if (mainMax !== undefined) {
+      try {
+        const parsed = parseDisplayValue(values.mainStat.stat, values.mainStat.valueText);
+        if (parsed > mainMax) {
+          overMax.push(
+            `Main stat ${toDisplayValue(values.mainStat.stat, parsed)} is above the ${def.cost}-cost reference maximum ${toDisplayValue(values.mainStat.stat, mainMax)} — check the value.`,
+          );
+        }
+      } catch {
+        // Submit validation reports unparseable input; no warning needed.
+      }
+    }
+    values.substats.forEach((row, i) => {
+      const tiers = SUB_STAT_TIERS[row.stat];
+      if (!tiers) return;
+      try {
+        const parsed = parseDisplayValue(row.stat, row.valueText);
+        const top = tiers[tiers.length - 1];
+        if (parsed > top) {
+          overMax.push(
+            `Substat ${i + 1} (${statLabel(row.stat)}) ${toDisplayValue(row.stat, parsed)} is above the reference maximum ${toDisplayValue(row.stat, top)} — check the value.`,
+          );
+        }
+      } catch {
+        // Submit validation reports unparseable input; no warning needed.
+      }
+    });
+  }
+
   /** Picking a (new) def force-fixes derived fields; every change is announced, never silent. */
   const handleDefPick = (echoDefId: string): void => {
     const next = echoDefId === '' ? undefined : findEchoDef(snapshot, echoDefId);
@@ -217,6 +255,15 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
         <p role="status" className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-300">
           {notices.join(' ')}
         </p>
+      )}
+      {overMax.length > 0 && (
+        <div role="status" aria-label="Above-reference warnings" className="rounded-md border border-amber-800 bg-amber-950 px-3 py-2 text-sm text-amber-200">
+          <ul className="list-disc pl-5">
+            {overMax.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <fieldset>

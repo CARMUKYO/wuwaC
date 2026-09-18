@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { OwnedEcho } from '../../data/schema.ts';
@@ -152,6 +152,144 @@ describe('InventoryPage', () => {
     await screen.findByText('Lingering One');
     await user.selectOptions(screen.getByLabelText(/sonata set/i), 'void-thunder');
     expect(await screen.findByText(/no echoes with this sonata set/i)).toBeInTheDocument();
+  });
+
+  it('previews a Kamera file and imports the matchable rows', async () => {
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+    await screen.findByText(/no echoes yet/i);
+
+    const file = new File(
+      [
+        JSON.stringify([
+          {
+            Hooscamp: {
+              level: 25,
+              tuneLv: 1,
+              sonata: 'lingeringtunes',
+              rarity: 5,
+              stats: { main: { 'atk%': 30 }, sub: { cr: 8.7 } },
+            },
+          },
+          { '340000070': { level: 25, tuneLv: 0, sonata: 'voidthunder', rarity: 5, stats: { main: { atk: 60 }, sub: {} } } },
+        ]),
+      ],
+      'echoes_wuwainventorykamera.json',
+      { type: 'application/json' },
+    );
+    await user.upload(screen.getByLabelText(/import echoes file/i), file);
+
+    expect(await screen.findByText(/1 echo ready to add, 1 skipped/i)).toBeInTheDocument();
+    expect(screen.getByText(/row 2 \(340000070\)/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^add 1 echo$/i }));
+
+    expect(await screen.findByText('Hooscamp')).toBeInTheDocument();
+    const rows = await db.ownedEchoes.toArray();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      echoDefId: 'hooscamp',
+      sonataId: 'lingering-tunes',
+      origin: 'import:wuwa-inventory-kamera',
+      mainStat: { stat: 'atkPct', value: 0.3 },
+    });
+  });
+
+  it('cancels an import preview without writing anything', async () => {
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+    await screen.findByText(/no echoes yet/i);
+
+    const file = new File(
+      [
+        JSON.stringify([
+          {
+            hooscamp: {
+              level: 0,
+              tuneLv: 0,
+              sonata: 'sierragale',
+              rarity: 5,
+              stats: { main: { atk: 60 }, sub: {} },
+            },
+          },
+        ]),
+      ],
+      'echoes.json',
+      { type: 'application/json' },
+    );
+    await user.upload(screen.getByLabelText(/import echoes file/i), file);
+    expect(await screen.findByText(/1 echo ready to add, 0 skipped/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }));
+    expect(screen.queryByText(/ready to add/i)).not.toBeInTheDocument();
+    expect(await db.ownedEchoes.count()).toBe(0);
+  });
+
+  it('alerts on a non-JSON import file', async () => {
+    const user = userEvent.setup();
+    render(<InventoryPage />);
+    await screen.findByText(/no echoes yet/i);
+
+    const file = new File(['definitely not json'], 'echoes.json', { type: 'application/json' });
+    await user.upload(screen.getByLabelText(/import echoes file/i), file);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not a JSON file/i);
+    expect(await db.ownedEchoes.count()).toBe(0);
+  });
+
+  it('exports the inventory in the Kamera shape', async () => {
+    await db.ownedEchoes.add({
+      id: 'echo-export',
+      echoDefId: 'hooscamp',
+      sonataId: 'sierra-gale',
+      cost: 1,
+      level: 25,
+      rarity: 5,
+      mainStat: { stat: 'atkPct', value: 0.3 },
+      substats: [{ stat: 'critRate', value: 0.087 }],
+      equippedTo: null,
+      origin: 'manual',
+    });
+    const blobs: Blob[] = [];
+    const downloads: { href: string; download: string }[] = [];
+    vi.stubGlobal(
+      'URL',
+      Object.assign(URL, {
+        createObjectURL: vi.fn((blob: Blob) => {
+          blobs.push(blob);
+          return 'blob:mock-export';
+        }),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        downloads.push({ href: this.href, download: this.download });
+      });
+    try {
+      const user = userEvent.setup();
+      render(<InventoryPage />);
+      await screen.findByText('Hooscamp');
+
+      await user.click(screen.getByRole('button', { name: /^export$/i }));
+
+      expect(blobs).toHaveLength(1);
+      expect(JSON.parse(await blobs[0].text())).toEqual([
+        {
+          hooscamp: {
+            level: 25,
+            tuneLv: 1,
+            sonata: 'sierragale',
+            rarity: 5,
+            stats: { main: { 'atk%': 30 }, sub: { 'cr%': 8.7 } },
+          },
+        },
+      ]);
+      expect(downloads).toEqual([{ href: 'blob:mock-export', download: 'echoes_wuwainventorykamera.json' }]);
+    } finally {
+      clickSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('flags orphan rows and re-links them through edit', async () => {
