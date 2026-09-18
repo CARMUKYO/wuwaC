@@ -95,4 +95,48 @@ describe('chain presets', () => {
       }
     }
   });
+
+  it('carries quoted windows only on the audited team entries (Phase 5 audit)', () => {
+    // Unambiguous subset: team-scope entries whose assumption quotes one
+    // concrete duration. Seven team entries stay untimed (Shorekeeper S2,
+    // Ciaccona S2, Iuno S2, Buling S6, Qiuyuan S2, Mornye S2 quote no
+    // length; Luuk S4 states its 20s only on the wielder part).
+    const expected: [string, number][] = [
+      ['augusta@4', 30],
+      ['baizhi@6', 20],
+      ['calcharo@4', 30],
+      ['camellya@4', 30],
+      ['carlotta@4', 30],
+      ['changli@4', 30],
+      ['chixia@6', 15],
+      ['danjin@6', 20],
+      ['encore@4', 30],
+      ['hiyuki@4', 30],
+      ['jiyan@4', 30],
+      ['lingyang@4', 30],
+      ['lumi@6', 20],
+      ['lupa@2', 30],
+      ['mortefi@6', 20],
+      ['qingxiao@4', 8],
+      ['rebecca@2', 30],
+      ['roccia@2', 30],
+      ['sanhua@6', 20],
+      ['sigrika@4', 20],
+      ['suisui@2', 30],
+      ['verina@4', 24],
+      ['xiangli-yao@4', 30],
+      ['yangyang-xuanling@4', 20],
+      ['yangyang@6', 20],
+      ['yinlin@4', 12],
+      ['zani@4', 30],
+      ['zhezhi@4', 30],
+    ];
+    const actual: [string, number][] = [];
+    for (const entry of CHAIN_PRESETS) {
+      if (entry.scope !== 'team' || entry.windowSeconds === undefined) continue;
+      actual.push([`${entry.characterId}@${entry.rank}`, entry.windowSeconds]);
+    }
+    actual.sort(([a], [b]) => (a < b ? -1 : 1));
+    expect(actual).toEqual(expected);
+  });
 });

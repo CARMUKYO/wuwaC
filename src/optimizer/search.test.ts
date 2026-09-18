@@ -5,6 +5,7 @@ import { standardMob } from '../domain/damage.ts';
 import {
   searchExhaustive,
   type OptimizeRequest,
+  type RankedBuild,
   type SearchData,
 } from './search.ts';
 
@@ -262,6 +263,66 @@ describe('searchExhaustive', () => {
     expect(buffed).toContain('fill1');
     expect(buffed).toContain('fill2');
     expect(buffed).not.toEqual(plain);
+  });
+
+  it('shifts rotation-dpr ranking when a window activates a buff (window == global)', () => {
+    // Same bucket-saturation inventory as the team-buff test above: one
+    // liberation block, +500% Aero buff present but inactive untimed. The
+    // untimed winner keeps both Aero pieces (dropping a crit scores 10562,
+    // dropping a fill 9863, dropping an Aero 9755); windowing the buff over
+    // the block ([0, 10), no global flag, no toggle) activates it, the Aero
+    // margin collapses, and the winner drops an Aero piece for the second
+    // fill instead — the window moves the optimum through the unmodified
+    // search. The windowed winner scores bit-identically to the same buff
+    // applied global, pinning that a covering window resolves exactly like
+    // full uptime on the optimizer path (partial-window resolution itself is
+    // pinned in the domain layer by rotation.test.ts).
+    const inv: OwnedEcho[] = [
+      mkEcho('aero1', { main: ['dmgBonus:Aero', 0.3], cost: 1 }),
+      mkEcho('aero2', { main: ['dmgBonus:Aero', 0.3], cost: 1 }),
+      mkEcho('crit1', { main: ['critDmg', 0.4], cost: 1 }),
+      mkEcho('crit2', { main: ['critDmg', 0.4], cost: 1 }),
+      mkEcho('fill1', { main: ['atkPct', 0.15], cost: 1 }),
+      mkEcho('fill2', { main: ['atkPct', 0.15], cost: 1 }),
+    ];
+    const plainBlock = { skillId: liberation.id, motionName: 'Lance of Qingloong Stage 1 DMG', forteLevel: 10, activeBuffIds: [] as string[] };
+    const timedBlock = { ...plainBlock, durationSeconds: 2 };
+    const teamAero = {
+      id: 'team-aero',
+      label: 'Team Aero',
+      source: 'Team',
+      mods: [{ stat: 'dmgBonus:Aero' as const, value: 5 }],
+    };
+    const run = (objective: OptimizeRequest['objective']): RankedBuild => {
+      const result = searchExhaustive(
+        { ...data, echoes: inv },
+        { costBudget: 12, sonataLock: { mode: 'none' }, objective, topN: 1 },
+      );
+      expect(result.builds).toHaveLength(1);
+      return result.builds[0];
+    };
+    const untimed = run({ kind: 'rotation-dpr', blocks: [plainBlock], buffs: [teamAero], globalBuffIds: [], crit: 'expected' });
+    expect(untimed.echoIds).toContain('aero1');
+    expect(untimed.echoIds).toContain('aero2');
+    const windowed = run({
+      kind: 'rotation-dpr',
+      blocks: [timedBlock],
+      buffs: [{ ...teamAero, windowStartSeconds: 0, windowDurationSeconds: 10 }],
+      globalBuffIds: [],
+      crit: 'expected',
+    });
+    expect(windowed.echoIds).toContain('fill1');
+    expect(windowed.echoIds).toContain('fill2');
+    expect(windowed.echoIds).not.toEqual(untimed.echoIds);
+    const global = run({
+      kind: 'rotation-dpr',
+      blocks: [timedBlock],
+      buffs: [teamAero],
+      globalBuffIds: ['team-aero'],
+      crit: 'expected',
+    });
+    expect(windowed.score).toBe(global.score);
+    expect(windowed.score).toBeGreaterThan(untimed.score);
   });
 
   it('scores echo-skill blocks through the shared rotation path (echo bucket wins)', () => {

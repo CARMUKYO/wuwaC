@@ -484,7 +484,7 @@ export const rotationBlockSpecSchema = z.object({
    * cross the worker boundary self-contained (see data/echoSkills.ts for
    * the parser and its documented shapes). Motion value and attribute are
    * required by the scorer; scaling defaults to ATK, flat to 0.
-   * Cooldown is display-only — blocks carry no timestamps (non-goal).
+   * Cooldown is display-only (shown, not simulated — no cooldown-clock model).
    */
   echoName: z.string().min(1).optional(),
   echoMotionValue: z.number().min(0).max(99).optional(),
@@ -492,6 +492,12 @@ export const rotationBlockSpecSchema = z.object({
   echoAttribute: attributeSchema.optional(),
   echoScaling: z.enum(['ATK', 'HP', 'DEF']).optional(),
   echoCooldown: z.number().min(0).optional(),
+  /**
+   * Per-block duration in seconds. Block i's start is the cumulative sum of
+   * durations before it (missing = 0 contribution); windowed buffs apply by
+   * block start. Optional — untimed blocks score exactly as before.
+   */
+  durationSeconds: z.number().min(0).optional(),
 });
 export type RotationBlockSpec = z.infer<typeof rotationBlockSpecSchema>;
 
@@ -506,6 +512,14 @@ export const rotationBuffSpecSchema = z.object({
       value: z.number(),
     }),
   ),
+  /**
+   * Optional time window `[start, start + duration)` in seconds. A buff
+   * carrying a duration auto-applies to blocks whose derived start falls
+   * inside (start defaults to 0); zero-duration windows never apply.
+   * Optional — untimed buffs keep today's global/toggle meaning.
+   */
+  windowStartSeconds: z.number().min(0).optional(),
+  windowDurationSeconds: z.number().min(0).optional(),
 });
 export type RotationBuffSpec = z.infer<typeof rotationBuffSpecSchema>;
 

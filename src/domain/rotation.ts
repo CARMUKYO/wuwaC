@@ -73,6 +73,8 @@ export interface BlockResult {
   share: number;
   /** True for buff-only skills (empty motion values) — always 0 damage. */
   buffCarrier: boolean;
+  /** Derived start in seconds (cumulative durations before this block). */
+  startSeconds: number;
 }
 
 export interface RotationResult {
@@ -104,6 +106,34 @@ function applyBuffs(
     for (const mod of buff.mods) sheet[mod.stat] += mod.value;
   }
   return sheet;
+}
+
+/**
+ * Derived block starts: block i starts at the cumulative sum of durations
+ * before it. Blocks without `durationSeconds` contribute 0, so untimed
+ * blocks stack at the last known time (never dropped, never reordered).
+ */
+export function blockStartTimes(blocks: RotationBlockSpec[]): number[] {
+  const starts: number[] = [];
+  let time = 0;
+  for (const block of blocks) {
+    starts.push(time);
+    time += block.durationSeconds ?? 0;
+  }
+  return starts;
+}
+
+/**
+ * Whether a buff's window covers a block scoring at `timeSeconds`. Windows
+ * are start-inclusive, end-exclusive; a block scores at its start. Buffs
+ * without a window duration carry no window and never auto-apply (their
+ * global/toggle behavior is unchanged); zero-duration windows apply nowhere.
+ */
+export function buffAppliesAt(buff: RotationBuffSpec, timeSeconds: number): boolean {
+  const duration = buff.windowDurationSeconds;
+  if (duration === undefined || duration <= 0) return false;
+  const start = buff.windowStartSeconds ?? 0;
+  return timeSeconds >= start && timeSeconds < start + duration;
 }
 
 /** Whether a block still resolves against the given character (stale after a switch). */
@@ -160,6 +190,13 @@ export function calculateRotation(input: RotationInput): RotationResult {
   const results: BlockResult[] = scored.blocks.map((b, i) => ({ ...b, id: blocks[i].id }));
   const dpr = scored.dpr;
   for (const r of results) r.share = dpr > 0 ? (r.damage / dpr) * 100 : 0;
+  for (const r of results) {
+    // D6: blocks starting at or past rotationTime still score — the warning
+    // keeps the overflow visible instead of silently dropping damage.
+    if (r.startSeconds >= rotationTime) {
+      warnings.push(`block ${JSON.stringify(r.id)} starts at ${r.startSeconds}s, at or past rotation time ${rotationTime}s (scored anyway)`);
+    }
+  }
   return { dpr, dps: dpr / rotationTime, totalTime: rotationTime, blocks: results, warnings, appliedAssumptions };
 }
 
@@ -172,6 +209,8 @@ export interface ScoredBlock {
   share: number;
   /** True for buff-only skills (empty motion values) — always 0 damage. */
   buffCarrier: boolean;
+  /** Derived start in seconds (cumulative durations before this block). */
+  startSeconds: number;
 }
 
 export interface ScoreRotationInput {
@@ -214,12 +253,21 @@ export function scoreRotationBlocks(
   const globalSheet = applyBuffs(baseSheet, buffsById, globalBuffIds, warnings);
   let statusHasBeenInflicted = false;
 
-  const results: ScoredBlock[] = blocks.map((block) => {
+  const starts = blockStartTimes(blocks);
+
+  const results: ScoredBlock[] = blocks.map((block, index) => {
     if (!Number.isInteger(block.forteLevel) || block.forteLevel < 1) {
       throw new Error(`forte level must be a whole number of 1 or more, got ${block.forteLevel}`);
     }
 
-    const sheet = applyBuffs(globalSheet, buffsById, block.activeBuffIds, warnings);
+    const startSeconds = starts[index];
+    // Union of manual mechanisms (global + toggles) with window auto-apply:
+    // windowed buffs already covered manually are skipped, never doubled.
+    const manual = new Set([...globalBuffIds, ...block.activeBuffIds]);
+    const windowedIds = buffs
+      .filter((buff) => !manual.has(buff.id) && buffAppliesAt(buff, startSeconds))
+      .map((buff) => buff.id);
+    const sheet = applyBuffs(globalSheet, buffsById, [...block.activeBuffIds, ...windowedIds], warnings);
     if (block.damageKind === 'negativeStatus') {
       if (block.statusType === undefined) {
         throw new Error('negativeStatus block needs a statusType');
@@ -247,6 +295,7 @@ export function scoreRotationBlocks(
         damage: result.damage,
         share: 0,
         buffCarrier: false,
+        startSeconds,
       };
     }
 
@@ -272,6 +321,7 @@ export function scoreRotationBlocks(
         damage: result.damage,
         share: 0,
         buffCarrier: false,
+        startSeconds,
       };
     }
 
@@ -302,6 +352,7 @@ export function scoreRotationBlocks(
         damage: result.damage,
         share: 0,
         buffCarrier: false,
+        startSeconds,
       };
     }
 
@@ -330,6 +381,7 @@ export function scoreRotationBlocks(
         damage: result.damage,
         share: 0,
         buffCarrier: false,
+        startSeconds,
       };
     }
     // Jiyan's outro looks buff-carrier-shaped but scores its coordinated
@@ -338,7 +390,7 @@ export function scoreRotationBlocks(
       ? jiyanOutroLanceSpec(characterId, skill, block.motionName)
       : null;
     if (skill.motionValues.length === 0 && lance === null) {
-      return { skillId: skill.id, motionName: block.motionName, label: skill.label, damage: 0, share: 0, buffCarrier: true };
+      return { skillId: skill.id, motionName: block.motionName, label: skill.label, damage: 0, share: 0, buffCarrier: true, startSeconds };
     }
     if (characterId === 'cartethyia' && resonanceChain >= 4 && statusHasBeenInflicted) {
       // S4: after a Negative Status is inflicted, Cartethyia grants 20% DMG
@@ -369,7 +421,7 @@ export function scoreRotationBlocks(
       wovenMyriad: block.wovenMyriad,
       tuneStrainStacks: block.tuneStrainStacks,
     });
-    return { skillId: skill.id, motionName: block.motionName, label: lance === null ? skill.label : `${skill.label} (coordinated lance)`, damage, share: 0, buffCarrier: false };
+    return { skillId: skill.id, motionName: block.motionName, label: lance === null ? skill.label : `${skill.label} (coordinated lance)`, damage, share: 0, buffCarrier: false, startSeconds };
   });
 
   return { dpr: results.reduce((sum, r) => sum + r.damage, 0), blocks: results, warnings };

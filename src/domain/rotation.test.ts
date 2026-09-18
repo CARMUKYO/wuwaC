@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { loadBundledSnapshot } from '../data/index.ts';
-import { ownedEchoSchema, type OwnedEcho, type RosterEntry } from '../data/schema.ts';
+import { objectiveSpecSchema, ownedEchoSchema, rotationBlockSpecSchema, rotationBuffSpecSchema, type OwnedEcho, type RosterEntry } from '../data/schema.ts';
 import type { ResonanceMode } from './characterMods.ts';
 import { buildEnemyProfile } from './enemy.ts';
-import { calculateRotation, isBlockStale, scoreRotationBlocks, type ActionBlock, type RotationBuff, type RotationInput } from './rotation.ts';
+import { blockStartTimes, buffAppliesAt, calculateRotation, isBlockStale, scoreRotationBlocks, type ActionBlock, type RotationBuff, type RotationInput } from './rotation.ts';
+import { scoreSheet } from './objectives.ts';
 import { resolveTeamBuffs } from './teamBuffs.ts';
 import { emptySheet } from './stats.ts';
 
@@ -99,7 +100,7 @@ describe('calculateRotation', () => {
     expect(global.blocks[1].damage / plain.blocks[1].damage).toBeCloseTo(1.2, 10);
   });
 
-  it('scales DPR by the resolved Lynae team buffs, and toggle-off restores baseline (hand-computed)', () => {
+  it('scales DPR by the resolved Lynae team buffs; untimed windows match global (hand-computed)', () => {
     // Lynae Outro (15% all-DMG amp) + Liberation (24% team DMG) both land
     // on sheet.amplify for Jiyan's Basic blocks (the 25% Liberation-bucket
     // mod does not apply to Basic hits), so DmgAmplifyTotal goes 1.0 -> 1.39.
@@ -123,10 +124,12 @@ describe('calculateRotation', () => {
     );
     expect(buffed.dpr / plain.dpr).toBeCloseTo(1.39, 10);
 
+    // Without block durations every block starts at t=0, so the t=0
+    // windows cover the whole rotation: untoggled scores exactly as global.
     const toggledOff = calculateRotation(
       baseInput([block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG')], teamBuffs, []),
     );
-    expect(toggledOff.dpr).toBe(plain.dpr);
+    expect(toggledOff.dpr).toBe(buffed.dpr);
   });
 
   it('scores buff-only outros as zero-damage carriers', () => {
@@ -384,5 +387,272 @@ describe('generalized status blocks', () => {
       blocks: [{ skillId: liberation.id, motionName: 'Rekindle DMG', forteLevel: 10, activeBuffIds: [], targetHavocBaneStacks: 3 }],
     });
     expect(baned.blocks[0].damage / clean.blocks[0].damage).toBeCloseTo((1520 / 2941.28) / (1520 / 3032), 8);
+  });
+});
+
+describe('rotation timing schema fields', () => {
+  it('accepts old specs without timing fields and rejects negative timing', () => {
+    const oldBlock = { skillId: '1001101', motionName: 'Stage 1 DMG', forteLevel: 10, activeBuffIds: [] };
+    expect(rotationBlockSpecSchema.parse(oldBlock)).toEqual(oldBlock);
+    const oldBuff = { id: 'b', label: 'B', source: 'test', mods: [] };
+    expect(rotationBuffSpecSchema.parse(oldBuff)).toEqual(oldBuff);
+
+    expect(rotationBlockSpecSchema.safeParse({ ...oldBlock, durationSeconds: -1 }).success).toBe(false);
+    expect(rotationBuffSpecSchema.safeParse({ ...oldBuff, windowStartSeconds: -1 }).success).toBe(false);
+    expect(rotationBuffSpecSchema.safeParse({ ...oldBuff, windowDurationSeconds: -1 }).success).toBe(false);
+    expect(rotationBuffSpecSchema.parse({ ...oldBuff, windowStartSeconds: 0, windowDurationSeconds: 30 }))
+      .toMatchObject({ windowStartSeconds: 0, windowDurationSeconds: 30 });
+  });
+});
+
+describe('blockStartTimes', () => {
+  it('derives starts as cumulative durations (hand-computed)', () => {
+    const starts = blockStartTimes([
+      block('1', 'Stage 1 DMG', { durationSeconds: 2 }),
+      block('2', 'Stage 2 DMG', { durationSeconds: 3 }),
+      block('3', 'Stage 1 DMG', { durationSeconds: 1.5 }),
+    ]);
+    expect(starts).toEqual([0, 2, 5]);
+  });
+
+  it('treats missing durations as zero contribution (hand-computed)', () => {
+    const starts = blockStartTimes([
+      block('1', 'Stage 1 DMG'),
+      block('2', 'Stage 2 DMG', { durationSeconds: 4 }),
+      block('3', 'Stage 1 DMG'),
+    ]);
+    expect(starts).toEqual([0, 0, 4]);
+  });
+
+  it('maps an empty block list to no starts', () => {
+    expect(blockStartTimes([])).toEqual([]);
+  });
+});
+
+describe('buffAppliesAt', () => {
+  const windowed = (windowStartSeconds?: number, windowDurationSeconds?: number): RotationBuff => ({
+    id: 'w', label: 'W', source: 'test', mods: [],
+    ...(windowStartSeconds === undefined ? {} : { windowStartSeconds }),
+    ...(windowDurationSeconds === undefined ? {} : { windowDurationSeconds }),
+  });
+
+  it('is start-inclusive and end-exclusive (hand-computed)', () => {
+    const buff = windowed(2, 4); // [2, 6)
+    expect(buffAppliesAt(buff, 1.999)).toBe(false);
+    expect(buffAppliesAt(buff, 2)).toBe(true);
+    expect(buffAppliesAt(buff, 5.999)).toBe(true);
+    expect(buffAppliesAt(buff, 6)).toBe(false);
+  });
+
+  it('never applies zero-duration windows (hand-computed)', () => {
+    const buff = windowed(2, 0); // [2, 2): degenerate
+    expect(buffAppliesAt(buff, 2)).toBe(false);
+    expect(buffAppliesAt(buff, 0)).toBe(false);
+  });
+
+  it('never auto-applies buffs without a window duration (hand-computed)', () => {
+    expect(buffAppliesAt(windowed(), 0)).toBe(false);
+    // Start alone is not a window — without a duration nothing resolves.
+    expect(buffAppliesAt(windowed(0), 0)).toBe(false);
+  });
+
+  it('defaults a duration-only window to start 0 (hand-computed)', () => {
+    const buff = windowed(undefined, 5); // [0, 5)
+    expect(buffAppliesAt(buff, 0)).toBe(true);
+    expect(buffAppliesAt(buff, 5)).toBe(false);
+  });
+});
+
+describe('windowed buff scoring', () => {
+  const ampWindow = (windowStartSeconds: number, windowDurationSeconds: number): RotationBuff => ({
+    id: 'wamp', label: 'WAMP', source: 'test',
+    mods: [{ stat: 'amplify', value: 0.2 }],
+    windowStartSeconds, windowDurationSeconds,
+  });
+
+  it('applies a windowed buff only to in-window blocks (hand-computed)', () => {
+    // Starts [0, 2, 4]; window [1, 3) covers the middle block only.
+    const mk = () => [
+      block('1', 'Stage 1 DMG', { durationSeconds: 2 }),
+      block('2', 'Stage 2 DMG', { durationSeconds: 2 }),
+      block('3', 'Stage 1 DMG', { durationSeconds: 2 }),
+    ];
+    const plain = calculateRotation(baseInput(mk()));
+    expect(plain.blocks.map((b) => b.startSeconds)).toEqual([0, 2, 4]);
+    const subset = calculateRotation(baseInput(mk(), [ampWindow(1, 2)]));
+    expect(subset.blocks[0].damage).toBe(plain.blocks[0].damage);
+    expect(subset.blocks[1].damage / plain.blocks[1].damage).toBeCloseTo(1.2, 10);
+    expect(subset.blocks[2].damage).toBe(plain.blocks[2].damage);
+    expect(subset.warnings).toEqual(plain.warnings);
+  });
+
+  it('excludes blocks starting exactly at window end, includes window start (hand-computed)', () => {
+    // Starts [0, 2].
+    const mk = () => [
+      block('1', 'Stage 1 DMG', { durationSeconds: 2 }),
+      block('2', 'Stage 2 DMG', { durationSeconds: 2 }),
+    ];
+    const plain = calculateRotation(baseInput(mk()));
+    // Window [0, 2): block 1 (start 0) in, block 2 (start 2 = end) out.
+    const endOut = calculateRotation(baseInput(mk(), [ampWindow(0, 2)]));
+    expect(endOut.blocks[0].damage / plain.blocks[0].damage).toBeCloseTo(1.2, 10);
+    expect(endOut.blocks[1].damage).toBe(plain.blocks[1].damage);
+    // Window [2, 5): block 1 out, block 2 (start 2) in.
+    const startIn = calculateRotation(baseInput(mk(), [ampWindow(2, 3)]));
+    expect(startIn.blocks[0].damage).toBe(plain.blocks[0].damage);
+    expect(startIn.blocks[1].damage / plain.blocks[1].damage).toBeCloseTo(1.2, 10);
+  });
+
+  it('applies zero-duration windows nowhere (hand-computed)', () => {
+    const mk = () => [
+      block('1', 'Stage 1 DMG', { durationSeconds: 2 }),
+      block('2', 'Stage 2 DMG', { durationSeconds: 2 }),
+    ];
+    const plain = calculateRotation(baseInput(mk()));
+    // Window [2, 2): degenerate — even the block starting at t=2 is out.
+    const zeroed = calculateRotation(baseInput(mk(), [ampWindow(2, 0)]));
+    expect(zeroed.dpr).toBe(plain.dpr);
+    expect(zeroed.blocks.map((b) => b.damage)).toEqual(plain.blocks.map((b) => b.damage));
+  });
+
+  it('stacks untimed blocks at t=0 so a t=0 window covers them (hand-computed)', () => {
+    const plain = calculateRotation(baseInput([block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG')]));
+    expect(plain.blocks.map((b) => b.startSeconds)).toEqual([0, 0]);
+    const covered = calculateRotation(
+      baseInput([block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG')], [ampWindow(0, 5)]),
+    );
+    expect(covered.blocks[0].damage / plain.blocks[0].damage).toBeCloseTo(1.2, 10);
+    expect(covered.blocks[1].damage / plain.blocks[1].damage).toBeCloseTo(1.2, 10);
+  });
+
+  it('applies window-plus-manual buffs once, not twice (hand-computed)', () => {
+    // Double application would scale by 1.2^2 = 1.44; union scales by 1.2.
+    const mk = () => [
+      block('1', 'Stage 1 DMG', { durationSeconds: 2 }),
+      block('2', 'Stage 2 DMG', { durationSeconds: 2 }),
+    ];
+    const plain = calculateRotation(baseInput(mk()));
+    const buff = ampWindow(0, 100);
+    const global = calculateRotation(baseInput(mk(), [buff], ['wamp']));
+    expect(global.dpr / plain.dpr).toBeCloseTo(1.2, 10);
+    const toggled = calculateRotation(baseInput(
+      [block('1', 'Stage 1 DMG', { durationSeconds: 2, activeBuffIds: ['wamp'] }), block('2', 'Stage 2 DMG', { durationSeconds: 2 })],
+      [buff],
+    ));
+    expect(toggled.blocks[0].damage / plain.blocks[0].damage).toBeCloseTo(1.2, 10);
+    expect(toggled.blocks[1].damage / plain.blocks[1].damage).toBeCloseTo(1.2, 10);
+  });
+
+  it('still scores blocks starting at or past rotation time, with a warning (hand-computed)', () => {
+    // Starts [0, 6, 12] against a 10s rotation: block 3 overflows.
+    const mk = () => [
+      block('1', 'Stage 1 DMG', { durationSeconds: 6 }),
+      block('2', 'Stage 2 DMG', { durationSeconds: 6 }),
+      block('3', 'Stage 1 DMG', { durationSeconds: 6 }),
+    ];
+    const tight = calculateRotation({ ...baseInput(mk()), rotationTime: 10 });
+    const roomy = calculateRotation({ ...baseInput(mk()), rotationTime: 100 });
+    // Same damage either way — rotationTime only changes the DPS denominator.
+    expect(tight.blocks.map((b) => b.damage)).toEqual(roomy.blocks.map((b) => b.damage));
+    expect(tight.blocks[2].damage).toBeGreaterThan(0);
+    expect(tight.dpr).toBe(tight.blocks[0].damage + tight.blocks[1].damage + tight.blocks[2].damage);
+    expect(tight.warnings.some((w) => w.includes('"3"') && w.includes('scored anyway'))).toBe(true);
+    expect(roomy.warnings.some((w) => w.includes('scored anyway'))).toBe(false);
+
+    // Exactly at rotationTime counts as at-or-past.
+    const edge = calculateRotation({
+      ...baseInput([block('1', 'Stage 1 DMG', { durationSeconds: 5 }), block('2', 'Stage 2 DMG', { durationSeconds: 5 })]),
+      rotationTime: 5,
+    });
+    expect(edge.warnings.some((w) => w.includes('"2"'))).toBe(true);
+  });
+});
+
+describe('untimed backward compatibility', () => {
+  it('scores a realistic multi-buff rotation identically with and without timing fields', () => {
+    // Realistic shape: one global aura, one per-block toggle, one inactive
+    // buff present but neither global nor toggled, across mixed blocks.
+    const buffs: RotationBuff[] = [
+      { id: 'aura', label: 'AURA', source: 'test', mods: [{ stat: 'amplify', value: 0.15 }] },
+      { id: 'burst', label: 'BURST', source: 'test', mods: [{ stat: 'dmgBonus:Aero', value: 0.3 }] },
+      { id: 'idle', label: 'IDLE', source: 'test', mods: [{ stat: 'amplify', value: 0.5 }] },
+    ];
+    const echoBlock: ActionBlock = {
+      id: 'echo', skillId: '', motionName: 'Lorelei', forteLevel: 1, activeBuffIds: [],
+      damageKind: 'echoSkill', echoName: 'Lorelei', echoMotionValue: 4.05, echoAttribute: 'Havoc',
+    };
+    const untimed = [block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG', { activeBuffIds: ['burst'] }), echoBlock];
+    const timed = [
+      block('1', 'Stage 1 DMG', { durationSeconds: 2 }),
+      block('2', 'Stage 2 DMG', { durationSeconds: 3, activeBuffIds: ['burst'] }),
+      { ...echoBlock, durationSeconds: 1 },
+    ];
+    const before = calculateRotation(baseInput(untimed, buffs, ['aura']));
+    const after = calculateRotation(baseInput(timed, buffs, ['aura']));
+    // Identical math — timing fields without windows change only startSeconds.
+    expect(after.dpr).toBe(before.dpr);
+    expect(after.dps).toBe(before.dps);
+    expect(after.blocks.map((b) => b.damage)).toEqual(before.blocks.map((b) => b.damage));
+    expect(after.blocks.map((b) => b.share)).toEqual(before.blocks.map((b) => b.share));
+    expect(after.warnings).toEqual(before.warnings);
+    expect(before.blocks.map((b) => b.startSeconds)).toEqual([0, 0, 0]);
+    expect(after.blocks.map((b) => b.startSeconds)).toEqual([0, 2, 5]);
+    // The inactive untimed buff never auto-applies (it would scale DPR by 1.5).
+    const noIdle = calculateRotation(baseInput(untimed, buffs.slice(0, 2), ['aura']));
+    expect(noIdle.dpr).toBe(before.dpr);
+  });
+
+  it('loads a Phase-0-era serialized objective (no timing keys) and scores it identically', () => {
+    // Literal pre-change JSON — old saves contain none of the timing keys.
+    const oldJson = `{
+      "kind": "rotation-dpr",
+      "blocks": [
+        {"skillId": "1001101", "motionName": "Stage 1 DMG", "forteLevel": 10, "activeBuffIds": []},
+        {"skillId": "1001101", "motionName": "Stage 2 DMG", "forteLevel": 10, "activeBuffIds": []}
+      ],
+      "buffs": [{"id": "oldamp", "label": "OLDAMP", "source": "test", "mods": [{"stat": "amplify", "value": 0.2}]}],
+      "globalBuffIds": ["oldamp"],
+      "crit": "expected"
+    }`;
+    // Guard the fixture itself against accidentally gaining new-shape keys.
+    expect(oldJson).not.toContain('durationSeconds');
+    expect(oldJson).not.toContain('windowStartSeconds');
+    expect(oldJson).not.toContain('windowDurationSeconds');
+
+    const parsed = objectiveSpecSchema.parse(JSON.parse(oldJson) as unknown);
+    if (parsed.kind !== 'rotation-dpr') throw new Error('expected a rotation-dpr objective');
+    // Parse preserves the old shape — timing stays absent, nothing injected.
+    expect('durationSeconds' in parsed.blocks[0]).toBe(false);
+    expect('windowDurationSeconds' in parsed.buffs[0]).toBe(false);
+    expect(blockStartTimes(parsed.blocks)).toEqual([0, 0]);
+
+    const sheet = emptySheet();
+    sheet.critDmg = 1.5;
+    const bases = {
+      baseAtk: { character: 1000, weapon: 500 },
+      baseHp: { character: 10000 },
+      baseDef: { character: 1000 },
+    };
+    const ctx = {
+      skills: jiyan.skills,
+      attackerLevel: 90,
+      enemy: buildEnemyProfile('mob', 90, 0.1, 'Aero'),
+      ...bases,
+    };
+    const scored = scoreSheet(parsed, sheet, ctx);
+    // Global amplify 0.2 scales DPR by exactly 1.2 (hand-computed).
+    const unbuffed = scoreSheet({ ...parsed, buffs: [], globalBuffIds: [] }, sheet, ctx);
+    expect(scored / unbuffed).toBeCloseTo(1.2, 10);
+    // Identical content built with current helpers scores bit-identically.
+    const rebuilt = scoreRotationBlocks(sheet, bases, {
+      skills: jiyan.skills,
+      attackerLevel: 90,
+      enemy: buildEnemyProfile('mob', 90, 0.1, 'Aero'),
+      blocks: [block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG')],
+      buffs: [{ id: 'oldamp', label: 'OLDAMP', source: 'test', mods: [{ stat: 'amplify', value: 0.2 }] }],
+      globalBuffIds: ['oldamp'],
+      crit: 'expected',
+    });
+    expect(rebuilt.dpr).toBe(scored);
   });
 });

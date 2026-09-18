@@ -149,10 +149,14 @@ user's chosen objective.
   shields, healing, and Concerto-gauge utility).
 - For v1, it's enough to model a team as 3 characters with visible Sonata
   coverage. For v2 (implemented): each character's transcribed Outro and
-  team buffs resolve via `resolveTeamBuffs` into calculator buffs, import
-  as global buffs, and flow through the rotation objective into the
-  optimizer — windows are recorded in labels but scored full-rotation
-  (blocks carry no timestamps yet).
+  team buffs resolve via `resolveTeamBuffs` into calculator buffs and flow
+  through the rotation objective into the optimizer. Rotation blocks carry
+  optional durations (starts derive cumulatively) and buffs carry optional
+  time windows; known team/outro lengths attach as real windows defaulting
+  to t=0 (the rotation-opening swap) and score by block coverage, while
+  untimed buffs keep full-uptime meaning. `rotationTime` stays the manual
+  DPS denominator (loop time including unmodeled downtime); the UI warns
+  when summed durations exceed it.
 
 ## 6. Damage formula
 
@@ -257,9 +261,11 @@ Bonuses = DmgBonusPercent × DmgAmplifyTotal × SpecialDmgPercent × CritMultipl
 - Echo skills score as rotation blocks carrying the slot-1 Echo's parsed
   motion value, damage element, and scaling (`computeEchoSkillDamage`):
   the echo's own attribute bucket plus the `dmgBonus:echo` bucket, one
-  block per hit. Cooldowns are carried for display only — blocks have no
-  timestamps. Element-less echoes whose skill text reads Physical DMG
-  are unscorable (no Physical RES term exists).
+  block per hit. Echo blocks take durations like any other block;
+  cooldowns are carried for display only (shown, not simulated against
+  the timeline — there is no cooldown-clock model). Element-less echoes
+  whose skill text reads Physical DMG are unscorable (no Physical RES
+  term exists).
 - `DmgAmplifyTotal = 1 + (dmgAmplifyTarget + dmgAmplifyAttacker)` — a
   separate multiplier from an uncommon buff type ("DMG Amplify"), which
   can be negative (a reduction) as well as positive. Keep this as its

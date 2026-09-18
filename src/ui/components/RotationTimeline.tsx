@@ -15,7 +15,7 @@ import { resolveMotion } from '../../domain/damage.ts';
 import { JIYAN_OUTRO_LANCE_MV } from '../../domain/jiyan.ts';
 import { maxStatusStacks, negativeStatusDef } from '../../domain/negativeStatus.ts';
 import type { ActionBlock, BlockResult, RotationBuff } from '../../domain/rotation.ts';
-import { isBlockStale } from '../../domain/rotation.ts';
+import { blockStartTimes, buffAppliesAt, isBlockStale } from '../../domain/rotation.ts';
 import { isPercentStat, parseDisplayValue, statLabel, toDisplayValue } from '../format.ts';
 
 type KitStatePatch = Partial<
@@ -94,6 +94,14 @@ interface RotationTimelineProps {
   onToggleGlobalBuff: (id: string) => void;
   onAddBuff: (buff: Omit<RotationBuff, 'id'>) => void;
   onRemoveBuff: (id: string) => void;
+  onSetBlockDuration: (id: string, seconds: number) => void;
+  onSetBuffWindow: (id: string, start: number, duration: number) => void;
+  onClearBuffWindow: (id: string) => void;
+}
+
+/** Compact seconds for timeline display (integers stay clean, float noise trimmed). */
+function formatSeconds(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
 }
 
 function motionPercent(skill: CharacterData['skills'][number], motionName: string, forteLevel: number): string {
@@ -138,7 +146,11 @@ export function RotationTimeline(props: RotationTimelineProps) {
     mainEchoSkill = null,
     onAddBlock, onRemoveBlock, onMoveBlock, onSetBlockForte, onSetBlockStatusStacks, onSetBlockConviction,
     onSetBlockKitState, onToggleBlockBuff, onToggleGlobalBuff, onAddBuff, onRemoveBuff,
+    onSetBlockDuration, onSetBuffWindow, onClearBuffWindow,
   } = props;
+  const starts = blockStartTimes(blocks);
+  const anyTimed = blocks.some((block) => block.durationSeconds !== undefined);
+  const totalDuration = blocks.reduce((sum, block) => sum + (block.durationSeconds ?? 0), 0);
   const statusOptions = characterStatusBlocks(character.id);
   const baneCharacter = characterUsesHavocBane(character.id);
   const strainCharacter = characterUsesTuneStrain(character.id);
@@ -203,6 +215,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
       label: selectedPreset.label,
       source: `${selectedPreset.source} preset`,
       mods,
+      ...(selectedPreset.windowSeconds !== undefined ? { windowDurationSeconds: selectedPreset.windowSeconds } : {}),
     });
     setPresetId('');
   };
@@ -227,6 +240,16 @@ export function RotationTimeline(props: RotationTimelineProps) {
       )}
 
       <section aria-label="Rotation timeline">
+        {totalDuration > 0 && totalDuration > rotationTime && (
+          <p role="alert" className="mb-2 text-xs text-amber-300">
+            Total block duration {formatSeconds(totalDuration)}s exceeds rotation time {rotationTime}s — out-of-range blocks still score.
+          </p>
+        )}
+        {totalDuration > 0 && totalDuration <= rotationTime && (
+          <p className="mb-2 text-xs text-slate-400">
+            Total block duration {formatSeconds(totalDuration)}s of {rotationTime}s rotation time.
+          </p>
+        )}
         {blocks.length === 0 ? (
           <p className="text-slate-400">No actions yet — add your first hit below to start the rotation.</p>
         ) : (
@@ -257,6 +280,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">
                         {index + 1}. {blockLabel}
+                        {anyTimed && ` @${formatSeconds(starts[index])}s`}
                         {result?.buffCarrier && <span className="text-xs text-slate-400"> (buff carrier)</span>}
                       </p>
                       <p className="truncate text-xs text-slate-400">
@@ -303,6 +327,23 @@ export function RotationTimeline(props: RotationTimelineProps) {
                                 : `Forte ${block.forteLevel} · ${block.activeBuffIds.length} buff${block.activeBuffIds.length === 1 ? '' : 's'}`}
                       </summary>
                       <div className="mt-2 grid gap-2 md:grid-cols-2">
+                        <div>
+                          <label htmlFor={`block-duration-${block.id}`} className={labelClass}>Duration (s)</label>
+                          <input
+                            id={`block-duration-${block.id}`}
+                            type="number"
+                            min={0}
+                            max={3600}
+                            step="any"
+                            value={block.durationSeconds ?? ''}
+                            onChange={(e) => {
+                              if (e.target.value.trim() === '') return;
+                              const num = Number(e.target.value);
+                              if (Number.isFinite(num)) onSetBlockDuration(block.id, num);
+                            }}
+                            className={`${inputClass} mt-0.5`}
+                          />
+                        </div>
                         {tuneBreak ? (
                           <div>
                             <label htmlFor={`block-break-mult-${block.id}`} className={labelClass}>Tune Break coefficient (unverified — your research)</label>
@@ -441,7 +482,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                             </div>
                             {block.echoCooldown !== undefined && (
                               <p className="text-xs text-slate-500">
-                                Cooldown {block.echoCooldown}s (shown, not simulated — blocks carry no timestamps).
+                                Cooldown {block.echoCooldown}s (shown, not simulated).
                               </p>
                             )}
                           </>
@@ -613,16 +654,22 @@ export function RotationTimeline(props: RotationTimelineProps) {
                             <p className="mt-0.5 text-xs text-slate-500">No buffs yet — add one below.</p>
                           ) : (
                             <div className="mt-1 space-y-1">
-                              {buffs.map((buff) => (
-                                <label key={buff.id} className="flex items-center gap-2 text-xs text-slate-300">
-                                  <input
-                                    type="checkbox"
-                                    checked={block.activeBuffIds.includes(buff.id)}
-                                    onChange={() => onToggleBlockBuff(block.id, buff.id)}
-                                  />
-                                  <span>[{buff.source}] {buff.label}</span>
-                                </label>
-                              ))}
+                              {buffs.map((buff) => {
+                                const manual = block.activeBuffIds.includes(buff.id);
+                                const inWindow = buffAppliesAt(buff, starts[index]);
+                                return (
+                                  <label key={buff.id} className="flex items-center gap-2 text-xs text-slate-300">
+                                    <input
+                                      type="checkbox"
+                                      checked={manual || inWindow}
+                                      disabled={inWindow && !manual}
+                                      onChange={() => onToggleBlockBuff(block.id, buff.id)}
+                                    />
+                                    <span>[{buff.source}] {buff.label}</span>
+                                    {inWindow && <span className="rounded bg-slate-800 px-1 text-slate-400">window</span>}
+                                  </label>
+                                );
+                              })}
                             </div>
                           )}
                         </fieldset>
@@ -834,23 +881,73 @@ export function RotationTimeline(props: RotationTimelineProps) {
           </p>
         ) : (
           <ul className="mt-2 space-y-1">
-            {buffs.map((buff) => (
-              <li key={buff.id} className="flex items-center justify-between gap-2 text-xs">
-                <label className="flex min-w-0 items-center gap-2 text-slate-200">
-                  <input
-                    type="checkbox"
-                    checked={globalBuffIds.includes(buff.id)}
-                    onChange={() => onToggleGlobalBuff(buff.id)}
-                  />
-                  <span className="truncate">
-                    [{buff.source}] {buff.label} ({buff.mods.map((m) => `${statLabel(m.stat)} ${toDisplayValue(m.stat, m.value)}`).join(', ')}) — full uptime
-                  </span>
-                </label>
-                <button type="button" onClick={() => onRemoveBuff(buff.id)} className="shrink-0 rounded-md px-2 py-1 text-red-300 hover:bg-slate-800">
-                  Remove {buff.label}
-                </button>
-              </li>
-            ))}
+            {buffs.map((buff) => {
+              const hasWindow = buff.windowDurationSeconds !== undefined;
+              const windowStart = buff.windowStartSeconds ?? 0;
+              const windowEnd = windowStart + (buff.windowDurationSeconds ?? 0);
+              return (
+                <li key={buff.id} className="text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="flex min-w-0 items-center gap-2 text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={globalBuffIds.includes(buff.id)}
+                        onChange={() => onToggleGlobalBuff(buff.id)}
+                      />
+                      <span className="truncate">
+                        [{buff.source}] {buff.label} ({buff.mods.map((m) => `${statLabel(m.stat)} ${toDisplayValue(m.stat, m.value)}`).join(', ')})
+                        {hasWindow ? ` — window [${formatSeconds(windowStart)}s, ${formatSeconds(windowEnd)}s)` : ' — full uptime'}
+                      </span>
+                    </label>
+                    <button type="button" onClick={() => onRemoveBuff(buff.id)} className="shrink-0 rounded-md px-2 py-1 text-red-300 hover:bg-slate-800">
+                      Remove {buff.label}
+                    </button>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 pl-6 text-slate-300">
+                    <label htmlFor={`buff-window-start-${buff.id}`}>Window start (s)</label>
+                    <input
+                      id={`buff-window-start-${buff.id}`}
+                      type="number"
+                      min={0}
+                      max={3600}
+                      step="any"
+                      value={buff.windowStartSeconds ?? ''}
+                      onChange={(e) => {
+                        if (e.target.value.trim() === '') return;
+                        const num = Number(e.target.value);
+                        if (Number.isFinite(num)) onSetBuffWindow(buff.id, num, buff.windowDurationSeconds ?? 0);
+                      }}
+                      className="w-20 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100"
+                    />
+                    <label htmlFor={`buff-window-duration-${buff.id}`}>Window duration (s)</label>
+                    <input
+                      id={`buff-window-duration-${buff.id}`}
+                      type="number"
+                      min={0}
+                      max={3600}
+                      step="any"
+                      value={buff.windowDurationSeconds ?? ''}
+                      onChange={(e) => {
+                        if (e.target.value.trim() === '') return;
+                        const num = Number(e.target.value);
+                        if (Number.isFinite(num)) onSetBuffWindow(buff.id, buff.windowStartSeconds ?? 0, num);
+                      }}
+                      className="w-20 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100"
+                    />
+                    {hasWindow && (
+                      <button
+                        type="button"
+                        onClick={() => onClearBuffWindow(buff.id)}
+                        aria-label={`Clear window for ${buff.label}`}
+                        className="shrink-0 rounded-md px-2 py-1 text-slate-400 hover:bg-slate-800"
+                      >
+                        Clear window
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
         <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">

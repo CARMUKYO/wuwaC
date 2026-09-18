@@ -4,6 +4,7 @@ import type { CritMode } from '../domain/damage.ts';
 import { DEFAULT_ENEMY_LEVEL, DEFAULT_ENEMY_RES } from '../domain/enemy.ts';
 import { maxStatusStacks } from '../domain/negativeStatus.ts';
 import type { ActionBlock, RotationBuff } from '../domain/rotation.ts';
+import { blockStartTimes } from '../domain/rotation.ts';
 import { attributeSchema, type RosterEntry } from '../data/schema.ts';
 
 /**
@@ -111,9 +112,12 @@ interface CalculatorState {
     >,
   ) => void;
   toggleBlockBuff: (blockId: string, buffId: string) => void;
+  setBlockDuration: (id: string, seconds: number) => void;
   addBuff: (buff: Omit<RotationBuff, 'id'>) => RotationBuff;
   removeBuff: (id: string) => void;
   toggleGlobalBuff: (id: string) => void;
+  setBuffWindow: (id: string, start: number, duration: number) => void;
+  clearBuffWindow: (id: string) => void;
   setCrit: (crit: CritMode) => void;
   /** Active Resonance Mode for dual-mode kits; null until the user picks one. */
   resonanceMode: ResonanceMode | null;
@@ -149,6 +153,11 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       // Skill ids differ per character — stale forte levels would silently
       // score the wrong motions in Phase 2, so drop them on switch.
       forteLevels: id === s.characterId ? s.forteLevels : {},
+      // Blocks reference the old character's skills — drop them too, or the
+      // timeline would score unresolvable motions. Buffs stay: they carry
+      // only stat mods (no skill reference), and block->buff links die with
+      // the blocks, so nothing dangles.
+      blocks: id === s.characterId ? s.blocks : [],
       // Modes belong to one kit — a stale mode would score the wrong kit.
       resonanceMode: id === s.characterId ? s.resonanceMode : null,
       // Node ids differ per character — stale unlocks would gate the wrong nodes.
@@ -289,6 +298,14 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
         return { ...b, activeBuffIds: active };
       }),
     })),
+  setBlockDuration: (id, seconds) =>
+    set((s) => ({
+      blocks: s.blocks.map((b) =>
+        b.id === id && Number.isFinite(seconds)
+          ? { ...b, durationSeconds: Math.min(MAX_ROTATION_TIME, Math.max(0, seconds)) }
+          : b,
+      ),
+    })),
   addBuff: (buff) => {
     const row: RotationBuff = { ...buff, id: crypto.randomUUID() };
     set((s) => ({ buffs: [...s.buffs, row] }));
@@ -308,10 +325,30 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
         ? s.globalBuffIds.filter((v) => v !== id)
         : [...s.globalBuffIds, id],
     })),
+  // The window is a pair: a non-finite end ignores the whole call (the UI
+  // passes the stored value for the untouched field, so nothing is lost).
+  setBuffWindow: (id, start, duration) =>
+    set((s) => ({
+      buffs: s.buffs.map((b) =>
+        b.id === id && Number.isFinite(start) && Number.isFinite(duration)
+          ? {
+              ...b,
+              windowStartSeconds: Math.min(MAX_ROTATION_TIME, Math.max(0, start)),
+              windowDurationSeconds: Math.min(MAX_ROTATION_TIME, Math.max(0, duration)),
+            }
+          : b,
+      ),
+    })),
+  clearBuffWindow: (id) =>
+    set((s) => ({
+      buffs: s.buffs.map((b) =>
+        b.id === id ? { ...b, windowStartSeconds: undefined, windowDurationSeconds: undefined } : b,
+      ),
+    })),
   setCrit: (crit) => set({ crit }),
 
   resetFromRoster: (entry) =>
-    set({
+    set((s) => ({
       characterId: entry.characterId,
       level: entry.level,
       ascension: entry.ascension,
@@ -323,7 +360,10 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       weaponAscension: entry.weaponAscension ?? DEFAULT_WEAPON_ASCENSION,
       forteUnlockedIds: entry.forteUnlockedIds ?? null,
       rosterSourceId: entry.characterId,
-    }),
+      // Same-character refills keep the rotation; a new character's skills
+      // invalidate every block (same rule as setCharacterId).
+      blocks: entry.characterId === s.characterId ? s.blocks : [],
+    })),
   resetAll: () =>
     set({
       characterId: '',
@@ -349,3 +389,13 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       resonanceMode: null,
     }),
 }));
+
+/**
+ * Derived block start times for the timeline UI: block i starts at the
+ * cumulative sum of durations before it (missing durations contribute 0,
+ * so untimed blocks stack at the last known time). Pure derivation over
+ * `state.blocks` — see `domain/rotation.ts blockStartTimes`.
+ */
+export function selectBlockStartTimes(state: { blocks: ActionBlock[] }): number[] {
+  return blockStartTimes(state.blocks);
+}

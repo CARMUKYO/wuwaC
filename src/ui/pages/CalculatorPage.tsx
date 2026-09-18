@@ -65,7 +65,9 @@ export function CalculatorPage() {
     for (const buff of resolved.buffs) {
       if (calc.buffs.some((existing) => existing.label === buff.label)) continue;
       const row = calc.addBuff(buff);
-      calc.toggleGlobalBuff(row.id);
+      // Windowed imports score by coverage instead of full uptime; only
+      // untimed imports (unknown length) default to global.
+      if (row.windowDurationSeconds === undefined) calc.toggleGlobalBuff(row.id);
     }
   };
 
@@ -543,6 +545,9 @@ export function CalculatorPage() {
               onToggleGlobalBuff={calc.toggleGlobalBuff}
               onAddBuff={(buff) => calc.addBuff(buff)}
               onRemoveBuff={calc.removeBuff}
+              onSetBlockDuration={calc.setBlockDuration}
+              onSetBuffWindow={calc.setBuffWindow}
+              onClearBuffWindow={calc.clearBuffWindow}
             />
             {(scoring?.result?.warnings.length ?? 0) > 0 && (
               <p className="mt-2 text-xs text-amber-300">

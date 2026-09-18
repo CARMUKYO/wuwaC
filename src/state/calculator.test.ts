@@ -3,6 +3,7 @@ import {
   DEFAULT_CHARACTER_LEVEL,
   DEFAULT_FORTE_LEVEL,
   DEFAULT_ROTATION_TIME,
+  selectBlockStartTimes,
   useCalculatorStore,
   type EchoSlots,
 } from './calculator.ts';
@@ -79,6 +80,42 @@ describe('calculator store', () => {
     const s = useCalculatorStore.getState();
     expect(s.characterId).toBe('verina');
     expect(s.forteLevels).toEqual({});
+  });
+
+  it('drops rotation blocks but keeps buffs when the character changes', () => {
+    freshState();
+    const store = useCalculatorStore.getState();
+    store.setCharacterId('jiyan');
+    const buff = store.addBuff({ label: 'B', source: 'test', mods: [] });
+    useCalculatorStore.getState().toggleGlobalBuff(buff.id);
+    const block = useCalculatorStore.getState().addBlock({ skillId: 's1', motionName: 'M1', forteLevel: 10, activeBuffIds: [buff.id] });
+    expect(useCalculatorStore.getState().blocks).toHaveLength(1);
+
+    // Same-character re-pick keeps the rotation.
+    useCalculatorStore.getState().setCharacterId('jiyan');
+    expect(useCalculatorStore.getState().blocks.map((b) => b.id)).toEqual([block.id]);
+
+    useCalculatorStore.getState().setCharacterId('verina');
+    const s = useCalculatorStore.getState();
+    expect(s.blocks).toEqual([]);
+    // Buffs are skill-agnostic stat mods — they survive with their global flags.
+    expect(s.buffs.map((b) => b.id)).toEqual([buff.id]);
+    expect(s.globalBuffIds).toEqual([buff.id]);
+  });
+
+  it('drops rotation blocks on cross-character roster refills only', () => {
+    freshState();
+    useCalculatorStore.getState().resetFromRoster(entry);
+    const block = useCalculatorStore.getState().addBlock({ skillId: 's1', motionName: 'M1', forteLevel: 10, activeBuffIds: [] });
+
+    // Same-character refill keeps the rotation.
+    useCalculatorStore.getState().resetFromRoster({ ...entry, level: 90 });
+    expect(useCalculatorStore.getState().blocks.map((b) => b.id)).toEqual([block.id]);
+
+    useCalculatorStore.getState().resetFromRoster({ ...entry, characterId: 'verina' });
+    const s = useCalculatorStore.getState();
+    expect(s.characterId).toBe('verina');
+    expect(s.blocks).toEqual([]);
   });
 
   it('sets and clears echo slots; ignores out-of-range indexes', () => {
@@ -257,5 +294,82 @@ describe('calculator store', () => {
     expect(s.buffs).toEqual([]);
     expect(s.globalBuffIds).toEqual([]);
     expect(s.crit).toBe('expected');
+  });
+
+  it('stores timing fields passed to addBlock/addBuff, leaving them absent when omitted', () => {
+    freshState();
+    const block = useCalculatorStore.getState().addBlock({ skillId: 's1', motionName: 'M1', forteLevel: 10, activeBuffIds: [], durationSeconds: 2.5 });
+    expect(block.durationSeconds).toBeCloseTo(2.5, 10);
+    const buff = useCalculatorStore.getState().addBuff({ label: 'B', source: 'test', mods: [], windowStartSeconds: 1, windowDurationSeconds: 4 });
+    expect(buff.windowStartSeconds).toBe(1);
+    expect(buff.windowDurationSeconds).toBe(4);
+    const plain = useCalculatorStore.getState().addBlock({ skillId: 's2', motionName: 'M2', forteLevel: 10, activeBuffIds: [] });
+    expect(plain.durationSeconds).toBeUndefined();
+  });
+
+  it('clamps block durations to 0–3600 and ignores non-finite input', () => {
+    freshState();
+    const row = useCalculatorStore.getState().addBlock({ skillId: 's1', motionName: 'M1', forteLevel: 10, activeBuffIds: [] });
+    useCalculatorStore.getState().setBlockDuration(row.id, 2.5);
+    expect(useCalculatorStore.getState().blocks[0].durationSeconds).toBeCloseTo(2.5, 10);
+    useCalculatorStore.getState().setBlockDuration(row.id, 5000);
+    expect(useCalculatorStore.getState().blocks[0].durationSeconds).toBe(3600);
+    // Zero is a real duration (instantaneous block), not "unset".
+    useCalculatorStore.getState().setBlockDuration(row.id, -3);
+    expect(useCalculatorStore.getState().blocks[0].durationSeconds).toBe(0);
+    useCalculatorStore.getState().setBlockDuration('missing', 9);
+    expect(useCalculatorStore.getState().blocks).toHaveLength(1);
+    // Non-finite input is ignored — the stored 0 survives.
+    useCalculatorStore.getState().setBlockDuration(row.id, Number.NaN);
+    useCalculatorStore.getState().setBlockDuration(row.id, Number.POSITIVE_INFINITY);
+    expect(useCalculatorStore.getState().blocks[0].durationSeconds).toBe(0);
+  });
+
+  it('sets and clears buff windows with clamps and atomic non-finite ignore', () => {
+    freshState();
+    const buff = useCalculatorStore.getState().addBuff({ label: 'B', source: 'test', mods: [] });
+    useCalculatorStore.getState().setBuffWindow(buff.id, 1, 4);
+    let b = useCalculatorStore.getState().buffs[0];
+    expect(b.windowStartSeconds).toBe(1);
+    expect(b.windowDurationSeconds).toBe(4);
+    // Each end clamps independently into 0–3600.
+    useCalculatorStore.getState().setBuffWindow(buff.id, 5000, -3);
+    b = useCalculatorStore.getState().buffs[0];
+    expect(b.windowStartSeconds).toBe(3600);
+    expect(b.windowDurationSeconds).toBe(0);
+    // A non-finite end ignores the whole call — the stored window survives.
+    useCalculatorStore.getState().setBuffWindow(buff.id, Number.NaN, 9);
+    useCalculatorStore.getState().setBuffWindow(buff.id, 2, Number.POSITIVE_INFINITY);
+    b = useCalculatorStore.getState().buffs[0];
+    expect(b.windowStartSeconds).toBe(3600);
+    expect(b.windowDurationSeconds).toBe(0);
+    // Zero duration is stored (degenerate window), distinct from cleared.
+    useCalculatorStore.getState().setBuffWindow(buff.id, 2, 0);
+    b = useCalculatorStore.getState().buffs[0];
+    expect(b.windowStartSeconds).toBe(2);
+    expect(b.windowDurationSeconds).toBe(0);
+    // Missing ids are no-ops.
+    useCalculatorStore.getState().setBuffWindow('missing', 1, 1);
+    useCalculatorStore.getState().clearBuffWindow('missing');
+    expect(useCalculatorStore.getState().buffs).toHaveLength(1);
+    // Clear removes both ends and leaves everything else intact.
+    useCalculatorStore.getState().clearBuffWindow(buff.id);
+    b = useCalculatorStore.getState().buffs[0];
+    expect(b.windowStartSeconds).toBeUndefined();
+    expect(b.windowDurationSeconds).toBeUndefined();
+    expect(b.label).toBe('B');
+  });
+
+  it('derives block starts as cumulative durations ([0, d0, d0+d1, …])', () => {
+    freshState();
+    expect(selectBlockStartTimes(useCalculatorStore.getState())).toEqual([]);
+    useCalculatorStore.getState().addBlock({ skillId: 's1', motionName: 'M1', forteLevel: 10, activeBuffIds: [], durationSeconds: 2 });
+    useCalculatorStore.getState().addBlock({ skillId: 's2', motionName: 'M2', forteLevel: 10, activeBuffIds: [], durationSeconds: 3 });
+    useCalculatorStore.getState().addBlock({ skillId: 's3', motionName: 'M3', forteLevel: 10, activeBuffIds: [] });
+    expect(selectBlockStartTimes(useCalculatorStore.getState())).toEqual([0, 2, 5]);
+    // Reordering re-derives starts from the new order.
+    const ids = useCalculatorStore.getState().blocks.map((x) => x.id);
+    useCalculatorStore.getState().moveBlock(ids[0], 1);
+    expect(selectBlockStartTimes(useCalculatorStore.getState())).toEqual([0, 3, 5]);
   });
 });

@@ -10,10 +10,11 @@ import type { RotationBuff } from './rotation.ts';
  * Table entries (Outro + other team buffs) merge with the team's manual
  * `outroBuffs` overrides: `stat`/`conditional` effects become buff mods
  * (the condition rides in the label), `custom` effects become warnings —
- * never guessed numbers. Buff windows have no timestamp model behind
- * them (rotation blocks carry no durations), so every buff scores
- * full-rotation like any other global buff; the window stays visible in
- * the label so users can judge the assumption.
+ * never guessed numbers. Known window lengths attach as real
+ * `windowDurationSeconds` (start omitted = t=0: the rotation opens with
+ * the outgoing character's Outro, and untimed blocks stack at t=0 so
+ * they score exactly as before); entries without a known length stay
+ * untimed and keep today's full-uptime meaning.
  */
 
 export interface ResolvedTeamBuffs {
@@ -53,9 +54,10 @@ export function resolveTeamBuffs(
     }
     for (const entry of entries) {
       buffs.push({
-        label: entry.windowSeconds !== undefined ? `${entry.label} · ${entry.windowSeconds}s` : entry.label,
+        label: entry.label,
         source: 'Team',
         mods: entry.mods.map((m) => ({ ...m })),
+        ...(entry.windowSeconds !== undefined ? { windowDurationSeconds: entry.windowSeconds } : {}),
       });
     }
     for (const entry of chainEntries) {
@@ -63,22 +65,23 @@ export function resolveTeamBuffs(
         label: entry.label,
         source: 'Team',
         mods: entry.mods.map((m) => ({ ...m })),
+        ...(entry.windowSeconds !== undefined ? { windowDurationSeconds: entry.windowSeconds } : {}),
       });
     }
   }
 
   for (const override of team.outroBuffs ?? []) {
     const name = characterNameOf(override.fromCharacterId) ?? override.fromCharacterId;
-    const window = override.windowSeconds !== undefined ? ` · ${override.windowSeconds}s` : '';
     if (override.effect.kind === 'custom') {
       warnings.push(`custom team effect from ${name} not scored: ${override.effect.note}`);
       continue;
     }
     const condition = override.effect.kind === 'conditional' ? ` (when ${override.effect.condition})` : '';
     buffs.push({
-      label: `${name} (custom team buff)${condition}${window}`,
+      label: `${name} (custom team buff)${condition}`,
       source: 'Team',
       mods: [{ stat: override.effect.stat, value: override.effect.value }],
+      ...(override.windowSeconds !== undefined ? { windowDurationSeconds: override.windowSeconds } : {}),
     });
   }
 

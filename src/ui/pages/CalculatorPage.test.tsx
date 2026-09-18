@@ -339,7 +339,7 @@ describe('CalculatorPage', () => {
     expect(screen.queryByLabelText(/rotation results/i)).not.toBeInTheDocument();
   });
 
-  it('imports team buffs as enabled global buffs without duplicating', async () => {
+  it('imports windowed team buffs un-toggled without duplicating', async () => {
     setupScorable();
     useTeamStore.setState({
       teams: [{ id: 'team-1', name: 'Lynae team', characterIds: ['lynae', 'verina', 'sanhua'] }],
@@ -351,13 +351,44 @@ describe('CalculatorPage', () => {
     await user.selectOptions(screen.getByLabelText(/import outro/i), 'team-1');
     await user.click(screen.getByRole('button', { name: /import team buffs/i }));
 
-    const labels = useCalculatorStore.getState().buffs.map((b) => b.label);
-    expect(labels).toContain('Lynae Outro (incoming) · 14s');
-    expect(labels).toContain('Lynae Liberation (team) · 30s');
-    const state = useCalculatorStore.getState();
-    expect(state.globalBuffIds).toHaveLength(state.buffs.length);
+    // Known lengths arrive as real windows (label suffixes retired), scoring
+    // by coverage instead of full uptime — so nothing toggles global here.
+    const buffs = useCalculatorStore.getState().buffs;
+    const labels = buffs.map((b) => b.label);
+    expect(labels).toContain('Lynae Outro (incoming)');
+    expect(labels).toContain('Lynae Liberation (team)');
+    expect(labels).toContain('Verina Outro (team)');
+    expect(labels).toContain('Sanhua Outro (incoming)');
+    for (const buff of buffs) expect(buff.windowDurationSeconds).toBeDefined();
+    expect(useCalculatorStore.getState().globalBuffIds).toEqual([]);
 
     await user.click(screen.getByRole('button', { name: /import team buffs/i }));
     expect(useCalculatorStore.getState().buffs.map((b) => b.label)).toEqual(labels);
+  });
+
+  it('imports untimed team buffs as global while windowed ones stay window-only', async () => {
+    setupScorable();
+    useTeamStore.setState({
+      teams: [{ id: 'team-1', name: 'Shorekeeper team', characterIds: ['shorekeeper', 'verina', 'sanhua'] }],
+      loaded: true,
+    });
+    const user = userEvent.setup();
+    render(<CalculatorPage />);
+
+    await user.selectOptions(screen.getByLabelText(/import outro/i), 'team-1');
+    await user.click(screen.getByRole('button', { name: /import team buffs/i }));
+
+    // Shorekeeper Stellarealm quotes no length, so it defaults to global;
+    // every other import on this team carries a window and stays un-toggled.
+    const state = useCalculatorStore.getState();
+    const byLabel = new Map(state.buffs.map((b) => [b.label, b]));
+    const stellarealm = byLabel.get('Shorekeeper Stellarealm (team, capped)')!;
+    expect(stellarealm.windowDurationSeconds).toBeUndefined();
+    expect(state.globalBuffIds).toEqual([stellarealm.id]);
+    for (const buff of state.buffs) {
+      if (buff.id === stellarealm.id) continue;
+      expect(buff.windowDurationSeconds).toBeDefined();
+      expect(state.globalBuffIds).not.toContain(buff.id);
+    }
   });
 });

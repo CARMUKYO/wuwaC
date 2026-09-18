@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadBundledSnapshot } from '../data/index.ts';
 import type { Team } from '../data/schema.ts';
+import { buildEnemyProfile } from './enemy.ts';
+import { scoreRotationBlocks } from './rotation.ts';
+import { emptySheet } from './stats.ts';
 import { resolveTeamBuffs } from './teamBuffs.ts';
 
 const snapshot = loadBundledSnapshot();
@@ -18,29 +21,73 @@ describe('resolveTeamBuffs', () => {
     // Lynae Outro: 15% All DMG amp (multiplicative) + 25% Liberation
     // "Amplification" in the additive bucket (no per-type amplify term).
     expect(buffs).toContainEqual({
-      label: 'Lynae Outro (incoming) · 14s',
+      label: 'Lynae Outro (incoming)',
       source: 'Team',
       mods: [
         { stat: 'amplify', value: 0.15 },
         { stat: 'dmgBonus:liberation', value: 0.25 },
       ],
+      windowDurationSeconds: 14,
     });
     // Lynae Liberation: 24% team DMG as attacker amplify.
     expect(buffs).toContainEqual({
-      label: 'Lynae Liberation (team) · 30s',
+      label: 'Lynae Liberation (team)',
       source: 'Team',
       mods: [{ stat: 'amplify', value: 0.24 }],
+      windowDurationSeconds: 30,
     });
     expect(buffs).toContainEqual({
-      label: 'Verina Outro (team) · 30s',
+      label: 'Verina Outro (team)',
       source: 'Team',
       mods: [{ stat: 'amplify', value: 0.15 }],
+      windowDurationSeconds: 30,
     });
     expect(buffs).toContainEqual({
-      label: 'Sanhua Outro (incoming) · 14s',
+      label: 'Sanhua Outro (incoming)',
       source: 'Team',
       mods: [{ stat: 'dmgBonus:basic', value: 0.38 }],
+      windowDurationSeconds: 14,
     });
+  });
+
+  it('attaches the Verina 30s window and scores only in-window blocks (hand-computed)', () => {
+    const { buffs, warnings } = resolveTeamBuffs(team(['verina', 'sanhua', 'lynae']), characterNameOf);
+    expect(warnings).toEqual([]);
+    const verina = buffs.find((b) => b.label === 'Verina Outro (team)')!;
+    expect(verina.windowDurationSeconds).toBe(30);
+    expect(verina.windowStartSeconds).toBeUndefined();
+    // Starts [0, 15, 30]; the [0, 30) window covers blocks 1–2 only.
+    const jiyan = snapshot.characters.find((c) => c.id === 'jiyan')!;
+    const basic = jiyan.skills.find((s) => s.kind === 'basic')!;
+    const blocks = [
+      { skillId: basic.id, motionName: 'Stage 1 DMG', forteLevel: 10, activeBuffIds: [], durationSeconds: 15 },
+      { skillId: basic.id, motionName: 'Stage 2 DMG', forteLevel: 10, activeBuffIds: [], durationSeconds: 15 },
+      { skillId: basic.id, motionName: 'Stage 1 DMG', forteLevel: 10, activeBuffIds: [], durationSeconds: 5 },
+    ];
+    const sheet = emptySheet();
+    sheet.critDmg = 1.5;
+    const bases = {
+      baseAtk: { character: 100, weapon: 0 },
+      baseHp: { character: 10000 },
+      baseDef: { character: 100 },
+    };
+    const input = {
+      skills: jiyan.skills,
+      attackerLevel: 90,
+      enemy: buildEnemyProfile('mob', 90, 0.1, 'Aero'),
+      blocks,
+      globalBuffIds: [],
+      crit: 'expected' as const,
+    };
+    const windowed = scoreRotationBlocks(sheet, bases, { ...input, buffs: [{ ...verina, id: 'v' }] });
+    const untimed = scoreRotationBlocks(sheet, bases, {
+      ...input,
+      buffs: [{ ...verina, id: 'v', windowDurationSeconds: undefined }],
+    });
+    // Amplify 0.15 scales covered blocks by exactly 1.15; block 3 is untouched.
+    expect(windowed.blocks[0].damage / untimed.blocks[0].damage).toBeCloseTo(1.15, 10);
+    expect(windowed.blocks[1].damage / untimed.blocks[1].damage).toBeCloseTo(1.15, 10);
+    expect(windowed.blocks[2].damage).toBe(untimed.blocks[2].damage);
   });
 
   it('warns for members with no transcribable buffs and for unknown ids', () => {
@@ -61,6 +108,7 @@ describe('resolveTeamBuffs', () => {
       label: 'Yangyang S6 (team ATK)',
       source: 'Team',
       mods: [{ stat: 'atkPct', value: 0.2 }],
+      windowDurationSeconds: 20,
     });
     expect(gated.buffs.some((b) => b.label.includes('Chixia'))).toBe(false);
     expect(gated.warnings).toContain('no transcribable team buffs for Chixia');
@@ -70,6 +118,7 @@ describe('resolveTeamBuffs', () => {
       label: 'Chixia S6 (team Basic DMG)',
       source: 'Team',
       mods: [{ stat: 'dmgBonus:basic', value: 0.25 }],
+      windowDurationSeconds: 15,
     });
     expect(met.warnings.some((w) => w.includes('Chixia'))).toBe(false);
   });
@@ -98,11 +147,13 @@ describe('resolveTeamBuffs', () => {
       label: 'Roccia S2 (team Havoc DMG)',
       source: 'Team',
       mods: [{ stat: 'dmgBonus:Havoc', value: 0.4 }],
+      windowDurationSeconds: 30,
     });
     expect(met.buffs).toContainEqual({
       label: 'Sanhua S6 (team ATK)',
       source: 'Team',
       mods: [{ stat: 'atkPct', value: 0.2 }],
+      windowDurationSeconds: 20,
     });
     const gated = resolveTeamBuffs(team(['roccia', 'sanhua', 'verina']), characterNameOf, {
       roccia: 1,
@@ -135,9 +186,10 @@ describe('resolveTeamBuffs', () => {
       characterNameOf,
     );
     expect(buffs).toContainEqual({
-      label: 'Chixia (custom team buff) · 20s',
+      label: 'Chixia (custom team buff)',
       source: 'Team',
       mods: [{ stat: 'atkPct', value: 0.1 }],
+      windowDurationSeconds: 20,
     });
     expect(buffs).toContainEqual({
       label: 'Verina (custom team buff) (when after healing)',

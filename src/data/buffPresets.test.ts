@@ -320,4 +320,36 @@ describe('buff presets', () => {
     expect(isAutoApplied(preset('sonata-midnight-veil-5pc'))).toBe(false);
     expect(isAutoApplied(preset('sonata-pact-of-neonlight-leap-5pc'))).toBe(false);
   });
+
+  it('carries quoted windows only on the audited manual presets (Phase 5 audit)', () => {
+    // Unambiguous subset: manual (picker-added) presets whose assumption
+    // quotes one concrete duration covering every transcribed mod. Starts
+    // default to t=0 at add time (rotation-opening swap, user-editable).
+    const expected: [string, number][] = [
+      ['echo-denia-outro', 15],
+      ['sonata-midnight-veil-5pc', 15],
+      ['sonata-moonlit-clouds-5pc', 15],
+      ['sonata-pact-of-neonlight-leap-5pc', 15],
+      ['weapon-emerald-sentence-team', 30],
+      ['weapon-forged-dwarf-star-team', 15],
+      ['weapon-freeze-frame-team', 30],
+      ['weapon-kumokiri-team', 15],
+      ['weapon-luminous-hymn-team', 30],
+      ['weapon-skull-thrasher-team', 30],
+      ['weapon-starfield-calibrator-team', 4],
+      ['weapon-static-mist-outro', 14],
+      ['weapon-stellar-symphony-team', 30],
+      ['weapon-wildfire-mark-team', 30],
+    ];
+    const actual: [string, number][] = [];
+    for (const p of BUFF_PRESETS) {
+      if (p.windowSeconds === undefined) continue;
+      // Windows only take effect through the manual picker — an
+      // auto-applied preset carrying one would be dead data.
+      expect(isAutoApplied(p), `${p.id} carries a dead window`).toBe(false);
+      actual.push([p.id, p.windowSeconds]);
+    }
+    actual.sort(([a], [b]) => (a < b ? -1 : 1));
+    expect(actual).toEqual(expected);
+  });
 });
