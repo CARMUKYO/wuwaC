@@ -92,7 +92,7 @@ describe('resolveTeamBuffs', () => {
 
   it('warns for members with no transcribable buffs and for unknown ids', () => {
     const { buffs, warnings } = resolveTeamBuffs(team(['chixia', 'no-such-char', 'lynae']), characterNameOf);
-    expect(buffs).toHaveLength(2); // Lynae's two entries only
+    expect(buffs).toHaveLength(3); // Lynae's three entries only (Outro + Liberation + Visual Impact)
     expect(warnings).toEqual([
       'no transcribable team buffs for Chixia',
       'unknown team member "no-such-char" — no team buffs resolved',
@@ -172,6 +172,7 @@ describe('resolveTeamBuffs', () => {
       label: 'Luuk Herssen S4 (team DMG)',
       source: 'Team',
       mods: [{ stat: 'amplify', value: 0.2 }],
+      windowDurationSeconds: 20,
     });
     const gated = resolveTeamBuffs(team(['luuk-herssen', 'verina', 'sanhua']), characterNameOf, {
       'luuk-herssen': 3,
@@ -238,6 +239,37 @@ describe('resolveTeamBuffs', () => {
       mods: [{ stat: 'atkPct', value: 0.15 }],
     });
     expect(warnings).toContain('custom team effect from Sanhua not scored: unstructured aria');
+  });
+
+  it('resolves the team-buff audit converts with their quoted windows', () => {
+    const { buffs, warnings } = resolveTeamBuffs(
+      team(['qiuyuan', 'mornye', 'ciaccona']),
+      characterNameOf,
+    );
+    expect(buffs).toContainEqual({
+      label: 'Qiuyuan Liberation (team, capped)',
+      source: 'Team',
+      mods: [{ stat: 'critDmg', value: 0.3 }],
+      windowDurationSeconds: 30,
+    });
+    expect(buffs).toContainEqual({
+      label: "Qiuyuan Bamboo's Shade (team)",
+      source: 'Team',
+      mods: [{ stat: 'dmgBonus:echo', value: 0.3 }],
+      windowDurationSeconds: 30,
+    });
+    expect(buffs).toContainEqual({
+      label: 'Mornye Interfered Marker (team, capped)',
+      source: 'Team',
+      mods: [{ stat: 'amplify', value: 0.4 }],
+      windowDurationSeconds: 8,
+    });
+    expect(buffs).toContainEqual({
+      label: 'Ciaccona Solo Concert (team)',
+      source: 'Team',
+      mods: [{ stat: 'dmgBonus:Aero', value: 0.24 }],
+    });
+    expect(warnings).toEqual([]);
   });
 
   it('resolves Lynae S2 team all-DMG amp at rank with its 14s window, silent below', () => {

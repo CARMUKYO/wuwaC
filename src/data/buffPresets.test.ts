@@ -124,6 +124,7 @@ describe('buff presets', () => {
     expect(isAutoApplied(preset('sonata-moonlit-clouds-5pc'))).toBe(false);
     expect(isAutoApplied(preset('sonata-rejuvenating-glow-5pc'))).toBe(true);
     expect(isAutoApplied(preset('echo-denia-outro'))).toBe(false);
+    expect(isAutoApplied(preset('echo-hyvatia-outro'))).toBe(false);
   });
 
   it('gives every auto-applied sonata preset a piece threshold', () => {
@@ -149,6 +150,43 @@ describe('buff presets', () => {
       { stat: 'atkPct', value: 0.2 },
       { stat: 'dmgBonus:outro', value: 0.6 },
     ]);
+    expect(resolvePresetMods(preset('echo-glommoth-outro'), {})).toEqual([
+      { stat: 'dmgBonus:Glacio', value: 0.12 },
+    ]);
+    expect(resolvePresetMods(preset('echo-voidwing-moth-outro'), {})).toEqual([
+      { stat: 'atkPct', value: 0.12 },
+    ]);
+    // Hyvatia: 10% All-Attribute to the next resonator resolves to the
+    // incoming attribute (orchestrator catch: same class as the audit's
+    // outro follow-ups, missed as "needs per-recipient attributes").
+    expect(resolvePresetMods(preset('echo-hyvatia-outro'), { attribute: 'Glacio' })).toEqual([
+      { stat: 'dmgBonus:Glacio', value: 0.1 },
+    ]);
+    // Jué Blessing of Time stays untranscribed: wielder cast-buffs cannot
+    // carry windows (auto-applied presets take effect full-uptime; windows
+    // only work through the manual picker) — a model gap, not data.
+  });
+
+  it('pins weapon-audit fixes (snapshot descriptions, verified 2026-09-19)', () => {
+    const byId = new Map(BUFF_PRESETS.map((entry) => [entry.id, entry]));
+    // Ages of Harvest: Ageless Marking [24..48] + Ethereal Endowment [24..48]
+    // are two named co-active buffs with no same-name exclusion, so they sum:
+    // R1 0.24 + 0.24 = 0.48, R5 0.48 + 0.48 = 0.96.
+    const agesSkill = byId
+      .get('weapon-ages-of-harvest')
+      ?.mods.find((mod) => mod.stat === 'dmgBonus:skill');
+    expect(agesSkill?.valuesByRank).toEqual([0.48, 0.6, 0.72, 0.84, 0.96]);
+    // Bloodpact's Pledge: the Unbound-Flow Aero rider covers "nearby
+    // Resonators on the field", which includes a Rover: Aero wielder, so the
+    // wielder preset carries it gated to Rover: Aero (teammates stay manual).
+    const aero = byId.get('weapon-bloodpact-s-pledge-aero');
+    expect(aero?.target).toBe('wielder');
+    expect(aero?.requiresCharacterIds).toEqual(['rover-aero']);
+    expect(aero?.mods).toHaveLength(1);
+    expect(aero?.mods[0]?.stat).toBe('dmgBonus:Aero');
+    expect(aero?.mods[0]?.valuesByRank).toEqual([0.1, 0.14, 0.18, 0.22, 0.26]);
+    // Pistols#26 label matches the snapshot weapon name exactly.
+    expect(byId.get('weapon-pistols-26')?.label).toBe('Pistols#26');
   });
 
   it('transcribes the live-source wave values (Game8 list, inspected 2026-09-16)', () => {
@@ -327,6 +365,9 @@ describe('buff presets', () => {
     // default to t=0 at add time (rotation-opening swap, user-editable).
     const expected: [string, number][] = [
       ['echo-denia-outro', 15],
+      ['echo-glommoth-outro', 15],
+      ['echo-hyvatia-outro', 15],
+      ['echo-voidwing-moth-outro', 15],
       ['sonata-midnight-veil-5pc', 15],
       ['sonata-moonlit-clouds-5pc', 15],
       ['sonata-pact-of-neonlight-leap-5pc', 15],

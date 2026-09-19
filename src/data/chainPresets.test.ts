@@ -170,9 +170,10 @@ describe('chain presets', () => {
 
   it('carries quoted windows only on the audited team entries (Phase 5 audit)', () => {
     // Unambiguous subset: team-scope entries whose assumption quotes one
-    // concrete duration. Seven team entries stay untimed (Shorekeeper S2,
+    // concrete duration. Six team entries stay untimed (Shorekeeper S2,
     // Ciaccona S2, Iuno S2, Buling S6, Qiuyuan S2, Mornye S2 quote no
-    // length; Luuk S4 states its 20s only on the wielder part).
+    // length). Luuk S4 carries its 20s: the chain prose applies the
+    // window to all Resonators in the team, not the wielder alone.
     const expected: [string, number][] = [
       ['augusta@4', 30],
       ['baizhi@6', 20],
@@ -189,6 +190,7 @@ describe('chain presets', () => {
       ['lingyang@4', 30],
       ['lumi@6', 20],
       ['lupa@2', 30],
+      ['luuk-herssen@4', 20],
       ['lynae@2', 14],
       ['mortefi@6', 20],
       ['phoebe@2', 30],

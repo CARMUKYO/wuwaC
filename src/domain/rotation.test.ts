@@ -112,7 +112,9 @@ describe('calculateRotation', () => {
     const teamBuffs: RotationBuff[] = lynae.buffs
       .filter((b) => b.label.startsWith('Lynae'))
       .map((b, i) => ({ ...b, id: `lynae-${i}` }));
-    expect(teamBuffs).toHaveLength(2);
+    // Outro + Liberation + Visual Impact (Tune Break Boost points, which do
+    // not move basic-block DPR — the 1.39 ratio below is unchanged).
+    expect(teamBuffs).toHaveLength(3);
 
     const plain = calculateRotation(baseInput([block('1', 'Stage 1 DMG'), block('2', 'Stage 2 DMG')]));
     const buffed = calculateRotation(

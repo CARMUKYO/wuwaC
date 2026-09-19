@@ -1088,8 +1088,9 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     characterId: 'luuk-herssen',
     rank: 4,
     label: 'Luuk Herssen S4 (team DMG)',
+    windowSeconds: 20,
     mods: [{ stat: 'amplify', value: 0.2 }],
-    assumption: 'After a team Tune Break; teammates part.',
+    assumption: '20s window after a team Tune Break (unstackable); teammates part.',
   },
   {
     scope: 'motion',
@@ -3346,7 +3347,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     rank: 2,
     label: 'Qiuyuan S2 (team Echo amp)',
     mods: [{ stat: 'dmgBonus:echo', value: 0.3 }],
-    assumption: "While Bamboo's Shade lasts; teammates part.",
+    assumption: "While Bamboo's Shade lasts; stacks with the base Bamboo's Shade team entry (+30%); teammates part.",
   },
 
   // --- Mornye ---------------------------------------------------------------
@@ -3363,7 +3364,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     rank: 2,
     label: 'Mornye S2 (team Crit DMG)',
     mods: [{ stat: 'critDmg', value: 0.32 }],
-    assumption: 'Target has Interfered Marker (gate-met); 260% Energy Regen scaling maxed; teammates part.',
+    assumption: 'Target has Interfered Marker (gate-met); 260% Energy Regen scaling maxed; teammates part. Excludes the +20% Off-Tune Buildup rider (no bucket).',
   },
 
   // --- Aemeath --------------------------------------------------------------

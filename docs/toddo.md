@@ -1,14 +1,16 @@
 # TODO — next audit targets & reminders
 
-## Next audit targets (not started)
-- [ ] **Weapon audits** — all 122 weapons systematically checked (stats, passives,
-      transcription vs snapshot). Character audits (waves 1–4) are done; weapons
-      never got the same treatment.
-- [ ] **Echo defs + Sonata sets** — 193 echo defs and 34 sonata sets: costs,
-      set bonuses, echo skills vs snapshot.
-- [ ] **Buff presets / team buffs pass** — dedicated audit of buffPresets.ts and
-      teamBuffs.ts values and exclusions (touched piecemeal during wave 4, never
-      fully swept).
+## Next audit targets (sweeps complete 2026-09-19, reviewed, pending commit)
+- [x] **Weapon audits (auditor-1)** — all 122 checked; 3 fixes in
+      (Ages of Harvest stack sum, Bloodpact wielder preset, Pistols#26
+      label); 5 live-vs-snapshot conflicts reported (below).
+- [x] **Echo defs + Sonata sets (auditor-2)** — 34/34 sonatas clean; 2 new
+      echo outro presets + 1 assumption; prism cost drift reported (below).
+- [x] **Buff presets / team buffs pass (auditor-3)** — 7 new team-buff
+      converts (Ciaccona/Qiuyuan×2/Buling/Iuno/Lynae/Mornye), Luuk S4
+      window fix, exclusion re-read. Orchestrator added the Hyvatia
+      outro preset (audit miss, same windowed pattern); Jué stays
+      untranscribed (wielder cast-buffs can't carry windows — model gap).
 
 ## In progress
 - [ ] **Rotation presets** — per-character preset rotations (Prydwen-sourced),
@@ -24,6 +26,18 @@
 - [ ] **Jianxin preset missing**: Prydwen page has only prose priority
       bullets, no step-by-step rotation — no preset file (correctly left
       unresolved).
+- [ ] **Prism echo costs**: snapshot says cost 3 (Handbook Elite Class) but
+      Game8 lists all four prisms 1-cost, provider Rarity is 0, and values
+      cluster with the 1-cost cohort. Needs sync-owner decision:
+      Handbook-first rule vs prism exception (sync + regen + cost-budget
+      fallout).
+- [ ] **Weapon live-conflicts (direction unknown, presets follow snapshot)**:
+      Comet Flare rank series, Blazing Brilliance 12s-vs-10s expiry,
+      Starfield Calibrator Skill-vs-Liberation trigger, Skull Thrasher +
+      Whispers of Sirens passive names. Needs provider re-check/in-game
+      truth; cannot hand-edit snapshot.
+- [ ] **Starfield `{Cus:...}` markup** leaking into passive description and
+      params (sync text-cleaning wart).
 
 ## User-side reminders
 - [ ] **Chisa ring-bonus units** — needs in-game tooltip observation; no citable

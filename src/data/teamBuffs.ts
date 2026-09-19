@@ -4,11 +4,14 @@ import type { StatKey } from './schema.ts';
  * Curated team-buff table (Team v2 data layer).
  *
  * One entry per transcribable Outro skill (all 58 characters checked
- * against the 2026-09-12 snapshot) plus the handful of non-Outro team
- * buffs with concrete numbers (Lynae's Liberation, Shorekeeper's
- * Stellarealm caps, Lupa's Pack Hunt base, Rover: Electro's Overshock,
- * Suisui's Bane-gated DEF ignore). Values are transcribed from snapshot
- * skill descriptions, never from memory; `skillId` is the provenance.
+ * against the 2026-09-19 snapshot) plus the non-Outro team buffs with
+ * concrete numbers (Lynae's Liberation, Shorekeeper's Stellarealm caps,
+ * Lupa's Pack Hunt base, Rover: Electro's Overshock, Suisui's Bane-gated
+ * DEF ignore, Ciaccona's Solo Concert, Qiuyuan's Liberation + Bamboo's
+ * Shade, Buling's Thunder Spell final stage, Iuno's Blessing at full
+ * stacks, Lynae's Visual Impact Tune Break Boost, Mornye's Interfered
+ * Marker at cap). Values are transcribed from snapshot skill
+ * descriptions, never from memory; `skillId` is the provenance.
  * A test asserts every character/skill id still resolves.
  *
  * Mapping rules (same as buff presets): "X DMG Amplified" for an element
@@ -21,11 +24,13 @@ import type { StatKey } from './schema.ts';
  * the coverage test asserts the map matches the uncovered roster exactly.
  * Partial exclusions (characters WITH entries, one rider untranscribed):
  * Denia's Fusion-Burst branch (Fusion Burst is unmodeled anywhere in the
- * codebase — no bucket) and Suisui's status-cap rider on `1005703`
- * (same skill as the transcribed Landscape entry; no cap bucket).
- * Stack-cap raises (Rover: Aero, Chisa, Luuk/Qingxiao Tune +1) stay out:
- * caps are a validation-only clamp with no `StatKey` and no team input
- * path — a follow-up feature, not an audit fix. RES-shred riders
+ * codebase — no bucket), Suisui's status-cap rider on `1005703`
+ * (same skill as the transcribed Landscape entry; no cap bucket), and
+ * Lucilla's Zoom (+10% active-resonator Echo-skill Crit DMG on `1005007`;
+ * no per-action crit bucket). Stack-cap raises (Rover: Aero, Chisa,
+ * Luuk/Qingxiao Tune +1) stay out: caps are a validation-only clamp
+ * with no `StatKey` and no team input path — a follow-up feature, not
+ * an audit fix. RES-shred riders
  * (Phoebe, Suisui) transcribe as negative `resistancePenetration` per
  * the shred-sign convention (schema.ts); Youhu's coordinated-attack amp
  * transcribes to `dmgBonus:coordinated` (Decision 3). Flat team ATK with
@@ -64,7 +69,7 @@ export const TEAM_BUFFS: TeamBuffEntry[] = [
   { characterId: 'shorekeeper', kind: 'outro', label: 'Shorekeeper Outro (team)', skillId: '1002509', windowSeconds: 30, target: 'team', mods: [{ stat: 'amplify', value: 0.15 }], assumption: 'Butterfly circle active; excludes the dodge-recovery utility.' },
   { characterId: 'roccia', kind: 'outro', label: 'Roccia Outro (incoming)', skillId: '1002709', windowSeconds: 14, target: 'incoming', mods: [{ stat: 'dmgBonus:Havoc', value: 0.20 }, { stat: 'dmgBonus:basic', value: 0.25 }] },
   { characterId: 'brant', kind: 'outro', label: 'Brant Outro (incoming)', skillId: '1002909', windowSeconds: 14, target: 'incoming', mods: [{ stat: 'dmgBonus:Fusion', value: 0.20 }, { stat: 'dmgBonus:skill', value: 0.25 }] },
-  { characterId: 'phoebe', kind: 'outro', label: 'Phoebe Outro (Confession team)', skillId: '1003009', windowSeconds: 30, target: 'team', mods: [{ stat: 'negativeStatusAmplify', value: 1.00 }, { stat: 'resistancePenetration', value: -0.10 }], assumption: 'Confession state; Spectro Frazzle DMG only; 10% Spectro shred scored sheet-wide (penetration is element-agnostic).' },
+  { characterId: 'phoebe', kind: 'outro', label: 'Phoebe Outro (Confession team)', skillId: '1003009', windowSeconds: 30, target: 'team', mods: [{ stat: 'negativeStatusAmplify', value: 1.00 }, { stat: 'resistancePenetration', value: -0.10 }], assumption: 'Confession state; Spectro Frazzle DMG only; 10% Spectro shred scored sheet-wide (penetration is element-agnostic). Excludes the Frazzle interval-extension rider (no tick model).' },
   { characterId: 'cantarella', kind: 'outro', label: 'Cantarella Outro (incoming)', skillId: '1003109', windowSeconds: 14, target: 'incoming', mods: [{ stat: 'dmgBonus:Havoc', value: 0.20 }, { stat: 'dmgBonus:skill', value: 0.25 }] },
   { characterId: 'ciaccona', kind: 'outro', label: 'Ciaccona Outro (team)', skillId: '1003409', windowSeconds: 30, target: 'team', mods: [{ stat: 'negativeStatusAmplify', value: 1.00 }], assumption: 'Aero Erosion DMG only.' },
   { characterId: 'zani', kind: 'outro', label: 'Zani Outro (team, marked)', skillId: '1003309', windowSeconds: 20, target: 'team', mods: [{ stat: 'dmgBonus:Spectro', value: 0.20 }], assumption: 'Vs the Heliacal Ember-marked target.' },
@@ -85,10 +90,10 @@ export const TEAM_BUFFS: TeamBuffEntry[] = [
   { characterId: 'lucilla', kind: 'outro', label: 'Lucilla Outro (incoming, Echo mode)', skillId: '1005009', windowSeconds: 14, target: 'incoming', mods: [{ stat: 'dmgBonus:echo', value: 0.50 }], assumption: 'Resonance Mode - Echo; see the Chafe-mode team entry for the other mode.' },
   { characterId: 'lucilla', kind: 'outro', label: 'Lucilla Outro (team, Chafe mode)', skillId: '1005009', windowSeconds: 30, target: 'team', mods: [{ stat: 'negativeStatusAmplify', value: 0.60 }], assumption: 'Resonance Mode - Glacio Chafe; Chafe DMG only.' },
   { characterId: 'lucy', kind: 'outro', label: 'Lucy Outro (incoming)', skillId: '1004909', windowSeconds: 14, target: 'incoming', mods: [{ stat: 'dmgBonus:basic', value: 0.25 }], assumption: 'Excludes Countermeasure Program (separate team entry).' },
-  { characterId: 'lucy', kind: 'outro', label: 'Lucy Outro (team Countermeasure)', skillId: '1004909', windowSeconds: 25, target: 'team', mods: [{ stat: 'amplify', value: 0.20 }], assumption: 'When a teammate (not Lucy) inflicts Hack - Shifting; excludes the DMG-reduction rider.' },
+  { characterId: 'lucy', kind: 'outro', label: 'Lucy Outro (team Countermeasure)', skillId: '1004909', windowSeconds: 25, target: 'team', mods: [{ stat: 'amplify', value: 0.20 }], assumption: 'When a teammate (not Lucy) inflicts Hack - Shifting; amp duration unstated — window = program duration. Excludes the DMG-reduction rider.' },
   { characterId: 'hiyuki', kind: 'outro', label: 'Hiyuki Outro (team)', skillId: '1005209', windowSeconds: 20, target: 'team', mods: [{ stat: 'dmgBonus:Glacio', value: 0.20 }], assumption: 'Other teammates vs Glacio Chafe-affected targets.' },
   { characterId: 'rover-electro', kind: 'outro', label: 'Rover: Electro Outro (incoming)', skillId: '1005509', windowSeconds: 14, target: 'incoming', mods: [{ stat: 'amplify', value: 0.25 }], assumption: 'After the incoming resonator inflicts a Negative Status (consumes Electro Core).' },
-  { characterId: 'yangyang-xuanling', kind: 'outro', label: 'Yangyang: Xuanling Outro (team)', skillId: '1005409', windowSeconds: 20, target: 'team', mods: [{ stat: 'dmgBonus:Havoc', value: 0.20 }], assumption: 'Tonal Switch holders after inflicting Havoc Bane.' },
+  { characterId: 'yangyang-xuanling', kind: 'outro', label: 'Yangyang: Xuanling Outro (team)', skillId: '1005409', windowSeconds: 20, target: 'team', mods: [{ stat: 'dmgBonus:Havoc', value: 0.20 }], assumption: 'Tonal Switch holders after inflicting Havoc Bane; amp duration unstated — window = Tonal Switch duration.' },
   { characterId: 'suisui', kind: 'outro', label: 'Suisui Outro (team)', skillId: '1005709', windowSeconds: 30, target: 'team', mods: [{ stat: 'amplify', value: 0.25 }], assumption: 'Excludes the Energy-Regen-scaling rider.' },
   // ---- Non-Outro team buffs with concrete numbers ----
   { characterId: 'shorekeeper', kind: 'other', label: 'Shorekeeper Stellarealm (team, capped)', skillId: '1002503', target: 'team', mods: [{ stat: 'critRate', value: 0.125 }, { stat: 'critDmg', value: 0.25 }], assumption: 'Supernal Stellarealm at cap (needs ~250% Energy Regen).' },
@@ -96,12 +101,20 @@ export const TEAM_BUFFS: TeamBuffEntry[] = [
   { characterId: 'rover-electro', kind: 'other', label: 'Rover: Electro Overshock (team)', skillId: '1005507', windowSeconds: 20, target: 'team', mods: [{ stat: 'atkPct', value: 0.10 }], assumption: 'Overshock cast via the button.' },
   { characterId: 'suisui', kind: 'other', label: 'Suisui Landscape (team, Bane)', skillId: '1005703', windowSeconds: 30, target: 'team', mods: [{ stat: 'defIgnore', value: 0.06 }, { stat: 'resistancePenetration', value: -0.12 }], assumption: 'After consuming Havoc Bane; Havoc DEF-ignore + RES shred scored sheet-wide (penetration is element-agnostic).' },
   { characterId: 'roccia', kind: 'other', label: 'Roccia Liberation (team, capped)', skillId: '1002703', windowSeconds: 30, target: 'team', mods: [{ stat: 'atk', value: 200 }], assumption: 'At cap (Roccia Crit Rate ≥70%): +1 ATK per 0.1% over 50%, up to 200.' },
+  // ---- Team-buff audit converts (2026-09-19): non-Outro buffs with concrete numbers ----
+  { characterId: 'ciaccona', kind: 'other', label: 'Ciaccona Solo Concert (team)', skillId: '1003401', target: 'team', mods: [{ stat: 'dmgBonus:Aero', value: 0.24 }], assumption: 'While Solo Concert is performed (no duration stated); not stackable.' },
+  { characterId: 'qiuyuan', kind: 'other', label: 'Qiuyuan Liberation (team, capped)', skillId: '1004103', windowSeconds: 30, target: 'team', mods: [{ stat: 'critDmg', value: 0.30 }], assumption: 'At cap (Qiuyuan Crit Rate ≥65%): +2% per 1% over 50%, up to 30%.' },
+  { characterId: 'qiuyuan', kind: 'other', label: "Qiuyuan Bamboo's Shade (team)", skillId: '1004107', windowSeconds: 30, target: 'team', mods: [{ stat: 'dmgBonus:echo', value: 0.30 }], assumption: "Bamboo's Shade (400 Swordster's Soliloquy); stacks with Qiuyuan S2 (+30%)." },
+  { characterId: 'buling', kind: 'other', label: 'Buling Thunder Spell (team, final stage)', skillId: '1004307', windowSeconds: 24, target: 'team', mods: [{ stat: 'dmgBonus:skill', value: 0.25 }], assumption: 'Thunder Spell - Heaven, Earth, Mind stage (two Intro casts); window = Array duration. Below S6 (S6 replaces this with 50% — see Buling S6 chain entry).' },
+  { characterId: 'iuno', kind: 'other', label: 'Iuno Blessing (team, full stacks)', skillId: '1003807', windowSeconds: 10, target: 'team', mods: [{ stat: 'amplify', value: 0.40 }], assumption: 'Blessing of the Wan Light at 10 stacks (4% each, full stacks); requires repeated shield gains inside the Full Moon domain.' },
+  { characterId: 'lynae', kind: 'other', label: 'Lynae Visual Impact (team)', skillId: '1004507', windowSeconds: 30, target: 'team', mods: [{ stat: 'tuneBreakBoost', value: 40 }], assumption: 'Tune Break Boost points (raw), not percent.' },
+  { characterId: 'mornye', kind: 'other', label: 'Mornye Interfered Marker (team, capped)', skillId: '1004407', windowSeconds: 8, target: 'team', mods: [{ stat: 'amplify', value: 0.40 }], assumption: 'Interfered Marker active (8s, tune-response state); at cap (Mornye Energy Regen ≥260%): +0.25% per 1% over 100%, up to 40%.' },
 ];
 
 /**
  * Fully excluded characters (no transcribable team buff anywhere in the
  * kit): id → one-line reason quoting the deciding wording. Re-read
- * 2026-09-17 against the coordinated/shred/DEF-ignore/amplify buckets;
+ * 2026-09-19 against the coordinated/shred/DEF-ignore/amplify buckets;
  * the coverage test fails if this map drifts from the uncovered roster
  * in either direction, so converts must delete their row here.
  */

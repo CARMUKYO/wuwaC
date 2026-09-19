@@ -56,6 +56,51 @@ describe('team buffs table', () => {
     expect(youhu.mods).toEqual([{ stat: 'dmgBonus:coordinated', value: 1.0 }]);
   });
 
+  it('transcribes the team-buff audit converts (2026-09-19 re-read)', () => {
+    // Ciaccona Solo Concert: flat 24% Aero bonus, no duration stated.
+    const ciaccona = TEAM_BUFFS.find((e) => e.characterId === 'ciaccona' && e.kind === 'other')!;
+    expect(ciaccona.skillId).toBe('1003401');
+    expect(ciaccona.target).toBe('team');
+    expect(ciaccona.windowSeconds).toBeUndefined();
+    expect(ciaccona.mods).toEqual([{ stat: 'dmgBonus:Aero', value: 0.24 }]);
+    // Qiuyuan Liberation: +2% Crit DMG per 1% Crit Rate over 50%, up to
+    // 30% — cap needs 30/2 = 15 points over, i.e. 65% Crit Rate.
+    const qiuyuanLib = TEAM_BUFFS.find((e) => e.label === 'Qiuyuan Liberation (team, capped)')!;
+    expect(qiuyuanLib.skillId).toBe('1004103');
+    expect(qiuyuanLib.windowSeconds).toBe(30);
+    expect(qiuyuanLib.mods).toEqual([{ stat: 'critDmg', value: 0.3 }]);
+    expect(qiuyuanLib.assumption).toMatch(/65%/);
+    // Qiuyuan Bamboo's Shade: flat 30% Echo bonus, 30s.
+    const bamboo = TEAM_BUFFS.find((e) => e.label === "Qiuyuan Bamboo's Shade (team)")!;
+    expect(bamboo.skillId).toBe('1004107');
+    expect(bamboo.windowSeconds).toBe(30);
+    expect(bamboo.mods).toEqual([{ stat: 'dmgBonus:echo', value: 0.3 }]);
+    // Buling Thunder Spell final stage: 25% Skill bonus; window = the
+    // 24s Array duration. S6 replaces (50%, active resonator only).
+    const buling = TEAM_BUFFS.find((e) => e.label === 'Buling Thunder Spell (team, final stage)')!;
+    expect(buling.skillId).toBe('1004307');
+    expect(buling.windowSeconds).toBe(24);
+    expect(buling.mods).toEqual([{ stat: 'dmgBonus:skill', value: 0.25 }]);
+    // Iuno Blessing: 4% per stack x 10 stacks = 40%, 10s window.
+    const iuno = TEAM_BUFFS.find((e) => e.label === 'Iuno Blessing (team, full stacks)')!;
+    expect(iuno.skillId).toBe('1003807');
+    expect(iuno.windowSeconds).toBe(10);
+    expect(iuno.mods).toEqual([{ stat: 'amplify', value: 0.4 }]);
+    // Lynae Visual Impact: 40 raw Tune Break Boost points, 30s.
+    const lynae = TEAM_BUFFS.find((e) => e.label === 'Lynae Visual Impact (team)')!;
+    expect(lynae.skillId).toBe('1004507');
+    expect(lynae.windowSeconds).toBe(30);
+    expect(lynae.mods).toEqual([{ stat: 'tuneBreakBoost', value: 40 }]);
+    // Mornye Interfered Marker: +0.25% per 1% Energy Regen over 100%,
+    // up to 40% — cap needs 40/0.25 = 160 points over, i.e. 260% ER.
+    // Window = the 8s Marker duration.
+    const mornye = TEAM_BUFFS.find((e) => e.label === 'Mornye Interfered Marker (team, capped)')!;
+    expect(mornye.skillId).toBe('1004407');
+    expect(mornye.windowSeconds).toBe(8);
+    expect(mornye.mods).toEqual([{ stat: 'amplify', value: 0.4 }]);
+    expect(mornye.assumption).toMatch(/260%/);
+  });
+
   it('transcribes Roccia Liberation as capped flat team ATK (audit convert)', () => {
     const roccia = TEAM_BUFFS.find((e) => e.characterId === 'roccia' && e.kind === 'other')!;
     expect(roccia.skillId).toBe('1002703');
