@@ -524,6 +524,59 @@ export function echoCostFromIntensity(intensity: string): 1 | 3 | 4 | null {
 }
 
 /**
+ * Prose-verified echo cost overrides (provider Handbook contradictions).
+ *
+ * Handbook intensity is usually the echo cost, but the four elemental
+ * Prisms ship Handbook "Elite Class" (3) while being 1-cost echoes: the
+ * provider's own Rarity is 0 (= 1), Game8 lists all four 1-cost, their
+ * CD-8s skills cluster with the 1-cost cohort, and sibling Aero Prism
+ * already resolves 1. Keyed by provider echo Id; each entry cites its
+ * evidence. Generalize only with per-record verification — never flip
+ * unresolved Handbook/Rarity conflicts by rule.
+ */
+export interface EchoCostOverride {
+  echoId: string;
+  cost: 1 | 3 | 4;
+  reason: string;
+}
+
+export const ECHO_COST_OVERRIDES: readonly EchoCostOverride[] = [
+  {
+    echoId: '390077012',
+    cost: 1,
+    reason:
+      'Fusion Prism: Handbook Elite vs Rarity 0; Game8 1-Cost (https://game8.co/games/Wuthering-Waves/archives/454301).',
+  },
+  {
+    echoId: '390077013',
+    cost: 1,
+    reason:
+      'Glacio Prism: Handbook Elite vs Rarity 0; Game8 1-Cost (https://game8.co/games/Wuthering-Waves/archives/454304).',
+  },
+  {
+    echoId: '390077016',
+    cost: 1,
+    reason:
+      'Spectro Prism: Handbook Elite vs Rarity 0; Game8 1-Cost (https://game8.co/games/Wuthering-Waves/archives/454312).',
+  },
+  {
+    echoId: '390077017',
+    cost: 1,
+    reason:
+      'Havoc Prism: Handbook Elite vs Rarity 0; Game8 1-Cost (https://game8.co/games/Wuthering-Waves/archives/454306).',
+  },
+];
+
+/**
+ * Apply a verified cost override, if one matches this echo.
+ * Pass-through otherwise — most echoes keep their resolved cost.
+ */
+export function applyEchoCostOverride(echoId: string, resolved: 1 | 3 | 4): 1 | 3 | 4 {
+  const hit = ECHO_COST_OVERRIDES.find((o) => o.echoId === echoId);
+  return hit ? hit.cost : resolved;
+}
+
+/**
  * Expected-exclusion check for echo list names. Returns a skip reason when
  * the entry must not enter the snapshot, `null` when it should sync
  * normally:

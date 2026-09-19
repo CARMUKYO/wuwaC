@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyEchoCostOverride,
   applyMotionTypeOverride,
   bonusKindFromDamageType,
   echoCostFromIntensity,
@@ -332,6 +333,22 @@ describe('echoCostFromRarity', () => {
   it('returns null for unverified rarities', () => {
     expect(echoCostFromRarity(4)).toBeNull();
     expect(echoCostFromRarity(99)).toBeNull();
+  });
+});
+
+describe('applyEchoCostOverride', () => {
+  it('pins the four Handbook-contradicted prisms to cost 1', () => {
+    // Handbook Elite (3) vs Rarity 0 (1); Game8 lists all four 1-cost.
+    expect(applyEchoCostOverride('390077012', 3)).toBe(1); // Fusion Prism
+    expect(applyEchoCostOverride('390077013', 3)).toBe(1); // Glacio Prism
+    expect(applyEchoCostOverride('390077016', 3)).toBe(1); // Spectro Prism
+    expect(applyEchoCostOverride('390077017', 3)).toBe(1); // Havoc Prism
+  });
+
+  it('passes everything else through untouched', () => {
+    expect(applyEchoCostOverride('6000095', 1)).toBe(1); // Aero Prism
+    expect(applyEchoCostOverride('999999999', 3)).toBe(3);
+    expect(applyEchoCostOverride('390077012', 1)).toBe(1);
   });
 });
 

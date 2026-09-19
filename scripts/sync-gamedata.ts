@@ -33,6 +33,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { z } from 'zod';
 import {
+  applyEchoCostOverride,
   applyMotionTypeOverride,
   bonusKindFromDamageType,
   echoCostFromIntensity,
@@ -483,6 +484,11 @@ function normalizeEchoDef(
     if (viaRarity !== null && viaRarity !== cost) {
       warn(`${entry.Name}: Handbook cost ${cost} vs Rarity cost ${viaRarity}, kept Handbook`);
     }
+  }
+  const overridden = applyEchoCostOverride(String(entry.Id), cost);
+  if (overridden !== cost) {
+    warn(`${entry.Name}: cost override ${cost} -> ${overridden} (verified Handbook contradiction)`);
+    cost = overridden;
   }
   // Provider-internal corroboration: MainProp.RandGroupId identifies the
   // main-stat pool family (501 = 4-cost pool, 502 = 3-cost pool, calibrated

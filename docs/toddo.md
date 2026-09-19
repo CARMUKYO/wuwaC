@@ -26,11 +26,9 @@
 - [ ] **Jianxin preset missing**: Prydwen page has only prose priority
       bullets, no step-by-step rotation — no preset file (correctly left
       unresolved).
-- [ ] **Prism echo costs**: snapshot says cost 3 (Handbook Elite Class) but
-      Game8 lists all four prisms 1-cost, provider Rarity is 0, and values
-      cluster with the 1-cost cohort. Needs sync-owner decision:
-      Handbook-first rule vs prism exception (sync + regen + cost-budget
-      fallout).
+- [x] **Prism echo costs**: decided cost 1 (Game8 1-cost ×4 opened,
+      Rarity 0, CD-8s cohort, Aero sibling). Implemented as
+      ECHO_COST_OVERRIDES + regen 2026-09-19 (4 costs + pools only).
 - [ ] **Weapon live-conflicts (direction unknown, presets follow snapshot)**:
       Comet Flare rank series, Blazing Brilliance 12s-vs-10s expiry,
       Starfield Calibrator Skill-vs-Liberation trigger, Skull Thrasher +
