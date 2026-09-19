@@ -524,6 +524,39 @@ export function computeXiangliyaoChainRuleDamage(ctx: XiangliyaoChainRuleDamageC
   return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
 }
 
+/**
+ * Snapshot rows whose prose exempts them from DMG Bonus. Keys are
+ * `characterId|skillId|motionName` (exact snapshot motion names):
+ * - galbrena 1004007: "deal a fixed amount of Fusion DMG, considered
+ *   Basic Attack DMG that does not bear any effect from DMG buffs"
+ *   (Hellstride).
+ * - yangyang-xuanling 1005407: "deal a fixed instance of Havoc DMG,
+ *   considered Basic Attack DMG, which is not affected by any DMG Bonus
+ *   effects" (Wraith of Sound).
+ * - jingran 1005901: "dealing fix amount of Fusion DMG, considered Basic
+ *   Attack DMG. This instance of damage is not affect by any DMG Bonus
+ *   effects" (Shadow Step).
+ * - luuk-herssen 1004707: "Deal fixed Spectro DMG, considered Basic
+ *   Attack DMG that is not affected by any DMG Bonus" (Ichor Blade;
+ *   snapshot row name carries the "(per 0.15s)" suffix).
+ */
+export const BUFF_IMMUNE_MOTIONS: ReadonlySet<string> = new Set([
+  'galbrena|1004007|Hellstride DMG',
+  'yangyang-xuanling|1005407|Wraith of Sound DMG',
+  'jingran|1005901|Shadow Step DMG',
+  'luuk-herssen|1004707|Ichor Blade DMG (per 0.15s)',
+]);
+
+/** Whether this motion ignores the DmgBonusPercent term (see set above). */
+export function isBuffImmuneMotion(
+  characterId: string | undefined,
+  skillId: string,
+  motionName: string,
+): boolean {
+  if (characterId === undefined) return false;
+  return BUFF_IMMUNE_MOTIONS.has(`${characterId}|${skillId}|${motionName}`);
+}
+
 export function computeDamage(ctx: DamageContext): DamageResult {
   const { sheet, skill, enemy } = ctx;
   const lance = jiyanOutroLanceSpec(ctx.characterId, skill, ctx.motionName, ctx.resonanceChain ?? 0);
@@ -620,14 +653,20 @@ export function computeDamage(ctx: DamageContext): DamageResult {
     computeElemReductionTotal(enemy.elemReductionBase, enemy.elemReductionAdditional);
 
   const kind = motion.dmgType;
-  const bonuses =
-    computeDmgBonusPercent(
+  // Narrow reading: buff-immune prose ("not affected by any DMG Bonus")
+  // skips ONLY the DmgBonusPercent term — amplify, crit, resistance, and
+  // DEF terms still apply. Refinable against in-game testing.
+  const dmgBonusTerm = isBuffImmuneMotion(ctx.characterId, skill.id, motion.name)
+    ? 1
+    : computeDmgBonusPercent(
       sheet,
       skill.attribute,
       kind,
       kitMods.dmgBonusExtra,
       isCoordinatedMotion(ctx.characterId, motion.name),
-    ) *
+    );
+  const bonuses =
+    dmgBonusTerm *
     computeDmgAmplifyTotal(
       sheet.amplify +
         kitMods.amplifyExtra +

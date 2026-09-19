@@ -160,7 +160,7 @@ export function stripHtml(text: string): string {
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/g, ' ')
     .replace(/\{Cus:Ipt,[^}]*?PC=([A-Za-z]+)[^}]*\}/g, '$1')
-    .replace(/\{Cus:Sap,S=(.+) P=(.+) SapTag=[^}]*\}/g, singularPlural)
+    .replace(/\{Cus:Sap,S=([^}]*?) P=([^}]*?) SapTag=[^}]*\}/g, singularPlural)
     .replace(/\{Cus:Sap,S=([^ /}]+)\/([^ .}]+)/g, singularPlural)
     .replace(/\{Cus:[^}]*\}/g, '')
     .replace(/\s+/g, ' ')

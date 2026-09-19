@@ -3,10 +3,12 @@ import { loadBundledSnapshot } from '../data/index.ts';
 import type { CharacterSkill, RosterEntry } from '../data/schema.ts';
 import { computeStats, emptySheet } from './stats.ts';
 import {
+  BUFF_IMMUNE_MOTIONS,
   computeBaseAbilityDamage,
   computeBaseDamage,
   computeCritMultiplier,
   computeDamage,
+  isBuffImmuneMotion,
   computeEchoSkillDamage,
   computeFixedStatusCritMultiplier,
   computeNegativeStatusBaseDamage,
@@ -925,5 +927,93 @@ describe('generalized Negative Status damage', () => {
     const baned = computeDamage({ ...common, targetHavocBaneStacks: 3 });
     // Only the DEF term changes: 1512 × 0.94 = 1421.28 effective DEF.
     expect(baned.damage / clean.damage).toBeCloseTo((1520 / 2941.28) / (1520 / 3032), 8);
+  });
+});
+
+describe('buff-immune fixed damage', () => {
+  const galbrena = snapshot.characters.find((c) => c.id === 'galbrena')!;
+  const forte = galbrena.skills.find((s) => s.id === '1004007')!;
+
+  it('matches the four prose-exempt snapshot rows exactly', () => {
+    expect([...BUFF_IMMUNE_MOTIONS].sort()).toEqual([
+      'galbrena|1004007|Hellstride DMG',
+      'jingran|1005901|Shadow Step DMG',
+      'luuk-herssen|1004707|Ichor Blade DMG (per 0.15s)',
+      'yangyang-xuanling|1005407|Wraith of Sound DMG',
+    ]);
+    // Every key resolves to a real snapshot row (guards name drift).
+    for (const key of BUFF_IMMUNE_MOTIONS) {
+      const [characterId, skillId, motionName] = key.split('|');
+      const character = snapshot.characters.find((c) => c.id === characterId)!;
+      const skill = character.skills.find((s) => s.id === skillId)!;
+      expect(skill.motionValues.some((m) => m.name === motionName)).toBe(true);
+    }
+  });
+
+  it('detects immunity by exact character/skill/motion triple', () => {
+    expect(isBuffImmuneMotion('galbrena', '1004007', 'Hellstride DMG')).toBe(true);
+    expect(isBuffImmuneMotion('yangyang-xuanling', '1005407', 'Wraith of Sound DMG')).toBe(true);
+    expect(isBuffImmuneMotion('jingran', '1005901', 'Shadow Step DMG')).toBe(true);
+    expect(isBuffImmuneMotion('luuk-herssen', '1004707', 'Ichor Blade DMG (per 0.15s)')).toBe(true);
+    // Near misses stay non-immune.
+    expect(isBuffImmuneMotion(undefined, '1004007', 'Hellstride DMG')).toBe(false);
+    expect(isBuffImmuneMotion('galbrena', '1004007', 'Hellstride DMG ')).toBe(false);
+    expect(isBuffImmuneMotion('galbrena', '1004003', 'Hellstride DMG')).toBe(false);
+    expect(isBuffImmuneMotion('jiyan', '1004007', 'Hellstride DMG')).toBe(false);
+    expect(isBuffImmuneMotion('luuk-herssen', '1004707', 'Ichor Blade DMG')).toBe(false);
+  });
+
+  it('scores immune rows with DmgBonusPercent=1 under stacked bonuses (hand-computed)', () => {
+    // Hellstride: ratio 0 + flat 666. Sheet stacks Fusion/basic/heavy
+    // +50% each and 20% amplify. Immune: DmgBonusPercent term = 1, so
+    // bonuses = 1 x 1.2 x 1 x 1 = 1.2; amplify still applies.
+    const sheet = emptySheet();
+    sheet['dmgBonus:Fusion'] = 0.5;
+    sheet['dmgBonus:basic'] = 0.5;
+    sheet['dmgBonus:heavy'] = 0.5;
+    sheet.amplify = 0.2;
+    const result = computeDamage({
+      sheet,
+      baseAtk: { character: 1000, weapon: 0 },
+      baseHp: { character: 10000 },
+      baseDef: { character: 1000 },
+      attackerLevel: 90,
+      skill: forte,
+      motionName: 'Hellstride DMG',
+      forteLevel: 10,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+      characterId: 'galbrena',
+    });
+    expect(result.baseDamage).toBeCloseTo(666, 9);
+    expect(result.resistances).toBeCloseTo(0.9 * (1520 / 3032), 9);
+    expect(result.bonuses).toBeCloseTo(1.2, 9);
+    expect(result.damage).toBeCloseTo(666 * 0.9 * (1520 / 3032) * 1.2, 6);
+  });
+
+  it('leaves non-immune rows unchanged (hand-computed control)', () => {
+    // Same stacked sheet on the heavy-typed Stage 1 (ratio 0.5899):
+    // DmgBonusPercent = 1 + 0.5 + 0.5 = 2.0, bonuses = 2.0 x 1.2 = 2.4.
+    const sheet = emptySheet();
+    sheet['dmgBonus:Fusion'] = 0.5;
+    sheet['dmgBonus:basic'] = 0.5;
+    sheet['dmgBonus:heavy'] = 0.5;
+    sheet.amplify = 0.2;
+    const result = computeDamage({
+      sheet,
+      baseAtk: { character: 1000, weapon: 0 },
+      baseHp: { character: 10000 },
+      baseDef: { character: 1000 },
+      attackerLevel: 90,
+      skill: forte,
+      motionName: 'Basic Attack - Seraphic Execution Stage 1 DMG',
+      forteLevel: 10,
+      enemy: standardMob(90),
+      crit: 'nonCrit',
+      characterId: 'galbrena',
+    });
+    expect(result.baseDamage).toBeCloseTo(589.9, 6);
+    expect(result.bonuses).toBeCloseTo(2.4, 9);
+    expect(result.damage).toBeCloseTo(589.9 * 0.9 * (1520 / 3032) * 2.4, 4);
   });
 });

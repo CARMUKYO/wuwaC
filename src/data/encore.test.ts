@@ -403,6 +403,16 @@ describe('stripHtml', () => {
     expect(stripHtml('gain 2 {Cus:Sap,S=stack P=stacks SapTag=5}')).toBe('gain 2 stack(s)');
   });
 
+  it('renders adjacent Sap tokens independently (no greedy spanning)', () => {
+    // Two terminated tokens plus tags: captures must not cross token braces.
+    expect(
+      stripHtml(
+        'applies <SapTag=A>2</SapTag> {Cus:Sap,S=stack P=stacks SapTag=A} stacks of Havoc Bane. ' +
+          'Gain 1 {Cus:Sap,S=time P=times SapTag=3} every 20s.',
+      ),
+    ).toBe('applies 2 stack(s) stacks of Havoc Bane. Gain 1 time(s) every 20s.');
+  });
+
   it('renders unterminated S=X/Y fragments the same way', () => {
     expect(stripHtml('gains 10 {Cus:Sap,S=point/points. Echoes with the same name')).toBe(
       'gains 10 point(s). Echoes with the same name',

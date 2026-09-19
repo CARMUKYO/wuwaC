@@ -25,18 +25,24 @@
 - [ ] **Fixed-damage buff immunity**: 4 rows' prose says immune to DMG
       Bonus ("not affected by any DMG Bonus") — the calculator has no
       immunity term and overstates them. Needs domain design.
-- [ ] **Jianxin preset missing**: Prydwen page has only prose priority
-      bullets, no step-by-step rotation — no preset file (correctly left
-      unresolved).
+- [x] **Jianxin preset**: resolved via Game8's Optimal Rotation Combo
+      (opened 2026-09-19) — 17-step preset transcribed, all mappings
+      prose-verified.
 - [x] **Prism echo costs**: decided cost 1 (Game8 1-cost ×4 opened,
       Rarity 0, CD-8s cohort, Aero sibling). Implemented as
       ECHO_COST_OVERRIDES + regen 2026-09-19 (4 costs + pools only).
 - [x] **Weapon live-conflicts**: arbitrated 2026-09-19 — 4/5 were
       wiki-wrong (provider + Game8 agree; snapshot stands, no code change).
-- [ ] **Comet Flare R5** (in-game check): only genuinely ambiguous
-      conflict — wiki/Comet pages disagree on the R5 value and no source
-      shows S4/S5. Read it in-game; contingent override drafted in
-      auditor-1's report.
+- [x] **Comet Flare R5**: resolved keep-provider (S4 5.25%, S5 6%) —
+      the 5% side is single-origin hand-entry (Fandom June 2024, no
+      citation); 3.75/5.25 fractionals are un-inventable datamine
+      values corroborated by hakush snippet. In-game read optional.
+- [x] **Fixed-damage buff immunity**: implemented 2026-09-19 —
+      4-entry immune set (Hellstride, Wraith, Shadow Step, Ichor),
+      DmgBonusPercent=1, amplify/crit/res/def still apply (narrow
+      reading, in-game-refinable).
+- [x] **stripHtml greedy spanning**: fixed 2026-09-19 — brace-safe
+      captures after multi-token leak found in Xuanling prose.
 - [x] **Starfield `{Cus:...}` markup**: fixed in stripHtml 2026-09-19
       (Ipt→PC wording, Sap→X(s), unterminated fragments, unknown dropped;
       regen verified zero tokens remain).
