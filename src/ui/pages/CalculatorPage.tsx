@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { parseEchoSkillHits } from '../../data/echoSkills.ts';
 import { findEchoDef, loadBundledSnapshot } from '../../data/index.ts';
+import { presetsForCharacter, presetToBlocks } from '../../data/rotationPresets.ts';
 import { isBuffOnlySkill } from '../../domain/characterMods.ts';
 import type { CritMode } from '../../domain/damage.ts';
 import { buildEnemyProfile } from '../../domain/enemy.ts';
-import { calculateRotation, type BlockResult } from '../../domain/rotation.ts';
+import { calculateRotation, isBlockStale, type BlockResult } from '../../domain/rotation.ts';
 import { resolveTeamBuffs } from '../../domain/teamBuffs.ts';
 import { useCalculatorStore } from '../../state/calculator.ts';
 import { useInventoryStore } from '../../state/inventory.ts';
@@ -42,6 +43,8 @@ export function CalculatorPage() {
   const loadTeams = useTeamStore((s) => s.load);
   const [importTeamId, setImportTeamId] = useState('');
   const [teamWarnings, setTeamWarnings] = useState<string[]>([]);
+  const [presetId, setPresetId] = useState('');
+  const [presetMessages, setPresetMessages] = useState<string[]>([]);
 
   useEffect(() => {
     if (!rosterLoaded) void loadRoster();
@@ -72,6 +75,25 @@ export function CalculatorPage() {
   };
 
   const character = snapshot.characters.find((c) => c.id === calc.characterId);
+  const charPresets = character ? presetsForCharacter(character.id) : [];
+  const pickedPreset = charPresets.find((p) => p.id === presetId) ?? null;
+
+  const handleLoadPreset = (): void => {
+    if (!character || !pickedPreset) return;
+    const messages: string[] = [];
+    let added = 0;
+    for (const spec of presetToBlocks(pickedPreset)) {
+      // Snapshot drift must skip loudly: a stale block would throw in scoring.
+      if (isBlockStale(character, { ...spec, id: 'preset-load-check' })) {
+        messages.push(`skipped stale step ${JSON.stringify(spec.motionName || spec.skillId)}`);
+        continue;
+      }
+      calc.addBlock(spec);
+      added += 1;
+    }
+    messages.unshift(`Loaded ${added} blocks from ${pickedPreset.label} (${pickedPreset.sourceName}).`);
+    setPresetMessages(messages);
+  };
   const weapon = snapshot.weapons.find((w) => w.id === calc.weaponId);
   const scorable = character?.skills.filter((s) => s.motionValues.length > 0) ?? [];
   // Jiyan's outro is damage (coordinated lance), not a buff carrier — it
@@ -516,6 +538,57 @@ export function CalculatorPage() {
             <p className="mt-2 text-xs text-amber-300">
               Team import: {teamWarnings.join(' ')}
             </p>
+          )}
+          {charPresets.length > 0 && (
+            <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-48 flex-1">
+                  <label htmlFor="calc-preset" className={labelClass}>
+                    Load a rotation preset
+                  </label>
+                  <select
+                    id="calc-preset"
+                    value={pickedPreset?.id ?? ''}
+                    onChange={(e) => {
+                      setPresetId(e.target.value);
+                      setPresetMessages([]);
+                    }}
+                    className={`${selectClass} mt-0.5`}
+                  >
+                    <option value="">Pick a preset…</option>
+                    {charPresets.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label} ({p.sourceName})</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLoadPreset}
+                  disabled={!pickedPreset}
+                  title="Appends the preset steps as blocks (existing blocks are kept)"
+                  className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+                >
+                  Load preset
+                </button>
+              </div>
+              {pickedPreset && (
+                <p className="mt-2 text-xs text-slate-400">
+                  Source:{' '}
+                  <a
+                    href={pickedPreset.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sky-300 hover:underline"
+                  >
+                    {pickedPreset.sourceName} guide
+                  </a>
+                  {pickedPreset.notes ? ` — ${pickedPreset.notes}` : ''}
+                </p>
+              )}
+              {presetMessages.length > 0 && (
+                <p className="mt-1 text-xs text-amber-300">{presetMessages.join(' ')}</p>
+              )}
+            </div>
           )}
           <div className="mt-2">
             <RotationTimeline
