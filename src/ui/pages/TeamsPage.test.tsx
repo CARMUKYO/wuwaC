@@ -60,7 +60,8 @@ describe('TeamsPage', () => {
         cost: 1,
         level: 0,
         rarity: 5,
-        mainStat: { stat: 'atk', value: 10 },
+        mainStat: { stat: 'atkPct', value: 0.1 },
+        secondMainStat: { stat: 'hp', value: 2280 },
         substats: [],
         equippedTo,
       });

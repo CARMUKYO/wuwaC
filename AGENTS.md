@@ -121,8 +121,9 @@ interface Team {
 - **Echoes**: 5 slots, each Cost 1/3/4; a full loadout is normally capped
   at 12 total cost (commonly 1×4 + 2×3 + 2×1). Only slot 1's Echo skill is
   usable in combat; the rest are pure stat sticks. Main stat pool depends
-  on cost (1-cost is small/flat-stat-only; 4-cost has the widest pool
-  including Crit Rate/Crit DMG/Healing Bonus). Up to 5 substats, unlocked
+  on cost (1-cost primary is HP%/ATK%/DEF%-only with a fixed flat-HP
+  secondary; 4-cost has the widest pool including Crit Rate/Crit
+  DMG/Healing Bonus). Up to 5 substats, unlocked
   by "Tuning," fixed once rolled.
 - **Sonata sets**: equipping same-Sonata Echoes grants bonuses at 2 and 5
   pieces (a few sets instead use 1/3). You can run one 5-piece set, or mix

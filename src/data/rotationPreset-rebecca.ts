@@ -16,8 +16,9 @@ export const REBECCA_ROTATION_PRESETS: RotationPreset[] = [
       'Intro and Skill map to the Huntress-mode rows per the skill prose (both switch to Guts mode). ' +
       '"Ultimate" maps to the base Mk. 31 HMG row; the two enhancements need separate presses per the ' +
       'liberation prose, are not guide steps, and are omitted. ' +
-      'Note: the snapshot carries two identically-named "Heavy Attack - Guts DMG" rows (heavy/basic); ' +
-      'the resolver takes the first. ' +
+      'Note: the provider ships a second "Heavy Attack - Guts DMG" row (an STA-cost row ' +
+      'mislabeled DMG); the sync drops same-name duplicates keeping the first, so this ' +
+      'maps unambiguously to the Heavy row. ' +
       'Omitted: the bare "Jump" line (movement, no snapshot motion); the Echo timing line (echo skill). ' +
       'The page also details an Opener Rotation (not transcribed).',
     steps: [

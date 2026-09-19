@@ -13,35 +13,43 @@
       untranscribed (wielder cast-buffs can't carry windows — model gap).
 
 ## In progress
-- [ ] **Rotation presets** — per-character preset rotations (Prydwen-sourced),
+- [x] **Rotation presets** — per-character preset rotations (Prydwen-sourced),
       transcribed by the auditors. See brief in orchestrator session.
 
 ## Sync follow-ups (found during preset review 2026-09-19)
-- [ ] **All-zero motion rows**: 8 snapshot rows with 20 zero values (danjin
-      Chaoscleave Healing, brant Healing + Waves of Acclaims Healing,
-      galbrena Hellstride DMG, luuk-herssen Ichor Blade, rebecca second
-      Heavy Attack - Guts DMG, xuanling Wraith of Sound, jingran Shadow
-      Step). They show in the picker as 0% motions. Decide: drop at sync
-      or flag. No preset maps one.
+- [x] **All-zero motion rows**: triaged 2026-09-19 — the 7 kept rows all
+      carry flat values (3 heals + 4 fixed-damage), so no blind drop rule.
+      Implemented: same-name duplicate drop (Rebecca STA row gone) +
+      all-zero-ratio audit warning + 3 considered-Basic retypes
+      (Hellstride, Wraith of Sound, Shadow Step).
+- [ ] **Fixed-damage buff immunity**: 4 rows' prose says immune to DMG
+      Bonus ("not affected by any DMG Bonus") — the calculator has no
+      immunity term and overstates them. Needs domain design.
 - [ ] **Jianxin preset missing**: Prydwen page has only prose priority
       bullets, no step-by-step rotation — no preset file (correctly left
       unresolved).
 - [x] **Prism echo costs**: decided cost 1 (Game8 1-cost ×4 opened,
       Rarity 0, CD-8s cohort, Aero sibling). Implemented as
       ECHO_COST_OVERRIDES + regen 2026-09-19 (4 costs + pools only).
-- [ ] **Weapon live-conflicts (direction unknown, presets follow snapshot)**:
-      Comet Flare rank series, Blazing Brilliance 12s-vs-10s expiry,
-      Starfield Calibrator Skill-vs-Liberation trigger, Skull Thrasher +
-      Whispers of Sirens passive names. Needs provider re-check/in-game
-      truth; cannot hand-edit snapshot.
-- [ ] **Starfield `{Cus:...}` markup** leaking into passive description and
-      params (sync text-cleaning wart).
+- [x] **Weapon live-conflicts**: arbitrated 2026-09-19 — 4/5 were
+      wiki-wrong (provider + Game8 agree; snapshot stands, no code change).
+- [ ] **Comet Flare R5** (in-game check): only genuinely ambiguous
+      conflict — wiki/Comet pages disagree on the R5 value and no source
+      shows S4/S5. Read it in-game; contingent override drafted in
+      auditor-1's report.
+- [x] **Starfield `{Cus:...}` markup**: fixed in stripHtml 2026-09-19
+      (Ipt→PC wording, Sap→X(s), unterminated fragments, unknown dropped;
+      regen verified zero tokens remain).
+- [x] **Echo pool cross-check**: closed 2026-09-19 — Prydwen echo-stats
+      page corrected the model: 1-cost primary is HP%/ATK%/DEF%-only with
+      fixed flat-HP secondary (flats are secondary-only). Pools, Kamera
+      importer, docs, and 85 echo defs updated; placeholders TODO resolved.
 
 ## User-side reminders
 - [ ] **Chisa ring-bonus units** — needs in-game tooltip observation; no citable
       source exists.
 - [ ] **`.agents/` untracked dir** — planner output; keep or delete.
-- [ ] **README `Agents.md` link fix** — trivial, pending.
+- [x] **README `Agents.md` link fix** — done 2026-09-19.
 
 ## Prior roadmap (preserved 2026-09-19)
 

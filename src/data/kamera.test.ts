@@ -24,14 +24,14 @@ const MEMPHIS_ROW = {
   },
 };
 
-/** 1-cost row: single flat main, no secondary, no substats yet. */
+/** 1-cost row: % primary + fixed flat-HP secondary, no substats yet. */
 const HOOSCAMP_ROW = {
   Hooscamp: {
     level: 0,
     tuneLv: 0,
     sonata: 'Sierra Gale',
     rarity: 5,
-    stats: { main: { atk: 60 }, sub: {} },
+    stats: { main: { 'atk%': 18.0, hp: 2280 }, sub: {} },
   },
 };
 
@@ -65,14 +65,15 @@ describe('kamera echo files', () => {
       ],
       equippedTo: null,
     });
-    // 1-cost: the lone `atk` entry is the main stat, not a secondary.
+    // 1-cost: % primary plus fixed flat-HP secondary.
     expect(drafts[1]).toEqual({
       echoDefId: 'hooscamp',
       sonataId: 'sierra-gale',
       cost: 1,
       level: 0,
       rarity: 5,
-      mainStat: { stat: 'atk', value: 60 },
+      mainStat: { stat: 'atkPct', value: 0.18 },
+      secondMainStat: { stat: 'hp', value: 2280 },
       substats: [],
       equippedTo: null,
     });
@@ -85,7 +86,11 @@ describe('kamera echo files', () => {
     );
     expect(issues).toEqual([]);
     expect(drafts).toEqual([
-      expect.objectContaining({ echoDefId: 'hooscamp', mainStat: { stat: 'atk', value: 60 } }),
+      expect.objectContaining({
+        echoDefId: 'hooscamp',
+        mainStat: { stat: 'atkPct', value: 0.18 },
+        secondMainStat: { stat: 'hp', value: 2280 },
+      }),
     ]);
   });
 
@@ -157,14 +162,14 @@ describe('kamera echo files', () => {
       {
         hooscamp: {
           ...HOOSCAMP_DATA,
-          stats: { main: { atk: 60 }, sub: { nosuchstat: 5 } },
+          stats: { main: { 'atk%': 18.0, hp: 2280 }, sub: { nosuchstat: 5 } },
         },
       },
       // Duplicate substats after mapping (`cr` and `cr%` are both Crit Rate).
       {
         hooscamp: {
           ...HOOSCAMP_DATA,
-          stats: { main: { atk: 60 }, sub: { cr: 5, 'cr%': 6 } },
+          stats: { main: { 'atk%': 18.0, hp: 2280 }, sub: { cr: 5, 'cr%': 6 } },
         },
       },
       // Six substats.
@@ -172,7 +177,7 @@ describe('kamera echo files', () => {
         hooscamp: {
           ...HOOSCAMP_DATA,
           stats: {
-            main: { atk: 60 },
+            main: { 'atk%': 18.0, hp: 2280 },
             sub: { hp: 1, atk: 2, def: 3, 'hp%': 4, 'atk%': 5, 'def%': 6 },
           },
         },
@@ -230,7 +235,7 @@ describe('kamera echo files', () => {
           tuneLv: 0,
           sonata: 'sierragale',
           rarity: 5,
-          stats: { main: { atk: 60 }, sub: {} },
+          stats: { main: { 'atk%': 18.0, hp: 2280 }, sub: {} },
         },
       },
     ]);

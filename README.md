@@ -4,7 +4,7 @@ Local-first web app for Wuthering Waves: a personal Echo inventory plus a
 solver that searches your own Echoes for the best build per character —
 the Genshin Optimizer loop, translated to Echoes/Sonatas and (v2) teams.
 
-Project memory and architecture rules: [`Agents.md`](Agents.md).
+Project memory and architecture rules: [`AGENTS.md`](AGENTS.md).
 Game-mechanics ground truth: [`docs/WUWA_GAME_REFERENCE.md`](docs/WUWA_GAME_REFERENCE.md).
 
 ```bash

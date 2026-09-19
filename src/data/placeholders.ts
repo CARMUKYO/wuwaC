@@ -9,17 +9,18 @@ import type { StatKey } from './schema.ts';
  * verbatim onto every Echo def of that cost. Primary pools below are
  * transcribed from docs/echostats.md §1; the substat pool from §2.
  *
- * TODO: cross-check against a live source on the next sync pass — the
- * 1-cost flats and the fixed flat-ATK secondary on 3/4-cost Echoes follow
- * the mechanics reference (docs/WUWA_GAME_REFERENCE.md §2), not the guide.
+ * Cross-checked 2026-09-19 against Prydwen's Echoes Stats guide
+ * (https://www.prydwen.gg/wuthering-waves/guides/echo-stats): every Echo
+ * has 2 main stats; flats are secondary-only; 1-cost secondary is fixed
+ * flat HP, 3/4-cost secondary fixed flat ATK.
  */
 
 /** Main-stat pool per Echo cost tier (docs/echostats.md §1). */
 export const MAIN_STAT_POOLS: Record<1 | 3 | 4, { primary: StatKey[]; secondary: StatKey | null }> = {
-  // 1-cost: small pool — flats plus HP%/ATK%/DEF%; no Crit, ER, or elementals.
+  // 1-cost: HP%/ATK%/DEF% primary plus fixed flat-HP secondary; no Crit, ER, or elementals.
   1: {
-    primary: ['hp', 'atk', 'def', 'hpPct', 'atkPct', 'defPct'],
-    secondary: null,
+    primary: ['hpPct', 'atkPct', 'defPct'],
+    secondary: 'hp',
   },
   // 3-cost: % stats + Energy Regen + all six elementals, plus fixed flat-ATK secondary.
   3: {

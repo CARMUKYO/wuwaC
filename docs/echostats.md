@@ -3,9 +3,10 @@
 Use this data to populate sliders, dropdowns, and validation logic in the Echo Editor.
 
 ## 1. Main Stat Values (5-Star / Rarity 5 Max Level)
-*Note: Primary and Secondary main stats cannot be identical. Values below reflect Level 25 stats.*
+*Note: Primary and Secondary main stats cannot be identical. Values below reflect Level 25 stats. Every Echo has 2 main stats: a randomized primary (tables below) plus a fixed secondary — flat HP on 1-cost, flat ATK on 3/4-cost (flats are secondary-only, never primary).*
 
 ### 1-Cost Echoes
+Secondary: flat HP (fixed).
 | Stat | Value (Min - Max) |
 | :--- | :--- |
 | HP% | 4.5% - 22.8% |

@@ -208,7 +208,7 @@ describe('InventoryPage', () => {
               tuneLv: 0,
               sonata: 'sierragale',
               rarity: 5,
-              stats: { main: { atk: 60 }, sub: {} },
+              stats: { main: { 'atk%': 18.0, hp: 2280 }, sub: {} },
             },
           },
         ]),

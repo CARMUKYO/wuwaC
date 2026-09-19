@@ -388,7 +388,7 @@ export const ownedEchoSchema = z
     level: z.number().int().min(0).max(25),
     rarity: z.number().int().min(1).max(5),
     mainStat: z.object({ stat: statKeySchema, value: z.number() }),
-    /** 3/4-cost Echoes carry a fixed flat-ATK secondary (reference doc §2). */
+    /** Fixed secondary: flat HP on 1-cost, flat ATK on 3/4-cost (reference doc §2). */
     secondMainStat: z
       .object({ stat: statKeySchema, value: z.number() })
       .optional(),

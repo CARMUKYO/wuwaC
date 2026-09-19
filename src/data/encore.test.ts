@@ -3,6 +3,7 @@ import {
   applyEchoCostOverride,
   applyMotionTypeOverride,
   bonusKindFromDamageType,
+  dedupeMotions,
   echoCostFromIntensity,
   echoCostFromRarity,
   echoSkipReasonForName,
@@ -139,6 +140,25 @@ describe('partitionUsableMotions', () => {
   });
 });
 
+describe('dedupeMotions', () => {
+  it('keeps the first same-name row and drops later ones', () => {
+    const motions = [
+      { name: 'Heavy Attack - Guts DMG', values: [2.02] },
+      { name: 'Stage 1 DMG', values: [1.23] },
+      { name: 'Heavy Attack - Guts DMG', values: [0] },
+    ];
+    const { kept, dropped } = dedupeMotions(motions);
+    expect(kept).toEqual([motions[0], motions[1]]);
+    expect(dropped).toEqual([motions[2]]);
+  });
+
+  it('passes duplicate-free lists through untouched', () => {
+    const motions = [{ name: 'A' }, { name: 'B' }];
+    expect(dedupeMotions(motions)).toEqual({ kept: motions, dropped: [] });
+    expect(dedupeMotions([])).toEqual({ kept: [], dropped: [] });
+  });
+});
+
 describe('applyMotionTypeOverride', () => {
   it('retypes the three prose-verified contradictions', () => {
     expect(applyMotionTypeOverride('1001707', 'Umbra: Thwackblade Damage', 'basic')).toBe('heavy');
@@ -147,10 +167,17 @@ describe('applyMotionTypeOverride', () => {
     expect(applyMotionTypeOverride('1004903', 'Spoofing Program: Cripple Movement DMG', 'heavy')).toBe('liberation');
   });
 
+  it('retypes fixed-damage rows whose prose says considered-Basic', () => {
+    expect(applyMotionTypeOverride('1004007', 'Hellstride DMG', 'heavy')).toBe('basic');
+    expect(applyMotionTypeOverride('1005407', 'Wraith of Sound DMG', 'heavy')).toBe('basic');
+    expect(applyMotionTypeOverride('1005901', 'Shadow Step DMG', 'heavy')).toBe('basic');
+  });
+
   it('passes everything else through untouched', () => {
     expect(applyMotionTypeOverride('1001707', 'Umbra: Heavy Attack DMG', 'heavy')).toBe('heavy');
     expect(applyMotionTypeOverride('1000607', 'Resonating Spin DMG', 'skill')).toBe('skill');
     expect(applyMotionTypeOverride('1004903', 'Spoofing Program: Ping DMG', 'heavy')).toBe('heavy');
+    expect(applyMotionTypeOverride('1004007', 'Dodge Counter - Purgatory Scourge', 'heavy')).toBe('heavy');
     expect(applyMotionTypeOverride('9999999', 'Anything', 'basic')).toBe('basic');
   });
 });
@@ -349,6 +376,45 @@ describe('applyEchoCostOverride', () => {
     expect(applyEchoCostOverride('6000095', 1)).toBe(1); // Aero Prism
     expect(applyEchoCostOverride('999999999', 3)).toBe(3);
     expect(applyEchoCostOverride('390077012', 1)).toBe(1);
+  });
+});
+
+describe('stripHtml', () => {
+  it('strips tags and entities', () => {
+    expect(stripHtml('<span style="x">12%</span> DMG&nbsp;bonus')).toBe('12% DMG bonus');
+  });
+
+  it('resolves input tokens to the PC wording', () => {
+    expect(stripHtml('{Cus:Ipt,Touch=Tap PC=Press Gamepad=Press} Echo Skill to transform')).toBe(
+      'Press Echo Skill to transform',
+    );
+    expect(stripHtml('{Cus:Ipt,Touch=tap PC=press Gamepad=pess} Normal Attack')).toBe(
+      'press Normal Attack',
+    );
+  });
+
+  it('renders singular/plural tokens with (s)', () => {
+    expect(stripHtml('triggered 1 {Cus:Sap,S=time P=times SapTag=3} every 20s')).toBe(
+      'triggered 1 time(s) every 20s',
+    );
+    expect(stripHtml('grants 1 {Cus:Sap,S=Dark Core P=Dark Cores SapTag=A}')).toBe(
+      'grants 1 Dark Core(s)',
+    );
+    expect(stripHtml('gain 2 {Cus:Sap,S=stack P=stacks SapTag=5}')).toBe('gain 2 stack(s)');
+  });
+
+  it('renders unterminated S=X/Y fragments the same way', () => {
+    expect(stripHtml('gains 10 {Cus:Sap,S=point/points. Echoes with the same name')).toBe(
+      'gains 10 point(s). Echoes with the same name',
+    );
+    expect(stripHtml('restores 1 {Cus:Sap,S=point/points of Azure Plume.')).toBe(
+      'restores 1 point(s) of Azure Plume.',
+    );
+  });
+
+  it('drops unknown token shapes without leaking braces', () => {
+    expect(stripHtml('deal DMG{Cus:New,X=1} now')).toBe('deal DMG now');
+    expect(stripHtml('{Cus:Sap,S=lone} end')).toBe('end');
   });
 });
 

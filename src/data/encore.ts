@@ -118,11 +118,51 @@ export function partitionUsableMotions<T extends { name: string; values: readonl
   return { kept, dropped };
 }
 
-/** Strip provider markup ("<span …>12%</span>" -> "12%"). */
+/**
+ * Drop same-skill rows whose name duplicates an earlier-kept row (sync
+ * zero-row triage 2026-09-19). Keep-first mirrors resolveMotion's .find,
+ * so dropped rows already score nothing today (Rebecca's STA-cost row
+ * mislabeled "Heavy Attack - Guts DMG" is the only known case; all 31
+ * genuine hybrids are single-row, so damage never splits). The caller
+ * warns loudly per row — if a future duplicate orders zero-first, the
+ * warning is the safety net.
+ */
+export function dedupeMotions<T extends { name: string }>(
+  motions: readonly T[],
+): { kept: T[]; dropped: T[] } {
+  const seen = new Set<string>();
+  const kept: T[] = [];
+  const dropped: T[] = [];
+  for (const motion of motions) {
+    if (seen.has(motion.name)) {
+      dropped.push(motion);
+    } else {
+      seen.add(motion.name);
+      kept.push(motion);
+    }
+  }
+  return { kept, dropped };
+}
+
+/**
+ * Strip provider markup ("<span …>12%</span>" -> "12%") and resolve
+ * localization tokens: `{Cus:Ipt,...}` input prompts resolve to the PC
+ * wording ("Press"); `{Cus:Sap,S=X P=Y ...}` singular/plural tokens render
+ * as "X(s)" ("1 time(s)", "2 stack(s)") because rank-varying counts
+ * cannot pick a side. The provider also emits unterminated
+ * `{Cus:Sap,S=X/Y` fragments (no closing brace) — same rendering.
+ * Unknown token shapes are dropped, never leaked.
+ */
 export function stripHtml(text: string): string {
+  const singularPlural = (_match: string, singular: string, plural: string): string =>
+    plural === `${singular}s` ? `${singular}(s)` : `${singular}/${plural}`;
   return text
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/g, ' ')
+    .replace(/\{Cus:Ipt,[^}]*?PC=([A-Za-z]+)[^}]*\}/g, '$1')
+    .replace(/\{Cus:Sap,S=(.+) P=(.+) SapTag=[^}]*\}/g, singularPlural)
+    .replace(/\{Cus:Sap,S=([^ /}]+)\/([^ .}]+)/g, singularPlural)
+    .replace(/\{Cus:[^}]*\}/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -379,6 +419,27 @@ export const MOTION_TYPE_OVERRIDES: readonly MotionTypeOverride[] = [
     dmgType: 'liberation',
     reason:
       'Prose "Deals Hack DMG" withholds the considered-Heavy clause its three sibling programs carry; S6 treats Hack DMG as its own category; cf. Data Crash (Hack, non-heavy). Parent-kind fallback.',
+  },
+  {
+    skillId: '1004007',
+    motionName: 'Hellstride DMG',
+    dmgType: 'basic',
+    reason:
+      'Forte prose: "deal a fixed amount of Fusion DMG, considered Basic Attack DMG"; provider types Heavy.',
+  },
+  {
+    skillId: '1005407',
+    motionName: 'Wraith of Sound DMG',
+    dmgType: 'basic',
+    reason:
+      'Prose: "deal a fixed instance of Havoc DMG, considered Basic Attack DMG"; provider types Heavy.',
+  },
+  {
+    skillId: '1005901',
+    motionName: 'Shadow Step DMG',
+    dmgType: 'basic',
+    reason:
+      'Prose: "dealing fix amount of Fusion DMG, considered Basic Attack DMG"; provider types Heavy.',
   },
 ];
 

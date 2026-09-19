@@ -8,9 +8,9 @@ import { MAIN_STAT_POOLS, SUBSTAT_POOL } from './placeholders.ts';
  * re-synced with per-echo Handbook pools instead of cost tiers).
  */
 describe('echo cost-tier pools', () => {
-  it('gives 1-cost echoes the small pool (flats + HP%/ATK%/DEF%, no Crit/ER/elemental)', () => {
-    expect(MAIN_STAT_POOLS[1].primary).toEqual(['hp', 'atk', 'def', 'hpPct', 'atkPct', 'defPct']);
-    expect(MAIN_STAT_POOLS[1].secondary).toBeNull();
+  it('gives 1-cost echoes % primary + fixed flat-HP secondary (no Crit/ER/elemental)', () => {
+    expect(MAIN_STAT_POOLS[1].primary).toEqual(['hpPct', 'atkPct', 'defPct']);
+    expect(MAIN_STAT_POOLS[1].secondary).toBe('hp');
   });
 
   it('gives 3-cost echoes % stats + Energy Regen + all six elementals', () => {

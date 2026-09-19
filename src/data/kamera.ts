@@ -267,12 +267,13 @@ function mapOneRow(
     }
     mapped.push(stat);
   }
-  // The flat-ATK entry is the fixed secondary on 3/4-cost echoes
-  // (reference doc §2); on 1-cost echoes a lone `atk` is the main stat.
-  const primary = mapped.filter((m) => !(def.cost !== 1 && m.stat === 'atk'));
-  const secondary = mapped.filter((m) => def.cost !== 1 && m.stat === 'atk');
+  // Fixed secondaries (reference doc §2): flat ATK on 3/4-cost echoes,
+  // flat HP on 1-cost echoes. Anything else in main entries is the primary.
+  const secondaryStat = def.cost === 1 ? 'hp' : 'atk';
+  const primary = mapped.filter((m) => m.stat !== secondaryStat);
+  const secondary = mapped.filter((m) => m.stat === secondaryStat);
   if (primary.length !== 1 || secondary.length > 1) {
-    fail(`echo ${JSON.stringify(key)} has ${mainEntries.length} main-stat entries, expected 1${def.cost !== 1 ? ' (+ flat ATK secondary)' : ''} — skipped`);
+    fail(`echo ${JSON.stringify(key)} has ${mainEntries.length} main-stat entries, expected 1 (+ fixed ${secondaryStat} secondary) — skipped`);
     return;
   }
   if (!def.allowedMainStats.includes(primary[0].stat)) {

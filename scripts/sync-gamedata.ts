@@ -36,6 +36,7 @@ import {
   applyEchoCostOverride,
   applyMotionTypeOverride,
   bonusKindFromDamageType,
+  dedupeMotions,
   echoCostFromIntensity,
   echoCostFromRarity,
   echoSkipReasonForName,
@@ -295,6 +296,17 @@ function normalizeCharacter(raw: unknown, fetchedAt: string, iconUrl?: string): 
       skippedAttributes += 1;
     }
     motionValues.splice(0, motionValues.length, ...kept);
+    const { kept: deduped, dropped: duplicates } = dedupeMotions(motionValues);
+    for (const d of duplicates) {
+      warn(`${name}.${s.SkillName}.${d.name}: duplicate row dropped, kept first (${d.values.length} values, Lv1 ratio ${d.values[0] ?? 'n/a'})`);
+      skippedAttributes += 1;
+    }
+    motionValues.splice(0, motionValues.length, ...deduped);
+    for (const m of motionValues) {
+      if (m.values.length > 0 && m.values.every((v) => v === 0)) {
+        warn(`${name}.${s.SkillName}.${m.name}: all-zero ratios kept (Lv1 flat ${m.flatValues?.[0] ?? 0}) — triage if new`);
+      }
+    }
     const skillProse = stripHtml(s.SkillDescribe ?? '');
     skills.push({
       id: String(s.SkillId),

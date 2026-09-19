@@ -82,8 +82,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
   // values, so anything above max is impossible at any level/rarity —
   // while below-min is legitimate for unleveled echoes (hence only the
   // top is checked, and submit is never blocked). Pairs the reference
-  // does not list (1-cost flats, flat-ATK secondary, healingBonus subs)
-  // are unchecked.
+  // does not list (fixed secondaries, healingBonus subs) are unchecked.
   const overMax: string[] = [];
   if (def) {
     const mainMax = MAIN_STAT_RANGES[def.cost][values.mainStat.stat]?.max;
@@ -188,7 +187,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
       fail(`Main stat value is not a valid ${isPercentStat(values.mainStat.stat) ? 'percent' : 'number'}.`);
     }
 
-    // Fixed flat-ATK secondary on 3/4-cost Echoes (reference doc §2).
+    // Fixed secondary: flat HP on 1-cost, flat ATK on 3/4 (reference doc §2).
     const secondaryStat = def ? MAIN_STAT_POOLS[def.cost].secondary : null;
     let secondMainStat: EchoDraft['secondMainStat'];
     const secondText = values.secondMainStat?.valueText.trim() ?? '';

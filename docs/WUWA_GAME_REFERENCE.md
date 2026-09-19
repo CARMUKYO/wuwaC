@@ -44,11 +44,12 @@ user's chosen objective.
   split as a rule, only as a default/common case.
 - Only the Echo in **slot 1** has its active Echo Skill usable in combat;
   the other 4 slots are pure stat pieces regardless of order.
-- **Main stats**: every Echo has 1–2 main stats fixed at drop (not
+- **Main stats**: every Echo has 2 main stats fixed at drop (not
   rerollable), which scale up as the Echo is leveled (max level depends on
-  rarity, up to +25 for 5★). The main-stat *pool* depends on Cost:
-  - 1-cost: small pool, generally flat ATK/HP/DEF and similarly modest
-    options — no Crit stats.
+  rarity, up to +25 for 5★): a randomized primary plus a fixed secondary
+  (flat HP on 1-cost, flat ATK on 3/4-cost — flats are secondary-only).
+  The primary *pool* depends on Cost:
+  - 1-cost: small pool — HP%/ATK%/DEF% only, no Crit stats.
   - 3-cost: adds Attribute DMG Bonus and Energy Regen to the pool, plus a
     fixed flat-ATK secondary main stat.
   - 4-cost: the widest pool, including Crit Rate, Crit DMG, and Healing
