@@ -140,11 +140,12 @@ describe('cartethyiaMotionMultiplier', () => {
   });
 
   it('grants S2 +200% to base-form mid-air attacks', () => {
-    // "Mid-air Attack - Cartethyia" is real (S2 page links it under Normal
-    // Attack) but has no snapshot motion row yet — synthetic name pins the
-    // branch for when it syncs. Fleurdelys mid-airs stay excluded (above).
-    expect(cartethyiaMotionMultiplier('cartethyia', 2, basic, 'Mid-air Attack - Cartethyia DMG', 0)).toBe(3);
-    expect(cartethyiaMotionMultiplier('cartethyia', 1, basic, 'Mid-air Attack - Cartethyia DMG', 0)).toBe(1);
+    // Real basic-skill rows since the sync-name-filter fix (previously a
+    // synthetic name pinned this branch). Fleurdelys mid-airs stay excluded
+    // (above).
+    expect(cartethyiaMotionMultiplier('cartethyia', 2, basic, 'Mid-air Attack', 0)).toBe(3);
+    expect(cartethyiaMotionMultiplier('cartethyia', 2, basic, 'Mid-air Attack 1 Sword Shadow Recalled', 0)).toBe(3);
+    expect(cartethyiaMotionMultiplier('cartethyia', 1, basic, 'Mid-air Attack', 0)).toBe(1);
   });
 
   it('doubles Blade of Howling Squall at S3 (case-insensitive)', () => {

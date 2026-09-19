@@ -33,6 +33,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { z } from 'zod';
 import {
+  applyMotionTypeOverride,
   bonusKindFromDamageType,
   echoCostFromIntensity,
   echoCostFromRarity,
@@ -42,6 +43,7 @@ import {
   parseAttribute,
   parseMotionText,
   parsePercentText,
+  partitionUsableMotions,
   resolveMotionBonusKind,
   resolveMotionScaling,
   scalingFromPropertyName,
@@ -252,7 +254,7 @@ function normalizeCharacter(raw: unknown, fetchedAt: string, iconUrl?: string): 
       }
     }
     const motionValues = s.SkillAttributes.filter((a) => {
-      const keep = isScalingAttribute(a.attributeName);
+      const keep = isScalingAttribute(a.attributeName, a.values);
       if (!keep) skippedAttributes += 1;
       return keep;
     }).map((a) => {
@@ -266,7 +268,11 @@ function normalizeCharacter(raw: unknown, fetchedAt: string, iconUrl?: string): 
         name: a.attributeName,
         values: parsed.map((p) => p.ratio),
         hits,
-        dmgType: resolveMotionBonusKind(s.SkillType, a.values[0] ?? '', damageEntries),
+        dmgType: applyMotionTypeOverride(
+          String(s.SkillId),
+          a.attributeName,
+          resolveMotionBonusKind(s.SkillType, a.values[0] ?? '', damageEntries),
+        ),
         scaling: resolveMotionScaling(
           a.values[0] ?? '',
           s.DamageList.filter(
@@ -282,21 +288,12 @@ function normalizeCharacter(raw: unknown, fetchedAt: string, iconUrl?: string): 
       }
       return entry;
     });
-    const lengths = new Set(motionValues.map((m) => m.values.length));
-    if (lengths.size > 1) {
-      // Lengths index by forte level, so misaligned arrays cannot be used.
-      // Keep the majority length (healing/metadata rows sometimes ship
-      // shorter) and skip the rest loudly instead of failing the character.
-      const counts = new Map<number, number>();
-      for (const m of motionValues) counts.set(m.values.length, (counts.get(m.values.length) ?? 0) + 1);
-      const keepLength = [...counts].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0];
-      const dropped = motionValues.filter((m) => m.values.length !== keepLength);
-      for (const d of dropped) {
-        warn(`${name}.${s.SkillName}.${d.name}: ${d.values.length} values vs ${keepLength}, skipped`);
-        skippedAttributes += 1;
-      }
-      motionValues.splice(0, motionValues.length, ...motionValues.filter((m) => m.values.length === keepLength));
+    const { kept, dropped } = partitionUsableMotions(motionValues);
+    for (const d of dropped) {
+      warn(`${name}.${s.SkillName}.${d.name}: ${d.values.length} values, need >= 10 for forte levels 1-10, skipped`);
+      skippedAttributes += 1;
     }
+    motionValues.splice(0, motionValues.length, ...kept);
     const skillProse = stripHtml(s.SkillDescribe ?? '');
     skills.push({
       id: String(s.SkillId),

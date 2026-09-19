@@ -310,12 +310,14 @@ describe('chain motion entries', () => {
         run('hiyuki', 'basic', 'Basic Attack - Present Self Stage 1 DMG', 0),
     ).toBeCloseTo(1, 10);
     // Lucy S6: Hack-typed motions gain ×1.6 on top of the S3 parts (which
-    // cancel in the S6/S5 ratio); Cripple Movement also carries the ×1.4
-    // Heavy-taken rider via its provider Heavy typing.
+    // cancel in the S6/S5 ratio). Cripple Movement is pure Hack DMG (its
+    // prose withholds the considered-Heavy clause its siblings carry), so
+    // the sync retypes it to liberation and the ×1.4 Heavy-taken rider no
+    // longer applies — Data Crash and Cripple Movement agree at ×1.6.
     expect(
       run('lucy', 'liberation', 'Spoofing Program: Cripple Movement DMG', 6) /
         run('lucy', 'liberation', 'Spoofing Program: Cripple Movement DMG', 5),
-    ).toBeCloseTo(1.4 * 1.6, 10);
+    ).toBeCloseTo(1.6, 10);
     expect(
       run('lucy', 'forte', 'Hack Response - Data Crash DMG', 6) /
         run('lucy', 'forte', 'Hack Response - Data Crash DMG', 5),
@@ -419,6 +421,55 @@ describe('chain motion entries', () => {
       10,
     );
     expect(run('Glare DMG', 2) / run('Glare DMG', 1)).toBeCloseTo(1, 10);
+  });
+
+  it('doubles Suisui Heavy Drizzle at S5 like its Basic sibling', () => {
+    // S5: both Drizzle Stance multipliers +100%. The Heavy row only exists
+    // since the sync-name-filter fix; S5-vs-S4 isolates S5 (S2 critDmg is
+    // sheet-scope, invisible to this hand sheet; S6 critDmg gated off).
+    const suisui = snapshot.characters.find((c) => c.id === 'suisui')!;
+    const forte = suisui.skills.find((s) => s.kind === 'forte')!;
+    const run = (resonanceChain: number): number =>
+      computeDamage({
+        sheet: emptySheet(),
+        baseAtk: { character: 100, weapon: 0 },
+        baseHp: { character: 10000 },
+        baseDef: { character: 100 },
+        attackerLevel: 90,
+        skill: forte,
+        motionName: 'Heavy Attack - Drizzle Stance',
+        forteLevel: 10,
+        enemy: standardMob(90),
+        crit: 'nonCrit',
+        characterId: 'suisui',
+        resonanceChain,
+      }).damage;
+    expect(run(5) / run(4)).toBeCloseTo(2, 10);
+  });
+
+  it('amplifies Lynae Polychrome Leap x2.2 at S1', () => {
+    // S1: Polychrome Leap multiplier +120%. The Leap rows only exist since
+    // the sync-name-filter fix; S1-vs-S0 isolates S1 (the lynaeSkillMods
+    // Premixed Hue rider is S3-gated and Additive-Color-only, neutral both
+    // sides).
+    const lynae = snapshot.characters.find((c) => c.id === 'lynae')!;
+    const forte = lynae.skills.find((s) => s.kind === 'forte')!;
+    const run = (resonanceChain: number): number =>
+      computeDamage({
+        sheet: emptySheet(),
+        baseAtk: { character: 100, weapon: 0 },
+        baseHp: { character: 10000 },
+        baseDef: { character: 100 },
+        attackerLevel: 90,
+        skill: forte,
+        motionName: 'Basic Attack - Polychrome Leap 1',
+        forteLevel: 10,
+        enemy: standardMob(90),
+        crit: 'nonCrit',
+        characterId: 'lynae',
+        resonanceChain,
+      }).damage;
+    expect(run(1) / run(0)).toBeCloseTo(2.2, 10);
   });
 });
 

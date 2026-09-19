@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyMotionTypeOverride,
   bonusKindFromDamageType,
   echoCostFromIntensity,
   echoCostFromRarity,
@@ -9,6 +10,7 @@ import {
   parseAttribute,
   parseMotionText,
   parsePercentText,
+  partitionUsableMotions,
   percentTermsOf,
   resolveMotionBonusKind,
   resolveMotionScaling,
@@ -62,13 +64,93 @@ describe('parseMotionText', () => {
 
 describe('isScalingAttribute', () => {
   it('keeps damage/healing, drops rotation metadata', () => {
-    expect(isScalingAttribute('Stage 1 DMG')).toBe(true);
-    expect(isScalingAttribute('Emerald Storm: Finale Damage')).toBe(true);
-    expect(isScalingAttribute('Arboreal Flourish Healing')).toBe(true);
-    expect(isScalingAttribute('Cooldown')).toBe(false);
-    expect(isScalingAttribute('Concerto Regen')).toBe(false);
-    expect(isScalingAttribute('Heavy Attack STA Cost')).toBe(false);
-    expect(isScalingAttribute('Resonance Cost')).toBe(false);
+    expect(isScalingAttribute('Stage 1 DMG', ['36.80%'])).toBe(true);
+    expect(isScalingAttribute('Emerald Storm: Finale Damage', ['101.20%'])).toBe(true);
+    expect(isScalingAttribute('Arboreal Flourish Healing', ['500+11.33%'])).toBe(true);
+    expect(isScalingAttribute('Cooldown', ['12'])).toBe(false);
+    expect(isScalingAttribute('Concerto Regen', ['8'])).toBe(false);
+    expect(isScalingAttribute('Heavy Attack STA Cost', ['30'])).toBe(false);
+    expect(isScalingAttribute('Resonance Cost', ['100'])).toBe(false);
+  });
+
+  it('keeps bare damage names with percent values (surveyed provider rows)', () => {
+    // Each verified live in its provider record (sync items 1-2 + survey).
+    expect(isScalingAttribute('Mid-air Attack', ['62.00%'])).toBe(true); // Encore 1203 / Aalto / Iuno
+    expect(isScalingAttribute('Heavy Attack', ['14.58%*3+18.75%'])).toBe(true); // Changli 1205 / Lupa
+    expect(isScalingAttribute('Mid-air Heavy Attack', ['62.00%'])).toBe(true); // Changli 1205
+    expect(isScalingAttribute('Dodge Counter', ['41.57%*3'])).toBe(true); // Changli 1205
+    expect(isScalingAttribute('Hounds Roar Stage 2', ['17.72%*2+26.58%*2'])).toBe(true); // Calcharo 1301
+    expect(isScalingAttribute('Yellow Light: Basic Attack', ['16.00%*3'])).toBe(true); // Lumi 1504
+    expect(isScalingAttribute('Glitter', ['32.00%'])).toBe(true); // Lumi 1504
+    expect(isScalingAttribute('Yellow Light: Plunging Attack', ['48.00%'])).toBe(true); // Lumi 1504
+    expect(isScalingAttribute('Moonring - Dodge Counter', ['41.29%*2+42.54%'])).toBe(true); // Iuno 1410
+    expect(isScalingAttribute('Heavy Attack - Drizzle Stance', ['6.00%*10+60.00%'])).toBe(true); // Suisui 1110
+    expect(isScalingAttribute('Basic Attack Stage 1', ['27.20%'])).toBe(true); // Carlotta
+    expect(isScalingAttribute('Basic Attack - Polychrome Leap 1', ['17.00%*3'])).toBe(true); // Lynae
+    expect(isScalingAttribute('Mid-air Attack 1 Sword Shadow Recalled', ['2.84%'])).toBe(true); // Cartethyia
+    expect(isScalingAttribute('Dodge Counter - Purgatory Scourge', ['16.15%*3+113.03%'])).toBe(true); // Galbrena
+  });
+
+  it('drops percent-valued metadata: shields, recovery, buffs, parameters', () => {
+    expect(isScalingAttribute('Timed Counters Stage 1 Shield', ['300+11.25%'])).toBe(false);
+    expect(isScalingAttribute('Minor Zhoutian Final Shield', ['875+34.13%'])).toBe(false);
+    expect(isScalingAttribute('HP recovery', ['950+45.00%'])).toBe(false);
+    expect(isScalingAttribute('Mist Avatar HP', ['100%'])).toBe(false);
+    expect(isScalingAttribute('Gate Of Quandary ATK Increase', ['10%'])).toBe(false);
+    expect(isScalingAttribute('Movement Speed Increase', ['40%'])).toBe(false);
+    expect(isScalingAttribute('Basic Attack Multiplier Increase', ['25%'])).toBe(false);
+    expect(isScalingAttribute('Additional Multiplier Per Blaze', ['5.00%'])).toBe(false);
+    expect(isScalingAttribute('Additional multiplier per Incandescence', ['22.40%'])).toBe(false);
+  });
+
+  it('drops bare metadata without percents', () => {
+    expect(isScalingAttribute('Mystery Counter', [])).toBe(false);
+    expect(isScalingAttribute('Skill Duration', ['2.5'])).toBe(false);
+  });
+
+  it('drops debuff magnitudes despite the DMG in their names', () => {
+    // Taoqi Concealed Edge / Fortified Defense: enemy debuff magnitudes,
+    // not damage. Verified 2026-09-19 these are the only *eduction* rows.
+    expect(isScalingAttribute('Heavy Attack DMG Reduction', ['35%'])).toBe(false);
+    expect(isScalingAttribute('Rocksteady Shield Damage Reduction', ['15%'])).toBe(false);
+  });
+});
+
+describe('partitionUsableMotions', () => {
+  it('keeps 19- and 20-length rows together (Jianxin proved aligned)', () => {
+    const motions = [
+      { name: 'Stage 1 DMG', values: new Array(19).fill(0.1) },
+      { name: 'Stage 2 DMG', values: new Array(20).fill(0.2) },
+    ];
+    const { kept, dropped } = partitionUsableMotions(motions);
+    expect(kept.map((m) => m.name)).toEqual(['Stage 1 DMG', 'Stage 2 DMG']);
+    expect(dropped).toEqual([]);
+  });
+
+  it('drops rows too short for the forte track', () => {
+    const motions = [
+      { name: 'Stage 1 DMG', values: new Array(10).fill(0.1) },
+      { name: 'Truncated Row', values: new Array(9).fill(0.1) },
+    ];
+    const { kept, dropped } = partitionUsableMotions(motions);
+    expect(kept.map((m) => m.name)).toEqual(['Stage 1 DMG']);
+    expect(dropped.map((m) => m.name)).toEqual(['Truncated Row']);
+  });
+});
+
+describe('applyMotionTypeOverride', () => {
+  it('retypes the three prose-verified contradictions', () => {
+    expect(applyMotionTypeOverride('1001707', 'Umbra: Thwackblade Damage', 'basic')).toBe('heavy');
+    expect(applyMotionTypeOverride('1000617', 'Resonating Spin DMG', 'forte')).toBe('skill');
+    expect(applyMotionTypeOverride('1000617', 'Resonating Echoes Stage 2 DMG', 'forte')).toBe('skill');
+    expect(applyMotionTypeOverride('1004903', 'Spoofing Program: Cripple Movement DMG', 'heavy')).toBe('liberation');
+  });
+
+  it('passes everything else through untouched', () => {
+    expect(applyMotionTypeOverride('1001707', 'Umbra: Heavy Attack DMG', 'heavy')).toBe('heavy');
+    expect(applyMotionTypeOverride('1000607', 'Resonating Spin DMG', 'skill')).toBe('skill');
+    expect(applyMotionTypeOverride('1004903', 'Spoofing Program: Ping DMG', 'heavy')).toBe('heavy');
+    expect(applyMotionTypeOverride('9999999', 'Anything', 'basic')).toBe('basic');
   });
 });
 

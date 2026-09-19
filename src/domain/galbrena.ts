@@ -14,7 +14,7 @@ export interface GalbrenaSkillMods {
   dmgBonusExtra: number;
 }
 
-/** Demon Hypostasis quintet, including Purgatory Scourge (see below). */
+/** Demon Hypostasis quintet (S6 second paragraph; Purgatory Scourge included). */
 const S6_QUINTET =
   /seraphic execution|flamewing verdict|hellsent barrage|ravage|purgatory scourge/i;
 
@@ -28,12 +28,10 @@ const S6_QUINTET =
  *   additive dmgBonus:Fusion bucket (reference doc section 6; same
  *   mapping as Lynae Outro's "Liberation Amplification"). Like the S6
  *   x1.6 motion entries, this assumes Eternal Hypostasis is up.
- * - Purgatory Scourge is name-matched but has NO snapshot motion (no MV
- *   anywhere): verified absent at the primary source 2026-09-18
- *   (https://api-v2.encore.moe/api/en/character/1208 — Purgatory
- *   appears only in SkillDescribe prose, zero DamageList hits), so the
- *   branch is dormant until provider data completes. The Liberation 85%
- *   state and S1/S6 Purgatory riders stay flagged for the same reason.
+ * - Purgatory Scourge ('Dodge Counter - Purgatory Scourge', forte) ships
+ *   as a bare provider attribute the old name filter dropped; the sync
+ *   now keeps it, so this branch is live. (The Liberation 85% state stays
+ *   spec-and-flagged; see NOT modeled below.)
  *
  * The generic motion scope has no dmgBonus field, which is why this
  * paragraph needs a module instead of a motion entry. Everything else

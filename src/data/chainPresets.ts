@@ -660,7 +660,16 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     skillKind: 'forte',
     motionNameIncludes: 'seraphic execution',
     motionMultiplier: 1.6,
-    assumption: 'While Eternal Hypostasis lasts; Purgatory Scourge unmodeled (no snapshot motion).',
+    assumption: 'While Eternal Hypostasis lasts.',
+  },
+  {
+    scope: 'motion',
+    characterId: 'galbrena',
+    rank: 6,
+    skillKind: 'forte',
+    motionNameIncludes: 'purgatory scourge',
+    motionMultiplier: 1.6,
+    assumption: 'While Eternal Hypostasis lasts.',
   },
   {
     scope: 'motion',
@@ -684,7 +693,7 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     scope: 'note',
     characterId: 'galbrena',
     rank: 6,
-    reason: 'Afterflame Fusion amp (+35% at max) in galbrenaSkillMods; x1.6 trio above.',
+    reason: 'Afterflame Fusion amp (+35% at max) in galbrenaSkillMods; x1.6 quartet above.',
     appliedElsewhere: 'galbrenaSkillMods',
   },
 
@@ -1499,7 +1508,14 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     skillKind: 'forte',
     motionNameIncludes: 'basic attack - drizzle stance',
     motionMultiplier: 2,
-    assumption: 'Heavy Attack - Drizzle Stance unmodeled (no snapshot motion).',
+  },
+  {
+    scope: 'motion',
+    characterId: 'suisui',
+    rank: 5,
+    skillKind: 'forte',
+    motionNameIncludes: 'heavy attack - drizzle stance',
+    motionMultiplier: 2,
   },
 
   // --- Verina ---------------------------------------------------------------
@@ -1616,10 +1632,12 @@ export const CHAIN_PRESETS: ChainPreset[] = [
 
   // --- Lynae ----------------------------------------------------------------
   {
-    scope: 'note',
+    scope: 'motion',
     characterId: 'lynae',
     rank: 1,
-    reason: 'Polychrome Leap has no snapshot motion (2026-09-17).',
+    skillKind: 'forte',
+    motionNameIncludes: 'polychrome leap',
+    motionMultiplier: 2.2,
   },
   {
     scope: 'motion',
@@ -2153,7 +2171,16 @@ export const CHAIN_PRESETS: ChainPreset[] = [
     skillKind: 'forte',
     motionNameIncludes: 'seraphic execution',
     critDmgExtra: 0.8,
-    assumption: 'Afterflame maxed (80% cap); Purgatory Scourge unmodeled (no snapshot motion).',
+    assumption: 'Afterflame maxed (80% cap).',
+  },
+  {
+    scope: 'motion',
+    characterId: 'galbrena',
+    rank: 1,
+    skillKind: 'forte',
+    motionNameIncludes: 'purgatory scourge',
+    critDmgExtra: 0.8,
+    assumption: 'Afterflame maxed (80% cap).',
   },
   {
     scope: 'motion',

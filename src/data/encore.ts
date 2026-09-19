@@ -61,12 +61,61 @@ export function parseMotionText(text: string): { ratio: number; flat: number; hi
 }
 
 /**
- * Whether a skill attribute is a scaling component (damage/healing) as
- * opposed to rotation metadata (cooldowns, stamina costs, concerto regen,
- * durations). Only scaling components become motion values.
+ * Rotation-mechanics and amount vocabulary that marks a percent-valued
+ * attribute as metadata rather than damage. Surveyed 2026-09-19 over all
+ * 58 characters (827 skipped attributes): shields, HP recovery/amounts,
+ * buff increases, and multiplier parameter rows (Zani/Jinhsi) are the only
+ * percent-valued non-damage shapes; bare cost/cooldown/duration/concerto
+ * rows carry no percents but are fenced anyway so a future percent-valued
+ * one cannot leak in as phantom damage. Only gates the bare-name path —
+ * DMG/Damage/Healing names bypass it untouched.
  */
-export function isScalingAttribute(attributeName: string): boolean {
-  return /dmg|damage|healing/i.test(attributeName);
+const METADATA_ATTRIBUTE_PATTERN =
+  /shield|recovery|increase|multiplier|cooldown|duration|concerto|regen|\bcost\b|\bhp\b|\batk\b|\bdef\b/i;
+
+/**
+ * Whether a skill attribute is a scaling component (damage/healing) as
+ * opposed to rotation metadata. DMG/Damage/Healing names are always kept;
+ * bare provider names (Heavy Attack, Mid-air Attack, Dodge Counter, Hounds
+ * Roar Stage N, Yellow Light: Basic Attack, Glitter, ...) are kept when
+ * their values are damage-shaped (carry percents) and the name shows no
+ * metadata vocabulary. Everything else (costs, cooldowns, durations,
+ * regen, counts, shields, buffs, parameter rows) is dropped.
+ */
+export function isScalingAttribute(attributeName: string, values: readonly string[]): boolean {
+  // Debuff magnitudes ("DMG Reduction") are not damage even though the
+  // name carries DMG — Taoqi ships two (Concealed Edge / Fortified
+  // Defense); verified 2026-09-19 these are the only *eduction* rows, so
+  // this carve-out drops exactly them. It runs first because the DMG
+  // bypass below must not rescue mitigation vocabulary (unlike Healing /
+  // per-unit parameter rows, which the bypass intentionally keeps).
+  if (/reduction/i.test(attributeName)) return false;
+  if (/dmg|damage|healing/i.test(attributeName)) return true;
+  if (METADATA_ATTRIBUTE_PATTERN.test(attributeName)) return false;
+  return values.some((v) => v.includes('%'));
+}
+
+/**
+ * Split parsed motions into usable vs too-short rows (sync item 3).
+ *
+ * Proven against Jianxin (provider 1405): the first 10 entries are the
+ * combat track in both 19- and 20-shapes (each matches its DamageList
+ * RateLv level-for-level up to 0.01 display rounding), so every row with
+ * >= 10 values scores forte levels 1-10; the schema allows ragged arrays
+ * and scoring clamps the index. Rows with fewer than 10 values cannot
+ * cover the forte track and are dropped (the caller warns loudly per row).
+ * Replaces the old majority-length rule, which dropped genuine minority-
+ * length damage rows (Jianxin Stage 1/Mid-air/Dodge + Chi Counter).
+ */
+export function partitionUsableMotions<T extends { name: string; values: readonly unknown[] }>(
+  motions: readonly T[],
+): { kept: T[]; dropped: T[] } {
+  const kept: T[] = [];
+  const dropped: T[] = [];
+  for (const motion of motions) {
+    (motion.values.length >= 10 ? kept : dropped).push(motion);
+  }
+  return { kept, dropped };
 }
 
 /** Strip provider markup ("<span …>12%</span>" -> "12%"). */
@@ -291,6 +340,61 @@ export function resolveMotionBonusKind(
     }
   }
   return best;
+}
+
+/**
+ * Prose-verified motion typing overrides (sync item 4).
+ *
+ * The provider's DamageList Type is usually the "corresponding Type Bonus",
+ * but kit prose sometimes explicitly reassigns a hit ("considered as X
+ * DMG") or withholds the bucket its siblings carry — prose wins those
+ * cases. Keyed by provider SkillId; a null motionName covers the whole
+ * skill. Each entry cites its ruling prose.
+ */
+export interface MotionTypeOverride {
+  skillId: string;
+  motionName: string | null;
+  dmgType: DamageType | 'forte';
+  reason: string;
+}
+
+export const MOTION_TYPE_OVERRIDES: readonly MotionTypeOverride[] = [
+  {
+    skillId: '1001707',
+    motionName: 'Umbra: Thwackblade Damage',
+    dmgType: 'heavy',
+    reason:
+      'Forte prose: "Heavy Attack Thwackblade ... dealing Havoc DMG, considered as Heavy Attack DMG"; provider types Basic.',
+  },
+  {
+    skillId: '1000617',
+    motionName: null,
+    dmgType: 'skill',
+    reason:
+      'Forte prose (twice): Spin/Echoes "considered as Resonance Skill DMG"; matches sibling skill 1000607 tags.',
+  },
+  {
+    skillId: '1004903',
+    motionName: 'Spoofing Program: Cripple Movement DMG',
+    dmgType: 'liberation',
+    reason:
+      'Prose "Deals Hack DMG" withholds the considered-Heavy clause its three sibling programs carry; S6 treats Hack DMG as its own category; cf. Data Crash (Hack, non-heavy). Parent-kind fallback.',
+  },
+];
+
+/**
+ * Apply a prose-verified typing override, if one matches this motion.
+ * Pass-through otherwise — most motions keep their resolved bucket.
+ */
+export function applyMotionTypeOverride(
+  skillId: string,
+  motionName: string,
+  resolved: DamageType | 'forte',
+): DamageType | 'forte' {
+  const hit = MOTION_TYPE_OVERRIDES.find(
+    (o) => o.skillId === skillId && (o.motionName === null || o.motionName === motionName),
+  );
+  return hit ? hit.dmgType : resolved;
 }
 
 /**
