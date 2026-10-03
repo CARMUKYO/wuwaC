@@ -18,16 +18,16 @@ interface SliderFieldProps {
  */
 export function SliderField({ id, label, value, min, max, step = 1, display, onChange }: SliderFieldProps) {
   return (
-    <div>
-      <label htmlFor={id} className="block text-xs font-medium text-slate-300">
-        <span className="flex items-baseline justify-between">
-          <span>{label}</span>
-          <span className="text-sm font-semibold text-slate-100" aria-hidden="true">
+    <div className="min-w-0">
+      <label htmlFor={id} className="block font-mono text-[11px] font-medium tracking-[0.08em] text-fog uppercase">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="min-w-0 truncate">{label}</span>
+          <span className="shrink-0 font-display text-xl leading-none font-semibold tracking-wide text-seal tnum" aria-hidden="true">
             {display ?? value}
           </span>
         </span>
       </label>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="mt-1.5 flex items-center gap-2">
         <input
           id={id}
           type="range"
@@ -36,7 +36,7 @@ export function SliderField({ id, label, value, min, max, step = 1, display, onC
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full accent-slate-100"
+          className="terminal-range min-w-0 flex-1"
         />
         <input
           aria-label={`${label} (exact value)`}
@@ -51,7 +51,7 @@ export function SliderField({ id, label, value, min, max, step = 1, display, onC
             if (!Number.isFinite(num)) return;
             onChange(num);
           }}
-          className="w-20 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100"
+          className="w-20 shrink-0 rounded-md border border-line-strong bg-canvas px-2 py-1 font-mono text-xs text-ink tnum transition-terminal hover:border-dim focus:border-seal"
         />
       </div>
     </div>

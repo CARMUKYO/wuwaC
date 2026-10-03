@@ -5,6 +5,8 @@ import { MAIN_STAT_POOLS, SUBSTAT_POOL } from '../../data/placeholders.ts';
 import type { StatKey } from '../../data/schema.ts';
 import type { EchoDraft } from '../../state/inventory.ts';
 import { isPercentStat, parseDisplayValue, statLabel, toDisplayValue } from '../format.ts';
+import { btnGhost, btnOutline, btnPrimary, inputClass, labelClass } from './classes.ts';
+import { Alert } from './ui.tsx';
 
 export interface EchoFormValues {
   echoDefId: string;
@@ -235,28 +237,24 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
     });
   };
 
-  const inputClass =
-    'w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
-  const labelClass = 'block text-xs font-medium text-slate-300';
-
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
       {errors.length > 0 && (
-        <div role="alert" className="rounded-md border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
+        <Alert tone="danger">
           <ul className="list-disc pl-5">
             {errors.map((message) => (
               <li key={message}>{message}</li>
             ))}
           </ul>
-        </div>
+        </Alert>
       )}
       {notices.length > 0 && (
-        <p role="status" className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-300">
+        <Alert tone="info" role="status" className="text-xs">
           {notices.join(' ')}
-        </p>
+        </Alert>
       )}
       {overMax.length > 0 && (
-        <div role="status" aria-label="Above-reference warnings" className="rounded-md border border-amber-800 bg-amber-950 px-3 py-2 text-sm text-amber-200">
+        <div role="status" aria-label="Above-reference warnings" className="rounded-md border border-amber/40 bg-amber-wash px-3 py-2 text-sm text-amber">
           <ul className="list-disc pl-5">
             {overMax.map((message) => (
               <li key={message}>{message}</li>
@@ -267,14 +265,14 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
 
       <fieldset>
         <legend className={labelClass}>Echo (from game data — cost and pools fill in automatically)</legend>
-        <div className="mt-1 flex gap-2">
+        <div className="mt-1.5 flex gap-2">
           <input
             aria-label="Search echoes"
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search echoes…"
-            className={inputClass}
+            className={`${inputClass} min-w-0`}
           />
           <div className="flex shrink-0 gap-1" role="group" aria-label="Cost filter">
             {COST_FILTERS.map((c) => (
@@ -283,7 +281,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
                 type="button"
                 aria-pressed={costFilter === c}
                 onClick={() => setCostFilter(costFilter === c ? null : c)}
-                className={`rounded-md border px-2 py-1 text-xs ${costFilter === c ? 'border-slate-100 bg-slate-100 text-slate-900' : 'border-slate-700 text-slate-300 hover:bg-slate-800'}`}
+                className={`rounded-md border px-2.5 py-1 font-mono text-xs font-medium tnum transition-terminal ${costFilter === c ? 'border-seal bg-seal text-seal-ink' : 'border-line-strong text-fog hover:bg-panel-2'}`}
               >
                 {c}
               </button>
@@ -304,15 +302,17 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
           ))}
         </select>
         {filteredDefs.length === 0 && (
-          <p className="mt-1 text-xs text-slate-500">No echoes match — clear the search or cost filter.</p>
+          <p className="mt-1 text-xs text-dim">No echoes match — clear the search or cost filter.</p>
         )}
         {def && (
-          <div className="mt-2 rounded-md bg-slate-950 p-2 text-xs text-slate-300">
+          <div className="mt-2 rounded-md border border-line bg-canvas p-2.5 text-xs text-fog">
             <p>
-              <span className="font-medium text-slate-100">{def.name}</span>
-              {' · '}{def.element ?? 'No element'} · Cost {def.cost} · {def.sonataIds.map(sonataName).join(' / ')}
+              <span className="font-display text-base font-semibold tracking-wide text-seal">{def.name}</span>
+              <span className="font-mono text-[11px]">
+                {' · '}{def.element ?? 'No element'} · Cost {def.cost} · {def.sonataIds.map(sonataName).join(' / ')}
+              </span>
             </p>
-            {def.skillDescription && <p className="mt-1 text-slate-400">{def.skillDescription}</p>}
+            {def.skillDescription && <p className="mt-1 leading-relaxed text-fog">{def.skillDescription}</p>}
           </div>
         )}
       </fieldset>
@@ -331,11 +331,11 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <span className={labelClass}>Sonata set</span>
               {def.sonataIds.length === 1 ? (
-                <p className="mt-1 rounded-md border border-slate-800 bg-slate-950 px-2 py-1.5 text-sm">{sonataName(def.sonataIds[0])}</p>
+                <p className="mt-1 rounded-md border border-line bg-canvas px-2 py-1.5 text-sm">{sonataName(def.sonataIds[0])}</p>
               ) : (
                 <select
                   aria-label="Sonata set"
@@ -351,7 +351,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
             </div>
             <div>
               <span className={labelClass}>Cost</span>
-              <p className="mt-1 rounded-md border border-slate-800 bg-slate-950 px-2 py-1.5 text-sm">{def.cost} (from {def.name})</p>
+              <p className="mt-1 rounded-md border border-line bg-canvas px-2 py-1.5 text-sm">{def.cost} (from {def.name})</p>
             </div>
             <div>
               <label htmlFor="echo-level" className={labelClass}>Level</label>
@@ -379,7 +379,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="echo-main-stat" className={labelClass}>Main stat</label>
               <select
@@ -444,7 +444,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
             <legend className={labelClass}>Substats (up to 5, no duplicates)</legend>
             <div className="mt-1 space-y-2">
               {values.substats.map((row, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+                <div key={i} className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
                   <div>
                     <label htmlFor={`substat-${i + 1}-stat`} className={labelClass}>
                       Substat {i + 1} stat
@@ -484,7 +484,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
                     onClick={() =>
                       setValues((v) => ({ ...v, substats: v.substats.filter((_, j) => j !== i) }))
                     }
-                    className="rounded-md px-2 py-1.5 text-sm text-slate-400 hover:bg-slate-800"
+                    className={`${btnGhost} justify-self-start px-2 py-1 text-xs sm:justify-self-auto`}
                   >
                     Remove substat {i + 1}
                   </button>
@@ -500,7 +500,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
                     substats: [...v.substats, { stat: SUBSTAT_POOL[0], valueText: '' }],
                   }))
                 }
-                className="mt-2 rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
+                className={`${btnOutline} mt-2`}
               >
                 Add substat
               </button>
@@ -511,7 +511,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
 
       <button
         type="submit"
-        className="rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
+        className={`${btnPrimary} w-full px-5 py-2 sm:w-auto`}
       >
         {submitLabel}
       </button>
@@ -552,9 +552,9 @@ function MainStatSlider({ defCost, stat, valueText, onPick }: {
         step={step}
         value={Math.min(Math.max(displayValue, toDisplay(range.min)), toDisplay(range.max))}
         onChange={(e) => onPick(snap(Number(e.target.value)))}
-        className="w-full accent-slate-100"
+        className="terminal-range w-full"
       />
-      <p className="text-xs text-slate-500">
+      <p className="font-mono text-[11px] text-dim tnum">
         5★ Lv25 reference: {toDisplayValue(stat, range.min)} – {toDisplayValue(stat, range.max)}
       </p>
     </div>
@@ -591,9 +591,9 @@ function SubstatTierSlider({ index, stat, valueText, onPick }: {
         step={1}
         value={closest}
         onChange={(e) => onPick(toDisplayValue(stat, tiers[Number(e.target.value)]))}
-        className="w-full accent-slate-100"
+        className="terminal-range min-w-0 flex-1"
       />
-      <span className="shrink-0 text-xs text-slate-400">
+      <span className="shrink-0 font-mono text-[11px] text-fog tnum">
         {toDisplayValue(stat, tiers[closest])} (tier {closest + 1}/{tiers.length})
       </span>
     </div>

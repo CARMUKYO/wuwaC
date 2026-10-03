@@ -16,7 +16,7 @@ export function InitialsBadge({ name }: InitialsBadgeProps) {
   return (
     <span
       aria-hidden="true"
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-line-strong bg-panel-2 font-display text-base font-semibold tracking-wider text-seal"
     >
       {initials}
     </span>

@@ -13,10 +13,8 @@ import type { CritMode, EnemyProfile } from '../../domain/damage.ts';
 import { runOptimization, type OptimizationHandle } from '../../optimizer/worker.ts';
 import type { OptimizeRequest, SearchData, SearchResult } from '../../optimizer/search.ts';
 import { useLibraryStore } from '../../state/library.ts';
-
-const selectClass =
-  'w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
-const labelClass = 'block text-xs font-medium text-slate-300';
+import { btnOutline, btnPrimary, labelClass, selectClass } from './classes.ts';
+import { Alert } from './ui.tsx';
 
 type Status =
   | { kind: 'idle' }
@@ -145,21 +143,25 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
   };
 
   return (
-    <section aria-label="Optimize for this rotation" className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-      <h3 className="text-sm font-semibold">Optimize for This Rotation</h3>
+    <section aria-label="Optimize for this rotation" className="overflow-hidden rounded-lg border border-line bg-panel">
+      <div className="freq-ticks px-4 pt-4 pb-3">
+        <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-seal uppercase">Solver // Exhaustive search</p>
+        <h3 className="font-display text-2xl leading-tight font-semibold tracking-wide text-ink">Optimize for This Rotation</h3>
+      </div>
+      <div className="p-4 pt-3">
       {currentDpr !== null && (
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="font-mono text-[11px] text-fog tnum">
           Current picks: {Math.round(currentDpr).toLocaleString()} DPR ·{' '}
           {Math.round(currentDpr / rotationTime).toLocaleString()} DPS
         </p>
       )}
       {tooFew ? (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-dim">
           You need at least 5 echoes in your inventory to run the optimizer.
         </p>
       ) : (
         <>
-        <div className="mt-2 grid grid-cols-3 items-end gap-2">
+        <div className="mt-3 grid grid-cols-1 items-end gap-3 sm:grid-cols-3">
           <div>
             <label htmlFor="ropt-budget" className={labelClass}>Cost budget</label>
             <select id="ropt-budget" value={budget} onChange={(e) => setBudget(e.target.value as '10' | '12')} className={`${selectClass} mt-0.5`}>
@@ -181,7 +183,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
           </div>
         </div>
         {lockMode !== 'none' && (
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <label htmlFor="ropt-lock-a" className={labelClass}>
                 {lockMode === 'five' ? 'Locked set' : 'Set A (2pc)'}
@@ -211,7 +213,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
           onClick={handleRun}
           disabled={!canRun}
           title={blocks.length === 0 ? 'Add rotation actions first' : undefined}
-          className="mt-2 rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white disabled:opacity-40"
+          className={`${btnPrimary} mt-3 w-full px-5 py-2 sm:w-auto`}
         >
           Find best builds
         </button>
@@ -219,19 +221,19 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
       )}
 
       {status.kind === 'running' && (
-        <p className="mt-2 text-sm text-slate-400" role="status">
+        <p className="mt-3 font-mono text-xs tracking-[0.08em] text-seal tnum" role="status">
           Evaluated {status.evaluated} of {status.total} combos…
         </p>
       )}
       {status.kind === 'error' && (
-        <div role="alert" className="mt-2 rounded-md border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
+        <Alert tone="danger" className="mt-3">
           {status.message}
-        </div>
+        </Alert>
       )}
       {status.kind === 'done' && result && (
         <div className="mt-3">
           {result.builds.length === 0 ? (
-            <p className="text-xs text-slate-400">No valid builds — loosen the budget.</p>
+            <p className="text-xs text-fog">No valid builds — loosen the budget.</p>
           ) : (
             <ol className="space-y-2">
               {result.builds.map((build, i) => {
@@ -245,34 +247,39 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
                   return id === build.mainEchoId ? `${label} (main)` : label;
                 });
                 return (
-                  <li key={key} className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2">
-                    <p className="text-sm font-medium">
-                      #{i + 1} — {Math.round(build.score).toLocaleString()} DPR ·{' '}
-                      {Math.round(build.score / rotationTime).toLocaleString()} DPS
+                  <li key={key} className="rounded-lg border border-line bg-canvas px-4 py-3">
+                    <p className="font-mono text-[11px] tracking-[0.14em] text-dim uppercase tnum">
+                      Rank #{i + 1}
                       {uplift !== null && (
-                        <span className={uplift >= 0 ? 'text-green-300' : 'text-red-300'}>
-                          {' '}({uplift >= 0 ? '+' : ''}{uplift.toFixed(1)}% vs current)
+                        <span className={`ml-2 ${uplift >= 0 ? 'text-tide' : 'text-ember'}`}>
+                          ({uplift >= 0 ? '+' : ''}{uplift.toFixed(1)}% vs current)
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="mt-0.5 font-display text-2xl leading-none font-semibold tracking-wide text-ink tnum">
+                      {Math.round(build.score).toLocaleString()} DPR{' '}
+                      <span className="text-base font-medium text-fog">
+                        · {Math.round(build.score / rotationTime).toLocaleString()} DPS
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-fog">
                       {labels.join(' · ')}
                     </p>
                     {build.warnings.length > 0 && (
-                      <p className="text-xs text-amber-300">
+                      <p className="mt-0.5 text-xs text-amber">
                         {build.warnings.length} unmodeled effect{build.warnings.length === 1 ? '' : 's'}
                       </p>
                     )}
                     {build.appliedAssumptions.length > 0 && (
-                      <p className="text-xs text-slate-500" title={build.appliedAssumptions.join('\n')}>
+                      <p className="mt-0.5 text-xs text-dim" title={build.appliedAssumptions.join('\n')}>
                         Assumes: {build.appliedAssumptions.join('; ')}
                       </p>
                     )}
-                    <div className="mt-1 flex gap-2">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => onApply(slotOrder(build.echoIds, build.mainEchoId))}
-                        className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                        className={`${btnOutline} px-2.5 py-1 text-xs`}
                       >
                         Apply to loadout
                       </button>
@@ -290,7 +297,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
                             type="button"
                             onClick={() => void handleSave(build.echoIds, build.mainEchoId)}
                             disabled={saveName.trim() === ''}
-                            className="rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-900 hover:bg-white disabled:opacity-40"
+                            className={`${btnPrimary} px-2.5 py-1 text-xs`}
                           >
                             Confirm save
                           </button>
@@ -302,7 +309,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
                             setSavingKey(key);
                             setSaveName('');
                           }}
-                          className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                          className={`${btnOutline} px-2.5 py-1 text-xs`}
                         >
                           Save
                         </button>
@@ -313,12 +320,13 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
               })}
             </ol>
           )}
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-3 font-mono text-[11px] text-dim tnum">
             Scored {result.evaluated} combos
             {result.prunedEchoes.length > 0 && `, pruned ${result.prunedEchoes.length} dominated echoes`}.
           </p>
         </div>
       )}
+      </div>
     </section>
   );
 }
