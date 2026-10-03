@@ -12,6 +12,11 @@ import { echoDefIssues, useInventoryStore } from '../../state/inventory.ts';
 import { seedInventory } from '../../state/seed.ts';
 import { EchoForm, type EchoFormValues } from '../components/EchoForm.tsx';
 import { EchoList } from '../components/EchoList.tsx';
+import { btnGhost, btnOutline, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
+import { Skeleton, ToastStack } from '../components/feedback.tsx';
+import { useToasts } from '../toasts.ts';
+import { MotifEmptyState } from '../components/motif.tsx';
+import { Alert, PageHeader } from '../components/ui.tsx';
 import { toDisplayValue } from '../format.ts';
 
 function toFormValues(echo: OwnedEcho): EchoFormValues {
@@ -51,6 +56,7 @@ export function InventoryPage() {
   const [seedSonata, setSeedSonata] = useState('');
   const [preview, setPreview] = useState<(KameraImportResult & { fileName: string }) | null>(null);
   const [transferError, setTransferError] = useState<string | null>(null);
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -87,6 +93,7 @@ export function InventoryPage() {
       anchor.click();
       URL.revokeObjectURL(url);
       setTransferError(null);
+      pushToast(`Exported ${echoes.length} ${echoes.length === 1 ? 'echo' : 'echoes'}.`);
     } catch (err) {
       setTransferError(err instanceof Error ? err.message : 'Could not export the inventory.');
     }
@@ -100,97 +107,104 @@ export function InventoryPage() {
 
   return (
     <section>
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">
-          Echo Inventory
-          {loaded && echoes.length > 0 && sonataFilter === '' && ` (${echoes.length})`}
-          {loaded && echoes.length > 0 && sonataFilter !== '' && ` (${visible.length}/${echoes.length})`}
-        </h2>
-        {!adding && editing === null && (
-          <div className="flex gap-2">
-            {import.meta.env.DEV && (
-              <>
-                <select
-                  aria-label="Seed echo set"
-                  value={seedSonata}
-                  onChange={(e) => setSeedSonata(e.target.value)}
-                  title="Restrict seeded echoes to one Sonata set"
-                  className="rounded-md border border-dashed border-slate-600 bg-slate-900 px-2 py-1.5 text-sm text-slate-300"
-                >
-                  <option value="">Any set</option>
-                  {snapshot.sonataSets.map((set) => (
-                    <option key={set.id} value={set.id}>
-                      {set.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => void seedInventory(30, seedSonata === '' ? undefined : seedSonata)}
-                  title="Adds 30 random echoes from synced defs for optimizer testing"
-                  className="rounded-md border border-dashed border-slate-600 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
-                >
-                  Seed 30 random
-                </button>
-              </>
+      <PageHeader
+        eyebrow="01 // Gear box"
+        title={
+          <>
+            Echo Inventory
+            {loaded && echoes.length > 0 && sonataFilter === '' && (
+              <span className="text-seal"> ({echoes.length})</span>
             )}
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-900 hover:bg-white"
-            >
-              Add Echo
-            </button>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              title="Import echoes from a WuWa Inventory Kamera JSON file"
-              className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-            >
-              Import
-            </button>
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={echoes.length === 0}
-              title={
-                echoes.length === 0
-                  ? 'Nothing to export yet'
-                  : 'Download the inventory as a Kamera-shaped JSON file'
-              }
-              className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Export
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".json,application/json"
-              aria-label="Import echoes file"
-              className="sr-only"
-              onChange={(e) => {
-                void handleFile(e.target.files?.[0]);
-                e.target.value = '';
-              }}
-            />
-          </div>
-        )}
-      </div>
+            {loaded && echoes.length > 0 && sonataFilter !== '' && (
+              <span className="text-seal"> ({visible.length}/{echoes.length})</span>
+            )}
+          </>
+        }
+        description="Your Echo box — every piece the Calculator scores and the optimizer searches."
+        actions={
+          adding || editing !== null ? undefined : (
+            <>
+              {import.meta.env.DEV && (
+                <>
+                  <select
+                    aria-label="Seed echo set"
+                    value={seedSonata}
+                    onChange={(e) => setSeedSonata(e.target.value)}
+                    title="Restrict seeded echoes to one Sonata set"
+                    className="rounded-md border border-dashed border-dim bg-panel px-2 py-1.5 font-mono text-xs text-fog"
+                  >
+                    <option value="">Any set</option>
+                    {snapshot.sonataSets.map((set) => (
+                      <option key={set.id} value={set.id}>
+                        {set.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void seedInventory(30, seedSonata === '' ? undefined : seedSonata)}
+                    title="Adds 30 random echoes from synced defs for optimizer testing"
+                    className="rounded-md border border-dashed border-dim px-3 py-1.5 text-sm text-fog hover:bg-panel-2"
+                  >
+                    Seed 30 random
+                  </button>
+                </>
+              )}
+              <button type="button" onClick={() => setAdding(true)} className={btnPrimary}>
+                Add Echo
+              </button>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                title="Import echoes from a WuWa Inventory Kamera JSON file"
+                className={btnOutline}
+              >
+                Import
+              </button>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={echoes.length === 0}
+                title={
+                  echoes.length === 0
+                    ? 'Nothing to export yet'
+                    : 'Download the inventory as a Kamera-shaped JSON file'
+                }
+                className={btnOutline}
+              >
+                Export
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".json,application/json"
+                aria-label="Import echoes file"
+                className="sr-only"
+                onChange={(e) => {
+                  void handleFile(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+            </>
+          )
+        }
+      />
 
       {transferError !== null && (
-        <div role="alert" className="mt-4 rounded-md border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
+        <Alert tone="danger" className="mt-4">
           {transferError}
-        </div>
+        </Alert>
       )}
 
       {preview !== null && (
-        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900 p-4">
-          <h3 className="text-sm font-semibold text-slate-100">Import {preview.fileName}</h3>
-          <p className="mt-1 text-sm text-slate-300">
+        <div className="animate-tt-rise mt-4 rounded-lg border border-line bg-panel p-4">
+          <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-seal uppercase">Kamera import</p>
+          <h3 className="font-display text-xl leading-tight font-semibold tracking-wide text-ink">Import {preview.fileName}</h3>
+          <p className="mt-1 text-sm text-fog">
             {`${preview.drafts.length} ${preview.drafts.length === 1 ? 'echo' : 'echoes'} ready to add, ${preview.issues.length} skipped. Adding is additive — existing rows are untouched.`}
           </p>
           {preview.drafts.length > 0 && (
-            <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-xs text-slate-400">
+            <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-xs text-fog">
               {preview.drafts.slice(0, 20).map((d, i) => (
                 <li key={i}>{`${defName(d.echoDefId)} · ${setName(d.sonataId)} · Lv${d.level}`}</li>
               ))}
@@ -198,7 +212,7 @@ export function InventoryPage() {
             </ul>
           )}
           {preview.issues.length > 0 && (
-            <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-xs text-amber-200">
+            <ul className="mt-2 max-h-40 space-y-0.5 overflow-y-auto text-xs text-amber">
               {preview.issues.map((issue, i) => (
                 <li key={i}>{`Row ${issue.row} (${issue.key}): ${issue.message}`}</li>
               ))}
@@ -209,23 +223,25 @@ export function InventoryPage() {
               type="button"
               disabled={preview.drafts.length === 0}
               onClick={() => {
+                const count = preview.drafts.length;
                 void importEchoes(preview.drafts, KAMERA_ORIGIN)
                   .then(() => {
                     setPreview(null);
                     setTransferError(null);
+                    pushToast(`Added ${count} ${count === 1 ? 'echo' : 'echoes'} from ${preview.fileName}.`);
                   })
                   .catch((err: unknown) =>
                     setTransferError(err instanceof Error ? err.message : 'Import failed.'),
                   );
               }}
-              className="rounded-md bg-slate-100 px-4 py-1.5 text-sm font-semibold text-slate-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+              className={btnPrimary}
             >
               {`Add ${preview.drafts.length} ${preview.drafts.length === 1 ? 'echo' : 'echoes'}`}
             </button>
             <button
               type="button"
               onClick={() => setPreview(null)}
-              className="rounded-md px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+              className={btnGhost}
             >
               Cancel
             </button>
@@ -234,24 +250,25 @@ export function InventoryPage() {
       )}
 
       {flagged.length > 0 && (
-        <div role="alert" className="mt-4 rounded-md border border-amber-800 bg-amber-950 px-3 py-2 text-sm text-amber-200">
+        <Alert tone="warning" className="mt-4">
           {`${flagged.length} ${flagged.length === 1 ? 'echo needs' : 'echoes need'} re-linking — press Edit on each flagged row and pick the real Echo. Saving stays blocked until it matches game data.`}
-        </div>
+        </Alert>
       )}
 
       {adding && (
-        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900 p-4">
+        <div className="animate-tt-rise mt-4 rounded-lg border border-line bg-panel p-4">
           <EchoForm
             submitLabel="Add Echo"
             onSubmit={async (draft) => {
               await addEcho(draft);
               setAdding(false);
+              pushToast('Echo added to the inventory.');
             }}
           />
           <button
             type="button"
             onClick={() => setAdding(false)}
-            className="mt-2 rounded-md px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+            className={`${btnGhost} mt-2`}
           >
             Cancel
           </button>
@@ -259,7 +276,7 @@ export function InventoryPage() {
       )}
 
       {editing !== null && (
-        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900 p-4">
+        <div className="animate-tt-rise mt-4 rounded-lg border border-line bg-panel p-4">
           <EchoForm
             key={editing.id}
             initial={toFormValues(editing)}
@@ -267,12 +284,13 @@ export function InventoryPage() {
             onSubmit={async (draft) => {
               await updateEcho(editing.id, draft);
               setEditing(null);
+              pushToast('Echo saved.');
             }}
           />
           <button
             type="button"
             onClick={() => setEditing(null)}
-            className="mt-2 rounded-md px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+            className={`${btnGhost} mt-2`}
           >
             Cancel
           </button>
@@ -280,15 +298,15 @@ export function InventoryPage() {
       )}
 
       {loaded && echoes.length > 0 && (
-        <div className="mt-4 flex items-center gap-2">
-          <label htmlFor="inventory-sonata-filter" className="text-xs font-medium text-slate-300">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <label htmlFor="inventory-sonata-filter" className={labelClass}>
             Sonata set
           </label>
           <select
             id="inventory-sonata-filter"
             value={sonataFilter}
             onChange={(e) => setSonataFilter(e.target.value)}
-            className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100"
+            className={`${inputClass} w-auto min-w-56`}
           >
             <option value="">All sets</option>
             {snapshot.sonataSets.map((set) => (
@@ -302,19 +320,22 @@ export function InventoryPage() {
 
       <div className="mt-4">
         {!loaded ? (
-          <p className="text-slate-400">Loading…</p>
+          <Skeleton lines={4} />
         ) : echoes.length === 0 ? (
-          <p className="text-slate-400">
-            No echoes yet — add your first Echo above to start building your gear box.
-          </p>
+          <MotifEmptyState seed="inventory-empty">No echoes yet — add your first Echo above to start building your gear box.</MotifEmptyState>
         ) : visible.length === 0 ? (
-          <p className="text-slate-400">
-            No echoes with this Sonata set — pick All sets to see the full inventory.
-          </p>
+          <MotifEmptyState seed="inventory-filtered">No echoes with this Sonata set — pick All sets to see the full inventory.</MotifEmptyState>
         ) : (
-          <EchoList echoes={visible} onEdit={setEditing} onDelete={(id) => void removeEcho(id)} />
+          <EchoList
+            echoes={visible}
+            onEdit={setEditing}
+            onDelete={(id) => {
+              void removeEcho(id).then(() => pushToast('Echo deleted.'));
+            }}
+          />
         )}
       </div>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </section>
   );
 }

@@ -14,12 +14,13 @@ interface GameIconProps {
 
 const SIZES = {
   sm: 'h-6 w-6',
-  md: 'h-10 w-10',
+  md: 'h-9 w-9',
   lg: 'h-16 w-16',
 } as const;
 
 export function GameIcon({ name, iconUrl, size = 'md' }: GameIconProps) {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   if (iconUrl === undefined || iconUrl === '' || failed) {
     return <InitialsBadge name={name} />;
   }
@@ -32,7 +33,10 @@ export function GameIcon({ name, iconUrl, size = 'md' }: GameIconProps) {
       decoding="async"
       draggable={false}
       onError={() => setFailed(true)}
-      className={`${SIZES[size]} shrink-0 rounded-md bg-slate-800 object-cover`}
+      onLoad={() => setLoaded(true)}
+      className={`${SIZES[size]} shrink-0 rounded-md border border-line bg-panel-2 object-cover transition-opacity duration-200 ${
+        loaded ? 'opacity-100' : 'opacity-0'
+      }`}
     />
   );
 }

@@ -6,9 +6,12 @@ import { useInventoryStore } from '../../state/inventory.ts';
 import { useTeamStore } from '../../state/teamStore.ts';
 import { GameIcon } from '../components/GameIcon.tsx';
 import { statLabel, toDisplayValue } from '../format.ts';
-
-const inputClass =
-  'w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
+import { btnDangerGhost, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
+import { Skeleton, ToastStack } from '../components/feedback.tsx';
+import { useToasts } from '../toasts.ts';
+import { MotifEmptyState } from '../components/motif.tsx';
+import { SuggestInput } from '../components/SuggestInput.tsx';
+import { Alert, AttributeDot, PageHeader, Panel } from '../components/ui.tsx';
 
 export function TeamsPage() {
   const teams = useTeamStore((s) => s.teams);
@@ -24,6 +27,7 @@ export function TeamsPage() {
   const [name, setName] = useState('');
   const [members, setMembers] = useState(['', '', '']);
   const [error, setError] = useState<string | null>(null);
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
   useEffect(() => {
     if (!loaded) void load();
@@ -52,6 +56,7 @@ export function TeamsPage() {
       await createTeam(name.trim(), [ids[0], ids[1], ids[2]]);
       setName('');
       setMembers(['', '', '']);
+      pushToast(`Team “${name.trim()}” assembled.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -59,21 +64,22 @@ export function TeamsPage() {
 
   return (
     <section>
-      <h2 className="text-xl font-semibold">Team Builder</h2>
-      <p className="mt-1 text-xs text-slate-500">
-        3-character teams with Sonata coverage from equipped Echoes plus each
-        member&apos;s transcribed Outro / team buffs — importable in the calculator.
-      </p>
+      <PageHeader
+        eyebrow="04 // Trios"
+        title="Team Builder"
+        description="3-character teams with Sonata coverage from equipped Echoes plus each member's transcribed Outro / team buffs — importable in the calculator."
+      />
 
       {error && (
-        <div role="alert" className="mt-2 rounded-md border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
+        <Alert tone="danger" className="mt-4">
           {error}
-        </div>
+        </Alert>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+      <Panel label="Assemble a team" title="Assemble a team" eyebrow="New trio" className="mt-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div>
-          <label htmlFor="team-name" className="block text-xs font-medium text-slate-300">
+          <label htmlFor="team-name" className={labelClass}>
             Team name
           </label>
           <input
@@ -81,96 +87,100 @@ export function TeamsPage() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={inputClass}
+            className={`${inputClass} mt-1.5`}
           />
         </div>
         {([0, 1, 2] as const).map((i) => (
-          <div key={i}>
-            <label htmlFor={`team-member-${i + 1}`} className="block text-xs font-medium text-slate-300">
-              {`Member ${i + 1} (character id)`}
-            </label>
-            <input
-              id={`team-member-${i + 1}`}
-              type="text"
-              list="team-character-ids"
-              value={members[i]}
-              onChange={(e) =>
-                setMembers((prev) => prev.map((m, j) => (j === i ? e.target.value : m)))
-              }
-              className={inputClass}
-            />
-          </div>
+          <SuggestInput
+            key={i}
+            id={`team-member-${i + 1}`}
+            label={`Member ${i + 1}`}
+            value={members[i]}
+            suggestions={snapshot.characters.map((c) => ({
+              value: c.id,
+              label: c.name,
+              hint: `${c.attribute} · ${c.id}`,
+            }))}
+            onChange={(next) => setMembers((prev) => prev.map((m, j) => (j === i ? next : m)))}
+          />
         ))}
-        <datalist id="team-character-ids">
-          {snapshot.characters.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </datalist>
         <div className="flex items-end">
           <button
             type="button"
             onClick={() => void handleCreate()}
-            className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-900 hover:bg-white"
+            className={`${btnPrimary} w-full sm:w-auto`}
           >
             Create team
           </button>
         </div>
       </div>
+      </Panel>
 
       <div className="mt-4">
         {!loaded ? (
-          <p className="text-slate-400">Loading…</p>
+          <Skeleton lines={2} />
         ) : teams.length === 0 ? (
-          <p className="text-slate-400">No teams yet — assemble your first trio above.</p>
+          <MotifEmptyState seed="teams-empty">No teams yet — assemble your first trio above.</MotifEmptyState>
         ) : (
           <ul className="space-y-3">
             {teams.map((team) => {
               const coverage = teamSonataCoverage(echoes, team, sonataNameOf);
               return (
-                <li key={team.id} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">{team.name}</h3>
+                <li key={team.id} className="animate-tt-fade rounded-lg border border-line bg-panel p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="min-w-0 flex-1 basis-48 truncate font-display text-2xl leading-none font-semibold tracking-wide text-ink">{team.name}</h3>
                     <button
                       type="button"
-                      onClick={() => void removeTeam(team.id)}
-                      className="rounded-md px-2 py-1 text-sm text-red-300 hover:bg-slate-800"
+                      onClick={() => void removeTeam(team.id).then(() => pushToast(`Team “${team.name}” deleted.`))}
+                      className={`${btnDangerGhost} ml-auto shrink-0 px-2 py-1 text-xs`}
                     >
                       Delete {team.name}
                     </button>
                   </div>
-                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                     {coverage.members.map((member) => {
                       const provided = TEAM_BUFFS.filter((e) => e.characterId === member.characterId);
+                      const memberCharacter = snapshot.characters.find((c) => c.id === member.characterId);
                       return (
-                        <div key={member.characterId} className="rounded-md bg-slate-950 p-2">
+                        <div key={member.characterId} className="rounded-md border border-line bg-canvas p-3">
                           <div className="flex items-center gap-1.5">
                             <GameIcon
                               name={characterName(member.characterId)}
-                              iconUrl={snapshot.characters.find((c) => c.id === member.characterId)?.iconUrl}
+                              iconUrl={memberCharacter?.iconUrl}
                               size="sm"
                             />
-                            <p className="text-xs font-medium">{characterName(member.characterId)}</p>
+                            <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-ink">
+                              {memberCharacter && <AttributeDot attribute={memberCharacter.attribute} />}
+                              <span className="truncate">{characterName(member.characterId)}</span>
+                            </p>
                           </div>
                           {member.pieces.length === 0 ? (
-                            <p className="text-xs text-slate-500">No echoes equipped</p>
+                            <p className="mt-1.5 font-mono text-[11px] text-dim">No echoes equipped</p>
                           ) : (
-                            <ul className="mt-1 text-xs text-slate-300">
+                            <ul className="mt-1.5 flex flex-wrap gap-1">
                               {member.pieces.map((piece) => (
-                                <li key={piece.sonataId}>
+                                <li
+                                  key={piece.sonataId}
+                                  className="rounded border border-line-strong bg-panel px-1.5 py-px font-mono text-[10px] tracking-[0.06em] text-fog uppercase tnum"
+                                >
                                   {piece.sonataName} ×{piece.count}
                                 </li>
                               ))}
                             </ul>
                           )}
                           {provided.length === 0 ? (
-                            <p className="mt-1 text-xs text-slate-500">No transcribed team buffs</p>
+                            <p className="mt-1.5 font-mono text-[11px] text-dim">No transcribed team buffs</p>
                           ) : (
-                            <ul className="mt-1 space-y-0.5 text-xs text-slate-300">
+                            <ul className="mt-1.5 space-y-1 text-xs text-fog">
                               {provided.map((entry) => (
                                 <li key={`${entry.skillId}-${entry.label}`} title={entry.assumption}>
-                                  {entry.label}
-                                  {entry.windowSeconds !== undefined && ` · ${entry.windowSeconds}s`}
-                                  {` (${entry.mods.map((m) => `${statLabel(m.stat)} ${toDisplayValue(m.stat, m.value)}`).join(', ')})`}
+                                  <span className="text-ink">{entry.label}</span>
+                                  {entry.windowSeconds !== undefined && (
+                                    <span className="ml-1 rounded bg-panel-3 px-1 font-mono text-[10px] text-fog tnum">{entry.windowSeconds}s</span>
+                                  )}
+                                  <span className="font-mono text-[11px]">
+                                    {` (${entry.mods.map((m) => `${statLabel(m.stat)} ${toDisplayValue(m.stat, m.value)}`).join(', ')})`}
+                                  </span>
                                 </li>
                               ))}
                             </ul>
@@ -180,9 +190,9 @@ export function TeamsPage() {
                     })}
                   </div>
                   {coverage.combined.length > 0 && (
-                    <p className="mt-2 text-xs text-slate-400">
+                    <p className="mt-3 font-mono text-[11px] tracking-[0.06em] text-dim uppercase tnum">
                       Team totals:{' '}
-                      {coverage.combined.map((c) => `${c.sonataName} ×${c.count}`).join(' · ')}
+                      <span className="text-fog">{coverage.combined.map((c) => `${c.sonataName} ×${c.count}`).join(' · ')}</span>
                     </p>
                   )}
                 </li>
@@ -191,6 +201,7 @@ export function TeamsPage() {
           </ul>
         )}
       </div>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </section>
   );
 }

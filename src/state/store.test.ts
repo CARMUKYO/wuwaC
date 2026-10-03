@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { useAppStore } from './store';
+import { sectionFromHash, useAppStore } from './store';
 
 // Phase 0 wiring test: proves Vitest + Zustand are set up. Real domain and
 // optimizer tests (hand-computed expected values) arrive in Phases 2 and 4.
@@ -13,5 +13,21 @@ describe('app store', () => {
     expect(useAppStore.getState().activeSection).toBe('calculator');
     useAppStore.getState().setActiveSection('inventory');
     expect(useAppStore.getState().activeSection).toBe('inventory');
+  });
+});
+
+describe('sectionFromHash', () => {
+  it('resolves known sections', () => {
+    expect(sectionFromHash('#calculator')).toBe('calculator');
+    expect(sectionFromHash('#database')).toBe('database');
+  });
+
+  it('reserves #b= share links for BuildsPage', () => {
+    expect(sectionFromHash('#b=eyJ9')).toBeNull();
+  });
+
+  it('rejects unknown or empty hashes', () => {
+    expect(sectionFromHash('#nope')).toBeNull();
+    expect(sectionFromHash('')).toBeNull();
   });
 });

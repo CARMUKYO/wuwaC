@@ -303,7 +303,7 @@ describe('RotationTimeline timing', () => {
     });
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveClass('text-amber-300');
+    expect(alert).toHaveClass('text-amber');
     expect(alert).toHaveTextContent('12s exceeds rotation time 10s');
   });
 
@@ -422,5 +422,24 @@ describe('RotationTimeline timing', () => {
     expect(boxes[1]).toBeDisabled();
     expect(boxes[2]).not.toBeChecked();
     expect(boxes[2]).toBeEnabled();
+  });
+});
+
+describe('RotationTimeline overview strip', () => {
+  it('renders one segment per block with start-time tooltips', () => {
+    renderTimeline({
+      blocks: [timedBlock('b1', 'Stage 1 DMG', 2), timedBlock('b2', 'Stage 2 DMG', 3)],
+      rotationTime: 10,
+    });
+    const overview = screen.getByLabelText(/rotation overview/i);
+    const segments = overview.querySelectorAll('[title]');
+    expect(segments).toHaveLength(2);
+    expect(segments[0].getAttribute('title')).toContain('@0s');
+    expect(segments[1].getAttribute('title')).toContain('@2s');
+  });
+
+  it('stays hidden with no blocks', () => {
+    renderTimeline({ blocks: [] });
+    expect(screen.queryByLabelText(/rotation overview/i)).not.toBeInTheDocument();
   });
 });

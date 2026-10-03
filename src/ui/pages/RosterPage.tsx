@@ -4,6 +4,12 @@ import type { RosterEntry } from '../../data/schema.ts';
 import { useRosterStore } from '../../state/roster.ts';
 import { GameIcon } from '../components/GameIcon.tsx';
 import { SliderField } from '../components/SliderField.tsx';
+import { btnDangerGhost, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
+import { Collapsible } from '../components/Collapsible.tsx';
+import { Skeleton, ToastStack } from '../components/feedback.tsx';
+import { useToasts } from '../toasts.ts';
+import { MotifEmptyState } from '../components/motif.tsx';
+import { AttributeDot, PageHeader } from '../components/ui.tsx';
 
 function defaultsFor(characterId: string): RosterEntry {
   const snapshot = loadBundledSnapshot();
@@ -22,9 +28,6 @@ function defaultsFor(characterId: string): RosterEntry {
   };
 }
 
-const inputClass =
-  'w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
-
 export function RosterPage() {
   const entries = useRosterStore((s) => s.entries);
   const loaded = useRosterStore((s) => s.loaded);
@@ -33,6 +36,7 @@ export function RosterPage() {
   const remove = useRosterStore((s) => s.remove);
   const snapshot = loadBundledSnapshot();
   const [addingId, setAddingId] = useState('');
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
   useEffect(() => {
     if (!loaded) void load();
@@ -51,42 +55,48 @@ export function RosterPage() {
 
   return (
     <section>
-      <h2 className="text-xl font-semibold">Character Roster</h2>
-
-      <div className="mt-4 flex items-end gap-2">
-        <div>
-          <label htmlFor="roster-character" className="block text-xs font-medium text-slate-300">
-            Character
-          </label>
-          <select
-            id="roster-character"
-            value={addingId}
-            onChange={(e) => setAddingId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Pick a character…</option>
-            {available.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="button"
-          disabled={addingId === ''}
-          onClick={() => {
-            if (addingId !== '') void upsert(defaultsFor(addingId)).then(() => setAddingId(''));
-          }}
-          className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-900 hover:bg-white disabled:opacity-40"
-        >
-          Add character
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="02 // Resonators"
+        title="Character Roster"
+        description="Who you've built — levels, weapons, and forte investment the Calculator can prefill."
+        actions={
+          <>
+            <select
+              id="roster-character"
+              aria-label="Character"
+              value={addingId}
+              onChange={(e) => setAddingId(e.target.value)}
+              className={`${inputClass} w-auto min-w-48`}
+            >
+              <option value="">Pick a character…</option>
+              {available.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={addingId === ''}
+              onClick={() => {
+                if (addingId === '') return;
+                const id = addingId;
+                void upsert(defaultsFor(id)).then(() => {
+                  setAddingId('');
+                  pushToast(`${characterName(id)} joined the roster.`);
+                });
+              }}
+              className={btnPrimary}
+            >
+              Add character
+            </button>
+          </>
+        }
+      />
 
       <div className="mt-4">
         {!loaded ? (
-          <p className="text-slate-400">Loading…</p>
+          <Skeleton lines={3} />
         ) : entries.length === 0 ? (
-          <p className="text-slate-400">No characters tracked yet — add one above.</p>
+          <MotifEmptyState seed="roster-empty">No characters tracked yet — add one above.</MotifEmptyState>
         ) : (
           <ul className="space-y-3">
             {entries.map((entry) => {
@@ -102,21 +112,32 @@ export function RosterPage() {
                   ? storedWeapon
                   : undefined;
               return (
-                <li key={entry.characterId} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                <li key={entry.characterId} className="animate-tt-fade relative rounded-lg border border-line bg-panel p-4">
+                  <span aria-hidden="true" className="seal-stamp absolute -top-2.5 right-4 px-2 py-0.5 text-xs">
+                    S{entry.resonanceChain}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex min-w-0 flex-1 basis-48 items-center gap-2.5">
                       <GameIcon name={name} iconUrl={character?.iconUrl} />
-                      <h3 className="text-sm font-semibold">{name}</h3>
+                      <div className="min-w-0">
+                        <h3 className="truncate font-display text-2xl leading-none font-semibold tracking-wide text-ink">{name}</h3>
+                        {character && (
+                          <p className="mt-1 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.14em] text-dim uppercase">
+                            <AttributeDot attribute={character.attribute} />
+                            {character.attribute} · {character.weaponType}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => void remove(entry.characterId)}
-                      className="rounded-md px-2 py-1 text-sm text-red-300 hover:bg-slate-800"
+                      onClick={() => void remove(entry.characterId).then(() => pushToast(`${name} left the roster.`))}
+                      className={`${btnDangerGhost} ml-auto shrink-0 px-2 py-1 text-xs`}
                     >
                       Remove {name}
                     </button>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
+                  <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                     <SliderField
                       id={`roster-level-${entry.characterId}`}
                       label={`Level for ${name}`}
@@ -142,7 +163,7 @@ export function RosterPage() {
                       onChange={(v) => commit(entry, { resonanceChain: v })}
                     />
                     <div>
-                      <label className="block text-xs text-slate-300">
+                      <label className={labelClass}>
                         <span className="flex items-center gap-1.5">
                           <GameIcon name={storedWeapon?.name ?? 'Weapon'} iconUrl={storedWeapon?.iconUrl} size="sm" />
                           Weapon
@@ -164,7 +185,7 @@ export function RosterPage() {
                         </select>
                       </label>
                       {mismatchedWeapon && character && (
-                        <p role="alert" className="mt-1 text-xs text-amber-300">
+                        <p role="alert" className="mt-1 text-xs text-amber">
                           {name} needs a {character.weaponType} — pick one to fix this entry.
                         </p>
                       )}
@@ -195,35 +216,42 @@ export function RosterPage() {
                     />
                   </div>
                   {scorable.length > 0 && (
-                    <fieldset className="mt-2">
-                      <legend className="text-xs text-slate-300">Forte levels (unset shows 10 — touch to store)</legend>
-                      <div className="mt-1 grid grid-cols-2 gap-2 md:grid-cols-3">
-                        {scorable.map((skill) => (
-                          <SliderField
-                            key={skill.id}
-                            id={`roster-forte-${entry.characterId}-${skill.id}`}
-                            label={`${skill.label} forte level`}
-                            value={entry.forteLevels[skill.id] ?? 10}
-                            min={1}
-                            max={10}
-                            onChange={(v) =>
-                              commit(entry, { forteLevels: { ...entry.forteLevels, [skill.id]: v } })
-                            }
-                          />
-                        ))}
-                      </div>
-                    </fieldset>
+                    <div className="mt-4">
+                      <Collapsible title="Forte levels" defaultOpen>
+                        <p className="mb-2 font-mono text-[11px] tracking-[0.08em] text-dim uppercase">
+                          Unset shows 10 — touch to store
+                        </p>
+                        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {scorable.map((skill) => (
+                            <SliderField
+                              key={skill.id}
+                              id={`roster-forte-${entry.characterId}-${skill.id}`}
+                              label={`${skill.label} forte level`}
+                              value={entry.forteLevels[skill.id] ?? 10}
+                              min={1}
+                              max={10}
+                              onChange={(v) =>
+                                commit(entry, { forteLevels: { ...entry.forteLevels, [skill.id]: v } })
+                              }
+                            />
+                          ))}
+                        </div>
+                      </Collapsible>
+                    </div>
                   )}
                   {character && character.forteNodes.length > 0 && (
-                    <fieldset className="mt-2">
-                      <legend className="text-xs text-slate-300">Forte nodes unlocked (untouched = all active)</legend>
-                      <div className="mt-1 grid grid-cols-2 gap-1 md:grid-cols-3">
+                    <div className="mt-4">
+                      <Collapsible title="Forte nodes unlocked" defaultOpen>
+                        <p className="mb-2 font-mono text-[11px] tracking-[0.08em] text-dim uppercase">
+                          Untouched = all active
+                        </p>
+                        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
                         {character.forteNodes.map((node) => {
                           const unlocked = entry.forteUnlockedIds === undefined
                             ? true
                             : entry.forteUnlockedIds.includes(node.id);
                           return (
-                            <label key={node.id} className="flex items-center gap-2 text-xs text-slate-300">
+                            <label key={node.id} className="flex items-center gap-2 text-xs text-fog">
                               <input
                                 type="checkbox"
                                 aria-label={`${node.title} unlocked for ${name}`}
@@ -243,8 +271,9 @@ export function RosterPage() {
                             </label>
                           );
                         })}
-                      </div>
-                    </fieldset>
+                        </div>
+                      </Collapsible>
+                    </div>
                   )}
                 </li>
               );
@@ -252,6 +281,7 @@ export function RosterPage() {
           </ul>
         )}
       </div>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </section>
   );
 }

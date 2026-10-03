@@ -15,10 +15,8 @@ import { EnemyConfig } from '../components/EnemyConfig.tsx';
 import { RotationOptimizer } from '../components/RotationOptimizer.tsx';
 import { RotationTimeline } from '../components/RotationTimeline.tsx';
 import { SliderField } from '../components/SliderField.tsx';
-
-const selectClass =
-  'w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
-const labelClass = 'block text-xs font-medium text-slate-300';
+import { btnOutline, labelClass, selectClass } from '../components/classes.ts';
+import { Alert, PageHeader, Panel } from '../components/ui.tsx';
 
 /** Default weapon for a character: first of its type, else the first weapon. */
 function defaultWeaponFor(snapshot: ReturnType<typeof loadBundledSnapshot>, characterId: string): string {
@@ -226,12 +224,14 @@ export function CalculatorPage() {
 
   return (
     <section>
-      <h2 className="text-xl font-semibold">Damage Calculator</h2>
-      <p className="mt-1 text-xs text-slate-500">
-        Build a rotation from real kit motions — DPR sums every action, DPS divides by rotation time.
-      </p>
+      <PageHeader
+        eyebrow="03 // Damage lab"
+        title="Damage Calculator"
+        description="Build a rotation from real kit motions — DPR sums every action, DPS divides by rotation time."
+      />
 
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <Panel label="Resonator" title="Resonator" eyebrow="Who hits" className="mt-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <div>
           <label htmlFor="calc-roster" className={labelClass}>
             Prefill from roster
@@ -285,20 +285,21 @@ export function CalculatorPage() {
             ))}
           </select>
           {weaponMismatch && character && weapon && (
-            <p role="alert" className="mt-1 text-xs text-amber-300">
+            <p role="alert" className="mt-1 text-xs text-amber">
               {character.name} needs a {character.weaponType} — {weapon.name} is a {weapon.weaponType}.
             </p>
           )}
         </div>
       </div>
+      </Panel>
 
       {character === undefined ? (
-        <p className="mt-4 text-slate-400">
+        <p className="mt-4 rounded-lg border border-dashed border-line-strong bg-panel px-4 py-6 text-center text-sm text-fog">
           Pick a character above — or prefill from your roster — to unlock level and skill inputs.
         </p>
       ) : (
-        <>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <Panel label="Investment" title="Investment" eyebrow="Levels & fortes" className="mt-4">
+          <div className="grid gap-x-4 gap-y-3 md:grid-cols-2">
             <SliderField
               id="calc-level"
               label="Character level"
@@ -359,9 +360,9 @@ export function CalculatorPage() {
             />
           </div>
 
-          <fieldset className="mt-4">
-            <legend className="text-sm font-semibold">Skill levels (1-10)</legend>
-            <div className="mt-2 grid gap-3 md:grid-cols-2">
+          <fieldset className="mt-5">
+            <legend className="font-mono text-[11px] tracking-[0.08em] text-dim uppercase">Skill levels (1-10)</legend>
+            <div className="mt-2 grid gap-x-4 gap-y-3 md:grid-cols-2">
               {scorable.map((skill) => (
                 <SliderField
                   key={skill.id}
@@ -375,7 +376,7 @@ export function CalculatorPage() {
               ))}
             </div>
             {buffOnly.length > 0 && (
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-dim">
                 Buff-only (no damage component — add below as buff carriers):{' '}
                 {buffOnly.map((s) => s.label).join(', ')}
               </p>
@@ -383,15 +384,15 @@ export function CalculatorPage() {
           </fieldset>
 
           {character.forteNodes.length > 0 && (
-            <fieldset className="mt-4">
-              <legend className="text-sm font-semibold">Forte nodes unlocked</legend>
+            <fieldset className="mt-5">
+              <legend className="font-mono text-[11px] tracking-[0.08em] text-dim uppercase">Forte nodes unlocked</legend>
               <div className="mt-2 grid gap-1 md:grid-cols-2">
                 {character.forteNodes.map((node) => {
                   const unlocked = calc.forteUnlockedIds === null
                     ? true
                     : calc.forteUnlockedIds.includes(node.id);
                   return (
-                    <label key={node.id} className="flex items-center gap-2 text-xs text-slate-300">
+                    <label key={node.id} className="flex items-center gap-2 text-xs text-fog">
                       <input
                         type="checkbox"
                         checked={unlocked}
@@ -413,7 +414,7 @@ export function CalculatorPage() {
               </div>
             </fieldset>
           )}
-        </>
+        </Panel>
       )}
 
       <div className="mt-4">
@@ -427,17 +428,28 @@ export function CalculatorPage() {
         />
       </div>
 
-      <section aria-label="Echo loadout" className="mt-4 rounded-lg border border-slate-800 bg-slate-900 p-3">
-        <div className="flex items-baseline justify-between">
-          <h3 className="text-sm font-semibold">Echo Loadout</h3>
+      <Panel
+        label="Echo loadout"
+        title="Echo Loadout"
+        eyebrow="Gear"
+        className="mt-4"
+        actions={
           <span
-            className={`text-xs font-medium ${costTotal > 12 ? 'text-red-300' : costTotal === 12 ? 'text-green-300' : 'text-slate-400'}`}
+            key={costTotal}
+            className={`animate-tt-pop rounded border px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] tnum ${
+              costTotal > 12
+                ? 'border-ember/40 bg-ember-wash text-ember'
+                : costTotal === 12
+                  ? 'border-tide/40 bg-tide-wash text-tide'
+                  : 'border-line-strong bg-canvas text-fog'
+            }`}
           >
-            {costTotal}/12 cost
+            {costTotal}/12 COST
           </span>
-        </div>
+        }
+      >
         {echoes.length === 0 ? (
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-dim">
             No echoes in inventory yet — add some on the Inventory tab first.
           </p>
         ) : (
@@ -465,21 +477,24 @@ export function CalculatorPage() {
           </div>
         )}
         {hasDuplicates && (
-          <p role="alert" className="mt-2 text-xs text-red-300">
+          <p role="alert" className="mt-2 text-xs text-ember">
             The same Echo is picked twice — each Echo can only be equipped once.
           </p>
         )}
         {costTotal > 12 && (
-          <p role="alert" className="mt-2 text-xs text-red-300">
+          <p role="alert" className="mt-2 text-xs text-ember">
             Over the 12-cost budget — swap in cheaper Echoes.
           </p>
         )}
-      </section>
+      </Panel>
 
       {character !== undefined && weapon !== undefined && (
-        <section aria-label="Rotation builder" className="mt-4">
+        <section aria-label="Rotation builder" className="mt-6">
           <div className="flex flex-wrap items-end justify-between gap-2">
-            <h3 className="text-sm font-semibold">Rotation Builder</h3>
+            <div>
+              <p className="font-mono text-[11px] font-medium tracking-[0.22em] text-seal uppercase">The main event</p>
+              <h3 className="font-display text-3xl leading-none font-semibold tracking-wide text-ink">Rotation Builder</h3>
+            </div>
             <div className="w-40">
               <label htmlFor="calc-crit" className={labelClass}>
                 Crit mode
@@ -497,17 +512,17 @@ export function CalculatorPage() {
             </div>
           </div>
           {scoring?.error && (
-            <div role="alert" className="mt-2 rounded-md border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
+            <Alert tone="danger" className="mt-3">
               {scoring.error}
-            </div>
+            </Alert>
           )}
           {echoGateOpen && (
-            <p className="mt-2 text-slate-400">
+            <p className="mt-3 rounded-md border border-dashed border-line-strong bg-panel px-3 py-2 text-sm text-fog">
               Pick 5 distinct echoes above to score the rotation — blocks and buffs stay editable meanwhile.
             </p>
           )}
           {teams.length > 0 && (
-            <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
+            <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-line bg-panel p-4">
               <div className="min-w-48 flex-1">
                 <label htmlFor="calc-team-import" className={labelClass}>
                   Import Outro / team buffs from a team
@@ -528,19 +543,19 @@ export function CalculatorPage() {
                 type="button"
                 onClick={handleImportTeamBuffs}
                 disabled={importTeamId === ''}
-                className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+                className={btnOutline}
               >
                 Import team buffs
               </button>
             </div>
           )}
           {teamWarnings.length > 0 && (
-            <p className="mt-2 text-xs text-amber-300">
+            <p className="mt-2 text-xs text-amber">
               Team import: {teamWarnings.join(' ')}
             </p>
           )}
           {charPresets.length > 0 && (
-            <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
+            <div className="mt-3 rounded-lg border border-line bg-panel p-4">
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-48 flex-1">
                   <label htmlFor="calc-preset" className={labelClass}>
@@ -566,19 +581,19 @@ export function CalculatorPage() {
                   onClick={handleLoadPreset}
                   disabled={!pickedPreset}
                   title="Appends the preset steps as blocks (existing blocks are kept)"
-                  className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+                  className={btnOutline}
                 >
                   Load preset
                 </button>
               </div>
               {pickedPreset && (
-                <p className="mt-2 text-xs text-slate-400">
+                <p className="mt-2 text-xs text-fog">
                   Source:{' '}
                   <a
                     href={pickedPreset.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sky-300 hover:underline"
+                    className="text-glacio hover:underline"
                   >
                     {pickedPreset.sourceName} guide
                   </a>
@@ -586,7 +601,7 @@ export function CalculatorPage() {
                 </p>
               )}
               {presetMessages.length > 0 && (
-                <p className="mt-1 text-xs text-amber-300">{presetMessages.join(' ')}</p>
+                <p className="mt-1 text-xs text-amber">{presetMessages.join(' ')}</p>
               )}
             </div>
           )}
@@ -623,13 +638,13 @@ export function CalculatorPage() {
               onClearBuffWindow={calc.clearBuffWindow}
             />
             {(scoring?.result?.warnings.length ?? 0) > 0 && (
-              <p className="mt-2 text-xs text-amber-300">
+              <p className="mt-2 text-xs text-amber">
                 {scoring?.result?.warnings.length} unmodeled effect{(scoring?.result?.warnings.length ?? 0) === 1 ? '' : 's'} —
                 conditional/custom kit text that never touches the numbers.
               </p>
             )}
             {(scoring?.result?.appliedAssumptions.length ?? 0) > 0 && (
-              <p className="mt-2 text-xs text-slate-500" title={(scoring?.result?.appliedAssumptions ?? []).join('\n')}>
+              <p className="mt-2 text-xs text-dim" title={(scoring?.result?.appliedAssumptions ?? []).join('\n')}>
                 Assumes: {(scoring?.result?.appliedAssumptions ?? []).join('; ')}
               </p>
             )}

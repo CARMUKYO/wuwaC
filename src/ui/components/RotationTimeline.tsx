@@ -18,6 +18,8 @@ import { maxStatusStacks, negativeStatusDef } from '../../domain/negativeStatus.
 import type { ActionBlock, BlockResult, RotationBuff } from '../../domain/rotation.ts';
 import { blockStartTimes, buffAppliesAt, isBlockStale } from '../../domain/rotation.ts';
 import { isPercentStat, parseDisplayValue, statLabel, toDisplayValue } from '../format.ts';
+import { btnDangerGhost, btnGhost, btnOutline, btnSm, inputClass, labelClass } from './classes.ts';
+import { AnimatedNumber, DeltaChip, ScoreBar } from './feedback.tsx';
 
 type KitStatePatch = Partial<
   Pick<
@@ -57,10 +59,6 @@ const KIND_LABELS: Record<string, string> = {
   echo: 'Echo Skill',
   tunebreak: 'Tune Break',
 };
-
-const inputClass =
-  'w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
-const labelClass = 'block text-xs font-medium text-slate-300';
 
 interface RotationTimelineProps {
   character: CharacterData;
@@ -140,6 +138,52 @@ function motionScaling(
   return motion.scaling ?? skill.scaling;
 }
 
+/**
+ * Read-only rotation overview: one segment per block, proportional to
+ * duration when blocks are timed (equal widths otherwise). Segments
+ * starting past rotation time render ember. Tooltips carry the detail;
+ * the list below stays the editor of record.
+ */
+function RotationStrip({
+  blocks,
+  starts,
+  rotationTime,
+  anyTimed,
+}: {
+  blocks: ActionBlock[];
+  starts: number[];
+  rotationTime: number;
+  anyTimed: boolean;
+}) {
+  const totalDuration = blocks.reduce((sum, block) => sum + (block.durationSeconds ?? 0), 0);
+  const span = Math.max(totalDuration, rotationTime, 0.001);
+  return (
+    <div aria-label="Rotation overview" className="mb-2">
+      <div className="flex h-5 gap-px overflow-hidden rounded bg-panel-3">
+        {blocks.map((block, index) => {
+          const width = anyTimed
+            ? Math.max(1.5, ((block.durationSeconds ?? 0) / span) * 100)
+            : 100 / blocks.length;
+          const overrun = (starts[index] ?? 0) >= rotationTime;
+          const label = block.motionName !== '' ? block.motionName : block.skillId;
+          return (
+            <div
+              key={block.id}
+              title={`${index + 1}. ${label} @${formatSeconds(starts[index] ?? 0)}s`}
+              style={{ width: `${width}%` }}
+              className={`score-bar-fill h-5 shrink-0 ${overrun ? 'bg-ember/70' : 'bg-seal/70'}`}
+            />
+          );
+        })}
+      </div>
+      <div className="mt-0.5 flex justify-between font-mono text-[10px] text-dim tnum">
+        <span>0s</span>
+        <span>{formatSeconds(rotationTime)}s</span>
+      </div>
+    </div>
+  );
+}
+
 export function RotationTimeline(props: RotationTimelineProps) {
   const {
     character, resonanceChain, forteLevels, resonanceMode, onSetResonanceMode, blocks, buffs, globalBuffIds, results, dpr, dps, rotationTime,
@@ -162,6 +206,18 @@ export function RotationTimeline(props: RotationTimelineProps) {
     fusionBurst: 'Fusion Burst',
     tuneStrain: 'Tune Strain',
   };
+  // Previous scores for the delta chips, carried as render state: when
+  // the scores move, this render compares against the last committed
+  // pair (adjust-state pattern — React re-renders before painting).
+  const [scorePair, setScorePair] = useState({
+    dpr,
+    dps,
+    prevDpr: null as number | null,
+    prevDps: null as number | null,
+  });
+  if (dpr !== scorePair.dpr || dps !== scorePair.dps) {
+    setScorePair({ dpr, dps, prevDpr: scorePair.dpr, prevDps: scorePair.dps });
+  }
   const [buffError, setBuffError] = useState<string | null>(null);
   const [buffLabel, setBuffLabel] = useState('');
   const [buffSource, setBuffSource] = useState('');
@@ -224,35 +280,56 @@ export function RotationTimeline(props: RotationTimelineProps) {
   return (
     <div className="space-y-4">
       {dpr !== null && dps !== null && (
-        <div aria-label="Rotation results" className="grid grid-cols-3 gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3 text-center">
-          <div>
-            <p className="text-xs text-slate-400">DPR</p>
-            <p className="text-lg font-bold">{Math.round(dpr).toLocaleString()}</p>
+        <div
+          aria-label="Rotation results"
+          className="sticky top-2 z-[5] overflow-hidden rounded-lg border border-line bg-panel shadow-md"
+        >
+          <div className="freq-ticks px-4 pt-3 pb-2">
+            <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-seal uppercase">Rotation results</p>
           </div>
-          <div>
-            <p className="text-xs text-slate-400">DPS</p>
-            <p className="text-lg font-bold">{Math.round(dps).toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-400">Time</p>
-            <p className="text-lg font-bold">{rotationTime}s</p>
+          <div className="grid grid-cols-3 gap-2 px-4 pt-1 pb-4 text-center">
+            <div className="min-w-0">
+              <p className="font-mono text-[11px] tracking-[0.2em] text-dim uppercase">DPR</p>
+              <p className="mt-0.5 truncate font-display text-3xl leading-none font-semibold tracking-wide text-seal sm:text-4xl">
+                <AnimatedNumber value={dpr} />
+              </p>
+              <div className="mt-1 flex h-4 items-center justify-center">
+                <DeltaChip current={dpr} previous={scorePair.prevDpr ?? dpr} />
+              </div>
+            </div>
+            <div className="min-w-0 border-x border-line">
+              <p className="font-mono text-[11px] tracking-[0.2em] text-dim uppercase">DPS</p>
+              <p className="mt-0.5 truncate font-display text-3xl leading-none font-semibold tracking-wide text-ink sm:text-4xl">
+                <AnimatedNumber value={dps} />
+              </p>
+              <div className="mt-1 flex h-4 items-center justify-center">
+                <DeltaChip current={dps} previous={scorePair.prevDps ?? dps} />
+              </div>
+            </div>
+            <div className="min-w-0">
+              <p className="font-mono text-[11px] tracking-[0.2em] text-dim uppercase">Time</p>
+              <p className="mt-0.5 truncate font-display text-3xl leading-none font-semibold tracking-wide text-ink tnum sm:text-4xl">{rotationTime}s</p>
+            </div>
           </div>
         </div>
       )}
 
       <section aria-label="Rotation timeline">
         {totalDuration > 0 && totalDuration > rotationTime && (
-          <p role="alert" className="mb-2 text-xs text-amber-300">
+          <p role="alert" className="mb-2 text-xs text-amber">
             Total block duration {formatSeconds(totalDuration)}s exceeds rotation time {rotationTime}s — out-of-range blocks still score.
           </p>
         )}
         {totalDuration > 0 && totalDuration <= rotationTime && (
-          <p className="mb-2 text-xs text-slate-400">
+          <p className="mb-2 text-xs text-fog">
             Total block duration {formatSeconds(totalDuration)}s of {rotationTime}s rotation time.
           </p>
         )}
+        {blocks.length > 0 && (
+          <RotationStrip blocks={blocks} starts={starts} rotationTime={rotationTime} anyTimed={anyTimed} />
+        )}
         {blocks.length === 0 ? (
-          <p className="text-slate-400">No actions yet — add your first hit below to start the rotation.</p>
+          <p className="rounded-lg border border-dashed border-line-strong bg-panel px-4 py-6 text-center text-sm text-fog">No actions yet — add your first hit below to start the rotation.</p>
         ) : (
           <ol className="space-y-2">
             {blocks.map((block, index) => {
@@ -276,15 +353,16 @@ export function RotationTimeline(props: RotationTimelineProps) {
               const skillKind = skill?.kind;
               const blockCap = maxStatusStacks(block.statusType ?? 'aeroErosion', character.id, resonanceChain);
               return (
-                <li key={block.id} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {index + 1}. {blockLabel}
-                        {anyTimed && ` @${formatSeconds(starts[index])}s`}
-                        {result?.buffCarrier && <span className="text-xs text-slate-400"> (buff carrier)</span>}
+                <li key={block.id} className="animate-tt-fade rounded-lg border border-line bg-panel px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="min-w-0 flex-1 basis-48">
+                      <p className="truncate font-display text-lg leading-tight font-semibold tracking-wide text-ink">
+                        <span className="mr-1.5 font-mono text-[11px] font-medium text-seal tnum">{String(index + 1).padStart(2, '0')}</span>
+                        {blockLabel}
+                        {anyTimed && <span className="ml-1.5 font-mono text-[11px] font-medium text-dim tnum">@{formatSeconds(starts[index])}s</span>}
+                        {result?.buffCarrier && <span className="ml-1.5 font-mono text-[10px] tracking-[0.08em] text-dim uppercase">buff carrier</span>}
                       </p>
-                      <p className="truncate text-xs text-slate-400">
+                      <p className="mt-0.5 truncate font-mono text-[11px] text-fog tnum">
                         {negativeStatus
                           ? `${block.statusStacks ?? 1} stack${(block.statusStacks ?? 1) === 1 ? '' : 's'}`
                           : tuneBreak
@@ -294,27 +372,27 @@ export function RotationTimeline(props: RotationTimelineProps) {
                               : lanceBlock
                                 ? 'Coordinated lance (one trigger)'
                                 : block.motionName === '' ? 'No damage component' : block.motionName}
-                        {result && !result.buffCarrier && ` · ${Math.round(result.damage).toLocaleString()} dmg · ${result.share.toFixed(1)}%`}
+                        {result && !result.buffCarrier && (
+                          <span className="text-ink"> · {Math.round(result.damage).toLocaleString()} dmg · {result.share.toFixed(1)}%</span>
+                        )}
                       </p>
                     </div>
-                    <div className="flex shrink-0 gap-1">
-                      <button type="button" aria-label={`Move ${block.motionName || 'block'} up`} disabled={index === 0} onClick={() => onMoveBlock(block.id, -1)} className="rounded-md px-2 py-1 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-30">↑</button>
-                      <button type="button" aria-label={`Move ${block.motionName || 'block'} down`} disabled={index === blocks.length - 1} onClick={() => onMoveBlock(block.id, 1)} className="rounded-md px-2 py-1 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-30">↓</button>
-                      <button type="button" onClick={() => onRemoveBlock(block.id)} className="rounded-md px-2 py-1 text-sm text-red-300 hover:bg-slate-800">Remove</button>
+                    <div className="ml-auto flex shrink-0 items-center gap-1">
+                      <button type="button" aria-label={`Move ${block.motionName || 'block'} up`} disabled={index === 0} onClick={() => onMoveBlock(block.id, -1)} className={`${btnGhost} ${btnSm}`}>↑</button>
+                      <button type="button" aria-label={`Move ${block.motionName || 'block'} down`} disabled={index === blocks.length - 1} onClick={() => onMoveBlock(block.id, 1)} className={`${btnGhost} ${btnSm}`}>↓</button>
+                      <button type="button" onClick={() => onRemoveBlock(block.id)} className={`${btnDangerGhost} ${btnSm}`}>Remove</button>
                     </div>
                   </div>
                   {result && !result.buffCarrier && (
-                    <div className="mt-1 h-1.5 rounded-full bg-slate-800" aria-hidden="true">
-                      <div className="h-1.5 rounded-full bg-slate-100" style={{ width: `${Math.min(100, result.share)}%` }} />
-                    </div>
+                    <ScoreBar share={result.share} className="mt-2" />
                   )}
                   {stale ? (
-                    <p role="alert" className="mt-1 text-xs text-amber-300">
+                    <p role="alert" className="mt-1 text-xs text-amber">
                       This action is not on {character.name}’s kit — remove it or switch back.
                     </p>
                   ) : (
                     <details className="mt-1">
-                      <summary className="cursor-pointer text-xs text-slate-400">
+                      <summary className="cursor-pointer text-xs text-fog">
                         {negativeStatus
                           ? `${statusLabel ?? 'Status'} · ${block.statusStacks ?? 1} stack${(block.statusStacks ?? 1) === 1 ? '' : 's'}`
                           : tuneBreak
@@ -482,7 +560,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                               </select>
                             </div>
                             {block.echoCooldown !== undefined && (
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-dim">
                                 Cooldown {block.echoCooldown}s (shown, not simulated).
                               </p>
                             )}
@@ -596,7 +674,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                           </div>
                         )}
                         {!specialKind && character.id === 'yangyang-xuanling' && (
-                          <label className="flex items-center gap-2 text-xs text-slate-300">
+                          <label className="flex items-center gap-2 text-xs text-fog">
                             <input
                               type="checkbox"
                               checked={block.voiceFlux ?? false}
@@ -607,7 +685,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         )}
                         {!specialKind && character.id === 'chisa' && skillKind === 'forte' && (
                           <div>
-                            <label className="flex items-center gap-2 text-xs text-slate-300">
+                            <label className="flex items-center gap-2 text-xs text-fog">
                               <input
                                 type="checkbox"
                                 checked={block.wovenMyriad ?? false}
@@ -652,14 +730,14 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         <fieldset>
                           <legend className={labelClass}>Buffs on this action</legend>
                           {buffs.length === 0 ? (
-                            <p className="mt-0.5 text-xs text-slate-500">No buffs yet — add one below.</p>
+                            <p className="mt-0.5 text-xs text-dim">No buffs yet — add one below.</p>
                           ) : (
                             <div className="mt-1 space-y-1">
                               {buffs.map((buff) => {
                                 const manual = block.activeBuffIds.includes(buff.id);
                                 const inWindow = buffAppliesAt(buff, starts[index]);
                                 return (
-                                  <label key={buff.id} className="flex items-center gap-2 text-xs text-slate-300">
+                                  <label key={buff.id} className="flex items-center gap-2 text-xs text-fog">
                                     <input
                                       type="checkbox"
                                       checked={manual || inWindow}
@@ -667,7 +745,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                                       onChange={() => onToggleBlockBuff(block.id, buff.id)}
                                     />
                                     <span>[{buff.source}] {buff.label}</span>
-                                    {inWindow && <span className="rounded bg-slate-800 px-1 text-slate-400">window</span>}
+                                    {inWindow && <span className="rounded bg-panel-3 px-1 text-fog">window</span>}
                                   </label>
                                 );
                               })}
@@ -684,15 +762,16 @@ export function RotationTimeline(props: RotationTimelineProps) {
         )}
       </section>
 
-      <section aria-label="Add actions">
-        <h3 className="text-sm font-semibold">Add Actions</h3>
+      <section aria-label="Add actions" className="rounded-lg border border-line bg-panel p-4">
+        <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-seal uppercase">Build the sequence</p>
+        <h3 className="font-display text-2xl leading-tight font-semibold tracking-wide text-ink">Add Actions</h3>
         {resonanceModes.length > 0 && (
-          <div className="mt-2 rounded-md border border-slate-800 p-2">
-            <p className="text-xs font-medium text-slate-400">Resonance Mode</p>
-            <p className="mt-1 text-xs text-slate-500">
+          <div className="mt-3 rounded-md border border-line bg-canvas p-3">
+            <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Resonance Mode</p>
+            <p className="mt-1 text-xs text-dim">
               This kit scores differently per mode — pick the one this rotation runs.
             </p>
-            <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" aria-label="Resonance Mode">
+            <div className="mt-1.5 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Resonance Mode">
               {resonanceModes.map((mode) => (
                 <button
                   key={mode}
@@ -700,10 +779,10 @@ export function RotationTimeline(props: RotationTimelineProps) {
                   role="radio"
                   aria-checked={resonanceMode === mode}
                   onClick={() => onSetResonanceMode(mode)}
-                  className={`rounded-md border px-2 py-1 text-xs hover:bg-slate-800 ${
+                  className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-terminal hover:bg-panel-2 ${
                     resonanceMode === mode
-                      ? 'border-sky-500 text-sky-200'
-                      : 'border-slate-700 text-slate-200'
+                      ? 'border-glacio text-glacio'
+                      : 'border-line-strong text-ink'
                   }`}
                 >
                   {RESONANCE_MODE_LABELS[mode]}
@@ -712,10 +791,10 @@ export function RotationTimeline(props: RotationTimelineProps) {
             </div>
           </div>
         )}
-        <div className="mt-2 space-y-3">
+        <div className="mt-3 space-y-3">
           {kinds.map((kind) => (
             <div key={kind}>
-              <p className="text-xs font-medium text-slate-400">{KIND_LABELS[kind]}</p>
+              <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">{KIND_LABELS[kind]}</p>
               <div className="mt-1 flex flex-wrap gap-1">
                 {character.skills.filter((s) => s.kind === kind).flatMap((skill) => {
                   if (skill.motionValues.length === 0 && !isBuffOnlySkill(character.id, skill)) {
@@ -726,7 +805,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         type="button"
                         title={`${(JIYAN_OUTRO_LANCE_MV * 100).toFixed(1)}% ATK · Aero + coordinated buckets`}
                         onClick={() => onAddBlock(skill.id, '', forteLevels[skill.id] ?? 10)}
-                        className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                        className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-dim hover:bg-panel-2 hover:text-ink"
                       >
                         {skill.label} (coordinated lance)
                       </button>
@@ -737,7 +816,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                       key={skill.id}
                       type="button"
                       onClick={() => onAddBlock(skill.id, '', forteLevels[skill.id] ?? 10)}
-                      className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                      className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-dim hover:bg-panel-2 hover:text-ink"
                     >
                       {skill.label} (buff carrier)
                     </button>
@@ -748,7 +827,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         type="button"
                         title={motionTitle(skill, motion, forteLevels[skill.id] ?? 10)}
                         onClick={() => onAddBlock(skill.id, motion.name, forteLevels[skill.id] ?? 10)}
-                        className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                        className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-dim hover:bg-panel-2 hover:text-ink"
                       >
                         {motion.name} · {motionPercent(skill, motion.name, forteLevels[skill.id] ?? 10)}
                         {motionScaling(skill, motion) !== 'ATK' && ` [${motionScaling(skill, motion)}]`}
@@ -765,9 +844,9 @@ export function RotationTimeline(props: RotationTimelineProps) {
           const def = negativeStatusDef(status);
           const cap = maxStatusStacks(status, character.id, resonanceChain);
           return (
-            <div key={status} className="mt-3 rounded-md border border-slate-800 p-2">
-              <p className="text-xs font-medium text-slate-400">Negative Status DMG</p>
-              <p className="mt-1 text-xs text-slate-500">
+            <div key={status} className="mt-3 rounded-md border border-line bg-canvas p-3">
+              <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Negative Status DMG</p>
+              <p className="mt-1 text-xs text-dim">
                 {def.label} ignores {def.element}/action DMG bonuses and Crit. Its damage is resolved from the selected stack count.
               </p>
               <div className="mt-1 flex flex-wrap gap-1">
@@ -780,7 +859,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                       statusType: status,
                       statusStacks: stacks,
                     })}
-                    className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                    className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-dim hover:bg-panel-2 hover:text-ink"
                   >
                     {def.label} ×{stacks}
                   </button>
@@ -790,9 +869,9 @@ export function RotationTimeline(props: RotationTimelineProps) {
           );
         })}
         {ruptureResponses.length > 0 && resonanceMode === 'tuneRupture' && (
-          <div className="mt-3 rounded-md border border-slate-800 p-2">
-            <p className="text-xs font-medium text-slate-400">Tune Rupture Response (provisional)</p>
-            <p className="mt-1 text-xs text-slate-500">
+          <div className="mt-3 rounded-md border border-line bg-canvas p-3">
+            <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Tune Rupture Response (provisional)</p>
+            <p className="mt-1 text-xs text-dim">
               Response instances use the snapshot MV with trail scaling, no base Crit, and no verified formula — tune the trail count per block.
             </p>
             <div className="mt-1 flex flex-wrap gap-1">
@@ -807,7 +886,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                       damageKind: 'tuneRupture',
                       tuneResponseStacks: 0,
                     })}
-                    className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                    className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-dim hover:bg-panel-2 hover:text-ink"
                   >
                     {motionName}
                   </button>
@@ -816,9 +895,9 @@ export function RotationTimeline(props: RotationTimelineProps) {
             </div>
           </div>
         )}
-        <div className="mt-3 rounded-md border border-slate-800 p-2">
-          <p className="text-xs font-medium text-slate-400">Tune Break (provisional)</p>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="mt-3 rounded-md border border-line bg-canvas p-3">
+          <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Tune Break (provisional)</p>
+          <p className="mt-1 text-xs text-dim">
             Mistuned-target break hit: provisional base-10000 shape, no verified formula or coefficients — set the coefficient per block from your own research.
           </p>
           <div className="mt-1 flex flex-wrap gap-1">
@@ -828,22 +907,22 @@ export function RotationTimeline(props: RotationTimelineProps) {
                 damageKind: 'tuneBreak',
                 tuneBreakMultiplier: 1,
               })}
-              className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+              className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-dim hover:bg-panel-2 hover:text-ink"
             >
               Tune Break ×1.0
             </button>
           </div>
         </div>
         {mainEchoSkill !== null && (
-          <div className="mt-3 rounded-md border border-slate-800 p-2">
-            <p className="text-xs font-medium text-slate-400">Echo Skill (slot 1: {mainEchoSkill.echoName})</p>
+          <div className="mt-3 rounded-md border border-line bg-canvas p-3">
+            <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Echo Skill (slot 1: {mainEchoSkill.echoName})</p>
             {mainEchoSkill.hits.length === 0 ? (
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-dim">
                 No damaging skill to score — heals, shields, Physical damage, and utility echoes carry no scorable hit.
               </p>
             ) : (
               <>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-dim">
                   One block per hit — repeat for multi-hit skills{mainEchoSkill.cooldown !== undefined ? ` (cooldown ${mainEchoSkill.cooldown}s shown, not simulated)` : ''}.
                 </p>
                 <div className="mt-1 flex flex-wrap gap-1">
@@ -860,7 +939,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         echoScaling: hit.scaling,
                         echoCooldown: mainEchoSkill.cooldown,
                       })}
-                      className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                      className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-dim hover:bg-panel-2 hover:text-ink"
                     >
                       {mainEchoSkill.hits.length > 1 ? `${hit.label} · ` : ''}{(hit.motionValue * 100).toFixed(1)}% {hit.attribute}
                       {hit.flatDamage > 0 && ` +${hit.flatDamage}`}
@@ -874,10 +953,11 @@ export function RotationTimeline(props: RotationTimelineProps) {
         )}
       </section>
 
-      <section aria-label="Buffs" className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-        <h3 className="text-sm font-semibold">Buffs</h3>
+      <section aria-label="Buffs" className="rounded-lg border border-line bg-panel p-4">
+        <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-seal uppercase">Modifiers</p>
+        <h3 className="font-display text-2xl leading-tight font-semibold tracking-wide text-ink">Buffs</h3>
         {buffs.length === 0 ? (
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-dim">
             No buffs yet — pick a preset below or add a custom buff with its verified numbers.
           </p>
         ) : (
@@ -888,8 +968,8 @@ export function RotationTimeline(props: RotationTimelineProps) {
               const windowEnd = windowStart + (buff.windowDurationSeconds ?? 0);
               return (
                 <li key={buff.id} className="text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="flex min-w-0 items-center gap-2 text-slate-200">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex min-w-0 flex-1 basis-48 items-center gap-2 text-ink">
                       <input
                         type="checkbox"
                         checked={globalBuffIds.includes(buff.id)}
@@ -900,11 +980,11 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         {hasWindow ? ` — window [${formatSeconds(windowStart)}s, ${formatSeconds(windowEnd)}s)` : ' — full uptime'}
                       </span>
                     </label>
-                    <button type="button" onClick={() => onRemoveBuff(buff.id)} className="shrink-0 rounded-md px-2 py-1 text-red-300 hover:bg-slate-800">
+                    <button type="button" onClick={() => onRemoveBuff(buff.id)} className={`${btnDangerGhost} ml-auto shrink-0 ${btnSm}`}>
                       Remove {buff.label}
                     </button>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 pl-6 text-slate-300">
+                  <div className="mt-1 flex flex-wrap items-center gap-2 pl-6 text-fog">
                     <label htmlFor={`buff-window-start-${buff.id}`}>Window start (s)</label>
                     <input
                       id={`buff-window-start-${buff.id}`}
@@ -918,7 +998,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         const num = Number(e.target.value);
                         if (Number.isFinite(num)) onSetBuffWindow(buff.id, num, buff.windowDurationSeconds ?? 0);
                       }}
-                      className="w-20 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100"
+                      className="w-20 rounded-md border border-line-strong bg-canvas px-2 py-1 font-mono text-xs text-ink tnum"
                     />
                     <label htmlFor={`buff-window-duration-${buff.id}`}>Window duration (s)</label>
                     <input
@@ -933,14 +1013,14 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         const num = Number(e.target.value);
                         if (Number.isFinite(num)) onSetBuffWindow(buff.id, buff.windowStartSeconds ?? 0, num);
                       }}
-                      className="w-20 rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100"
+                      className="w-20 rounded-md border border-line-strong bg-canvas px-2 py-1 font-mono text-xs text-ink tnum"
                     />
                     {hasWindow && (
                       <button
                         type="button"
                         onClick={() => onClearBuffWindow(buff.id)}
                         aria-label={`Clear window for ${buff.label}`}
-                        className="shrink-0 rounded-md px-2 py-1 text-slate-400 hover:bg-slate-800"
+                        className={`${btnGhost} shrink-0 ${btnSm}`}
                       >
                         Clear window
                       </button>
@@ -966,13 +1046,13 @@ export function RotationTimeline(props: RotationTimelineProps) {
             </select>
           </div>
           <div className="flex items-end">
-            <button type="button" onClick={handleAddPreset} disabled={presetId === ''} className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40">
+            <button type="button" onClick={handleAddPreset} disabled={presetId === ''} className={btnOutline}>
               Add preset
             </button>
           </div>
         </div>
         {selectedPreset?.assumption && (
-          <p className="mt-1 text-xs text-slate-500">{selectedPreset.label}: {selectedPreset.assumption}</p>
+          <p className="mt-1 text-xs text-dim">{selectedPreset.label}: {selectedPreset.assumption}</p>
         )}
         <form onSubmit={handleAddBuff} className="mt-3 grid gap-2 md:grid-cols-4">
           <div>
@@ -1008,11 +1088,11 @@ export function RotationTimeline(props: RotationTimelineProps) {
             <input id="buff-value-2" type="text" inputMode="decimal" value={buffValue2} onChange={(e) => setBuffValue2(e.target.value)} className={`${inputClass} mt-0.5`} />
           </div>
         </form>
-        {buffError && <div role="alert" className="mt-2 text-xs text-red-300">{buffError}</div>}
-        <button type="button" onClick={(e) => handleAddBuff(e as unknown as FormEvent)} className="mt-2 rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800">
+        {buffError && <div role="alert" className="mt-2 text-xs text-ember">{buffError}</div>}
+        <button type="button" onClick={(e) => handleAddBuff(e as unknown as FormEvent)} className={`${btnOutline} mt-2`}>
           Add buff
         </button>
-        <p className="mt-1 text-xs text-slate-500">RES shred is entered as a negative RES Penetration value.</p>
+        <p className="mt-1 text-xs text-dim">RES shred is entered as a negative RES Penetration value.</p>
       </section>
     </div>
   );

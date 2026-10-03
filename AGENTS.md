@@ -175,6 +175,17 @@ interface Team {
 
 - `src` — application source
 - `docs` — project documentation
+- UI styling: `src/index.css` `@theme` tokens (paper default + `[data-theme="ink"]`
+  overrides) consumed via `src/ui/components/classes.ts` (class strings) and
+  `src/ui/components/ui.tsx` (primitives). Never raw hex in components —
+  add a token instead. Theme state lives in `src/state/theme.ts`.
+- UI dynamics: signature motif in `src/ui/components/motif.tsx`
+  (FrequencyStrip, seal stamps), live-feedback primitives in
+  `src/ui/components/feedback.tsx` + `src/ui/toasts.ts`, motion hooks in
+  `src/ui/motion.ts`, command palette in `src/ui/components/palette.tsx`,
+  free-text suggest in `src/ui/components/SuggestInput.tsx`. All keyframes
+  live in the Motion section of `src/index.css` (reduced-motion safe);
+  section routing (`#section`, `#b=` reserved) lives in `src/state/store.ts`.
 
 ## Conventions
 

@@ -3,9 +3,11 @@ import { loadBundledSnapshot } from '../../data/index.ts';
 import { serializeBuilds, useLibraryStore } from '../../state/library.ts';
 import { decodeBuildLink, encodeBuildLink } from '../../state/share.ts';
 import { GameIcon } from '../components/GameIcon.tsx';
-
-const inputClass =
-  'w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100';
+import { btnDangerGhost, btnGhost, btnOutline, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
+import { Skeleton, ToastStack } from '../components/feedback.tsx';
+import { useToasts } from '../toasts.ts';
+import { MotifEmptyState } from '../components/motif.tsx';
+import { Alert, PageHeader } from '../components/ui.tsx';
 
 /** Decode a share hash and import it; resolves a user-facing notice. Pure module scope (no hooks). */
 async function importLinkIntoLibrary(
@@ -30,6 +32,7 @@ export function BuildsPage() {
   const [paste, setPaste] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
   const linkHandled = useRef(false);
 
   useEffect(() => {
@@ -105,65 +108,72 @@ export function BuildsPage() {
 
   return (
     <section>
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Build Library</h2>
-        {builds.length > 0 && (
-          <button
-            type="button"
-            onClick={handleExport}
-            className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-          >
-            Export all as JSON
-          </button>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="05 // Archive"
+        title="Build Library"
+        description="Winning optimizer results, saved with their full rotation spec — exportable and shareable by link."
+        actions={
+          builds.length > 0 ? (
+            <button type="button" onClick={handleExport} className={btnOutline}>
+              Export all as JSON
+            </button>
+          ) : undefined
+        }
+      />
 
       {error && (
-        <div role="alert" className="mt-2 rounded-md border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
+        <Alert tone="danger" className="mt-4">
           {error}
-        </div>
+        </Alert>
       )}
       {notice && (
-        <p role="status" className="mt-2 rounded-md border border-green-800 bg-green-950 px-3 py-2 text-sm text-green-200">
+        <Alert tone="success" role="status" className="mt-4">
           {notice}
-        </p>
+        </Alert>
       )}
 
       <div className="mt-4">
         {!loaded ? (
-          <p className="text-slate-400">Loading…</p>
+          <Skeleton lines={3} />
         ) : builds.length === 0 ? (
-          <p className="text-slate-400">No saved builds yet — save one from the Calculator results.</p>
+          <MotifEmptyState seed="builds-empty">No saved builds yet — save one from the Calculator results.</MotifEmptyState>
         ) : (
           <ul className="space-y-2">
             {builds.map((build) => (
-              <li key={build.id} className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+              <li key={build.id} className="animate-tt-fade row-sweep rounded-lg border border-line bg-panel px-4 py-3 transition-terminal hover:border-line-strong">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex min-w-0 flex-1 basis-52 items-center gap-3">
                     <GameIcon
                       name={characterName(build.characterId)}
                       iconUrl={snapshot.characters.find((c) => c.id === build.characterId)?.iconUrl}
                     />
-                    <div>
-                      <p className="text-sm font-medium">{build.name}</p>
-                      <p className="text-xs text-slate-400">
+                    <div className="min-w-0">
+                      <p className="truncate font-display text-xl leading-tight font-semibold tracking-wide text-ink">{build.name}</p>
+                      <p className="mt-0.5 font-mono text-[11px] tracking-[0.06em] text-dim uppercase tnum">
                         {characterName(build.characterId)}
-                        {build.score !== undefined && ` · score ${build.score.toFixed(1)}`}
+                        {build.score !== undefined && (
+                          <>
+                            {' · '}
+                            <span className="seal-stamp px-1.5 py-px text-[10px]">
+                              score {build.score.toFixed(1)}
+                            </span>
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="ml-auto flex shrink-0 gap-1">
                     <button
                       type="button"
                       onClick={() => void handleCopyLink(build.id)}
-                      className="rounded-md px-2 py-1 text-sm text-slate-300 hover:bg-slate-800"
+                      className={`${btnGhost} px-2 py-1 text-xs`}
                     >
                       Copy link
                     </button>
                     <button
                       type="button"
-                      onClick={() => void removeBuild(build.id)}
-                      className="rounded-md px-2 py-1 text-sm text-red-300 hover:bg-slate-800"
+                      onClick={() => void removeBuild(build.id).then(() => pushToast(`Build “${build.name}” deleted.`))}
+                      className={`${btnDangerGhost} px-2 py-1 text-xs`}
                     >
                       Delete {build.name}
                     </button>
@@ -175,8 +185,8 @@ export function BuildsPage() {
         )}
       </div>
 
-      <div className="mt-6">
-        <label htmlFor="build-import" className="block text-xs font-medium text-slate-300">
+      <div className="mt-6 rounded-lg border border-line bg-panel p-4">
+        <label htmlFor="build-import" className={labelClass}>
           Paste build JSON to import (single build or array)
         </label>
         <textarea
@@ -184,16 +194,17 @@ export function BuildsPage() {
           value={paste}
           onChange={(e) => setPaste(e.target.value)}
           rows={4}
-          className={`${inputClass} mt-1 font-mono`}
+          className={`${inputClass} mt-1.5 font-mono text-xs`}
         />
         <button
           type="button"
           onClick={() => void handleImport()}
-          className="mt-2 rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
+          className={`${btnPrimary} mt-3`}
         >
           Import
         </button>
       </div>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </section>
   );
 }

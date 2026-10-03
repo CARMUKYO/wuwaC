@@ -1,10 +1,378 @@
 @import "tailwindcss";
 
-/* Minimal base. Component styling lives in Tailwind classes, not here. */
+/*
+ * WuWa Optimizer — "Paper & Seal" design system.
+ *
+ * Light-first, inspired by the game's own menus: warm paper ground, ink
+ * text, and a single vermilion seal-red accent (the Tacet-stamp red), with
+ * pine-teal and clay tones for status. A dark "ink" variant redefines the
+ * same tokens under [data-theme="ink"] — components only ever reference
+ * the semantic names below, never raw hex.
+ *
+ * Display type is Barlow Condensed, body is Barlow, and all
+ * metadata/numbers use JetBrains Mono with tabular figures.
+ */
+
+@theme {
+  --font-display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-sans: "Barlow", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Paper (default light theme). */
+  --color-canvas: #f1eee6;
+  --color-panel: #faf8f2;
+  --color-panel-2: #e8e3d5;
+  --color-panel-3: #dbd4c0;
+  --color-line: #d5cfbd;
+  --color-line-strong: #b3ab94;
+
+  --color-ink: #1d1f1c;
+  --color-fog: #565c55;
+  --color-dim: #71766d;
+
+  --color-seal: #bf3d1c;
+  --color-seal-bright: #a33315;
+  --color-seal-deep: #7c2a10;
+  --color-seal-wash: #f5ddd0;
+  --color-seal-ink: #fff9f4;
+
+  --color-tide: #0f766e;
+  --color-tide-wash: #d8ece5;
+  --color-ember: #b3261e;
+  --color-ember-wash: #f6dcd6;
+  --color-ember-ink: #a02118;
+  --color-amber: #92400e;
+  --color-amber-wash: #f3e6c8;
+  --color-glacio: #0369a1;
+  --color-fusion: #c2410c;
+  --color-electro: #6d28d9;
+  --color-aero: #15803d;
+  --color-spectro: #7a6200;
+  --color-havoc: #be185d;
+}
+
+/* Ink (dark theme): same tokens, re-grounded. Wins over the layered
+ * @theme :root because unlayered author styles beat cascade layers. */
+[data-theme="ink"] {
+  color-scheme: dark;
+
+  --color-canvas: #0d100f;
+  --color-panel: #141816;
+  --color-panel-2: #1c2320;
+  --color-panel-3: #28312d;
+  --color-line: #25302b;
+  --color-line-strong: #3c4a44;
+
+  --color-ink: #e9e7dc;
+  --color-fog: #a2aba2;
+  --color-dim: #7d877f;
+
+  --color-seal: #e0572f;
+  --color-seal-bright: #ef7046;
+  --color-seal-deep: #7c2a10;
+  --color-seal-wash: #2a130b;
+  --color-seal-ink: #230f06;
+
+  --color-tide: #5ec8a6;
+  --color-tide-wash: #0d2019;
+  --color-ember: #e0684e;
+  --color-ember-wash: #26110c;
+  --color-ember-ink: #f0a895;
+  --color-amber: #e0b34e;
+  --color-amber-wash: #231a09;
+  --color-glacio: #8fd6e8;
+  --color-fusion: #ef7d54;
+  --color-electro: #c9a7f5;
+  --color-aero: #8fd6a0;
+  --color-spectro: #e8cf7a;
+  --color-havoc: #e08aa8;
+}
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {
   margin: 0;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-seal-deep);
+  color: #fff9f4;
+}
+
+/* Faint terminal grid over the page ground. Flat, theme-aware. */
+.terminal-ground {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--color-ink) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-ink) 6%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Thin ruled divider used under page headers and panel titles. */
+.rule {
+  border-top: 1px solid var(--color-line);
+}
+
+/* Frequency-tick strip: the Tacet/waveform motif for hero panels. */
+.freq-ticks {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-line-strong) 0,
+    var(--color-line-strong) 1px,
+    transparent 1px,
+    transparent 7px
+  );
+  background-size: 100% 5px;
+  background-repeat: no-repeat;
+  background-position: bottom;
+}
+
+/* Tabular numerals everywhere numbers appear in mono contexts. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Form controls ------------------------------------------------ */
+
+input[type="range"] {
+  accent-color: var(--color-seal);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-seal);
+}
+
+/* Custom range track so sliders read as instruments, not default widgets. */
+input[type="range"].terminal-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-panel-3);
+  outline-offset: 4px;
+}
+input[type="range"].terminal-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--color-seal);
+  border: 1px solid var(--color-seal-deep);
+  cursor: pointer;
+}
+input[type="range"].terminal-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--color-seal);
+  border: 1px solid var(--color-seal-deep);
+  cursor: pointer;
+}
+input[type="range"].terminal-range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-panel-3);
+}
+
+select option,
+select optgroup {
+  background-color: var(--color-panel);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-seal);
+  outline-offset: 2px;
+}
+
+/* ---- Touch devices --------------------------------------------------- */
+
+@media (pointer: coarse) {
+  /* Bigger grab targets for thumbs. */
+  input[type="range"].terminal-range::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+  }
+  input[type="range"].terminal-range::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* iOS Safari zooms into inputs below 16px — keep everything at 16 on
+ * phones so tapping a field doesn't yank the viewport. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ---- Scrollbars ---------------------------------------------------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- Details/summary ----------------------------------------------- */
+
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+details > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.35rem;
+  color: var(--color-seal);
+  font-size: 0.7em;
+}
+details[open] > summary::before {
+  content: "▾";
+}
+
+/* ---- Motion ---------------------------------------------------------- */
+/*
+ * Tacet Terminal signature motion. All keyframes live in this section so
+ * the reduced-motion block at the bottom neutralizes every one of them.
+ * Rule of thumb: opacity-first, small distances, short durations — the
+ * terminal feels alive, never bouncy.
+ */
+
+@keyframes tt-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tt-rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tt-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes tt-eq {
+  0%, 100% { transform: scaleY(0.45); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes tt-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@keyframes tt-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .transition-terminal {
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease;
+  }
+
+  /* Section swap + list enter. Used sparingly — never on scroll. */
+  .animate-tt-fade { animation: tt-fade 160ms ease; }
+  .animate-tt-rise { animation: tt-rise 180ms ease; }
+  .animate-tt-pop { animation: tt-pop 220ms ease; }
+  .animate-tt-toast { animation: tt-toast-in 200ms ease; }
+
+  /* Waveform bars (FrequencyStrip, BrandMark). transform-box keeps the
+   * scale anchored to each bar's own box in SVG. */
+  .eq-bar {
+    transform-box: fill-box;
+    transform-origin: center bottom;
+    animation: tt-eq 2.4s ease-in-out infinite;
+  }
+
+  /* Damage/score bars ease toward their new width on recompute. */
+  .score-bar-fill { transition: width 300ms ease; }
+
+  /* Delta readouts glide between tide/ember/ink. */
+  .delta-glide { transition: color 400ms ease; }
+
+  /* Interactive rows draw a seal baseline on hover — the frequency motif
+   * as an affordance, not decoration. */
+  .row-sweep {
+    background-image: linear-gradient(to right, var(--color-seal), var(--color-seal));
+    background-size: 0% 2px;
+    background-repeat: no-repeat;
+    background-position: left bottom;
+    transition: background-size 180ms ease;
+  }
+  .row-sweep:hover { background-size: 100% 2px; }
+}
+
+/* Seal stamp: the hanko-style mark for specimen plates (sonata sets,
+ * attribute tags). Square, vermilion, slightly rotated when free. */
+.seal-stamp {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-seal);
+  color: var(--color-seal-ink);
+  border-radius: 3px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.seal-stamp-tilt { transform: rotate(-2deg); }
+
+/* Skeleton shimmer for loading states. Static gradient under
+ * reduced motion (the animation simply never applies). */
+.skeleton {
+  background: linear-gradient(
+    100deg,
+    var(--color-panel-2) 40%,
+    var(--color-panel-3) 50%,
+    var(--color-panel-2) 60%
+  );
+  background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton { animation: tt-shimmer 1.6s linear infinite; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
