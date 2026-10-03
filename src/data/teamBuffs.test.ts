@@ -111,3 +111,26 @@ describe('team buffs table', () => {
     expect(roccia.assumption).toMatch(/70%/);
   });
 });
+
+describe('2026-10-03 sync arrivals', () => {
+  it('transcribes both Hsin Outro branches', () => {
+    const unison = TEAM_BUFFS.find((e) => e.label === 'Hsin Outro (team, Unison mode)')!;
+    expect(unison.skillId).toBe('1006109');
+    expect(unison.target).toBe('team');
+    expect(unison.windowSeconds).toBe(30);
+    expect(unison.mods).toEqual([{ stat: 'amplify', value: 0.2 }]);
+    const flare = TEAM_BUFFS.find((e) => e.label === 'Hsin Outro (team, Electro Flare mode)')!;
+    expect(flare.skillId).toBe('1006109');
+    expect(flare.windowSeconds).toBe(20);
+    expect(flare.mods).toEqual([{ stat: 'dmgBonus:Electro', value: 0.2 }]);
+  });
+
+  it('transcribes Suoming Outro with the Unison Boon branch as a note', () => {
+    const suoming = TEAM_BUFFS.find((e) => e.characterId === 'suoming')!;
+    expect(suoming.skillId).toBe('1006209');
+    expect(suoming.target).toBe('incoming');
+    expect(suoming.windowSeconds).toBe(8);
+    expect(suoming.mods).toEqual([{ stat: 'dmgBonus:Electro', value: 0.2 }]);
+    expect(suoming.assumption).toMatch(/25%.*custom buff/);
+  });
+});

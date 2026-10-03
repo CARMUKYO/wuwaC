@@ -380,6 +380,7 @@ describe('buff presets', () => {
       ['weapon-starfield-calibrator-team', 4],
       ['weapon-static-mist-outro', 14],
       ['weapon-stellar-symphony-team', 30],
+      ['weapon-unspoken-rue-team', 30],
       ['weapon-wildfire-mark-team', 30],
     ];
     const actual: [string, number][] = [];
@@ -392,5 +393,30 @@ describe('buff presets', () => {
     }
     actual.sort(([a], [b]) => (a < b ? -1 : 1));
     expect(actual).toEqual(expected);
+  });
+});
+
+describe('2026-10-03 sync arrivals', () => {
+  it('transcribes Unspoken Rue wielder + team branches', () => {
+    expect(resolvePresetMods(preset('weapon-unspoken-rue'), {})).toEqual([
+      { stat: 'atkPct', value: 0.24 },
+      { stat: 'dmgBonus:Electro', value: 0.6 },
+    ]);
+    const team = preset('weapon-unspoken-rue-team');
+    expect(team.windowSeconds).toBe(30);
+    expect(resolvePresetMods(team, {})).toEqual([{ stat: 'dmgBonus:Electro', value: 0.48 }]);
+    // Rank 1 resolves the first series entry, not the R5 default.
+    expect(resolvePresetMods(team, { weaponRank: 1 })).toEqual([
+      { stat: 'dmgBonus:Electro', value: 0.24 },
+    ]);
+  });
+
+  it('transcribes Blooming Jadehaven with the RES gate scored sheet-wide', () => {
+    expect(resolvePresetMods(preset('weapon-blooming-jadehaven'), {})).toEqual([
+      { stat: 'dmgBonus:Havoc', value: 0.24 },
+      { stat: 'dmgBonus:skill', value: 0.72 },
+      { stat: 'resistancePenetration', value: -0.24 },
+      { stat: 'negativeStatusAmplify', value: 0.6 },
+    ]);
   });
 });

@@ -3,8 +3,8 @@ import type { StatKey } from './schema.ts';
 /**
  * Curated team-buff table (Team v2 data layer).
  *
- * One entry per transcribable Outro skill (all 58 characters checked
- * against the 2026-09-19 snapshot) plus the non-Outro team buffs with
+ * One entry per transcribable Outro skill (all 60 characters checked
+ * against the 2026-10-03 snapshot) plus the non-Outro team buffs with
  * concrete numbers (Lynae's Liberation, Shorekeeper's Stellarealm caps,
  * Lupa's Pack Hunt base, Rover: Electro's Overshock, Suisui's Bane-gated
  * DEF ignore, Ciaccona's Solo Concert, Qiuyuan's Liberation + Bamboo's
@@ -109,6 +109,10 @@ export const TEAM_BUFFS: TeamBuffEntry[] = [
   { characterId: 'iuno', kind: 'other', label: 'Iuno Blessing (team, full stacks)', skillId: '1003807', windowSeconds: 10, target: 'team', mods: [{ stat: 'amplify', value: 0.40 }], assumption: 'Blessing of the Wan Light at 10 stacks (4% each, full stacks); requires repeated shield gains inside the Full Moon domain.' },
   { characterId: 'lynae', kind: 'other', label: 'Lynae Visual Impact (team)', skillId: '1004507', windowSeconds: 30, target: 'team', mods: [{ stat: 'tuneBreakBoost', value: 40 }], assumption: 'Tune Break Boost points (raw), not percent.' },
   { characterId: 'mornye', kind: 'other', label: 'Mornye Interfered Marker (team, capped)', skillId: '1004407', windowSeconds: 8, target: 'team', mods: [{ stat: 'amplify', value: 0.40 }], assumption: 'Interfered Marker active (8s, tune-response state); at cap (Mornye Energy Regen ≥260%): +0.25% per 1% over 100%, up to 40%.' },
+  // ---- 2026-10-03 sync arrivals (values from provider skill text) ----
+  { characterId: 'hsin', kind: 'outro', label: 'Hsin Outro (team, Unison mode)', skillId: '1006109', windowSeconds: 30, target: 'team', mods: [{ stat: 'amplify', value: 0.20 }], assumption: 'Resonance Mode - Unison; Shared Light holders only. Ends early if Hsin switches mode.' },
+  { characterId: 'hsin', kind: 'outro', label: 'Hsin Outro (team, Electro Flare mode)', skillId: '1006109', windowSeconds: 20, target: 'team', mods: [{ stat: 'dmgBonus:Electro', value: 0.20 }], assumption: '"Electro DMG Amplification" in the additive bucket (no per-type amplify term). Ends early if Hsin switches mode.' },
+  { characterId: 'suoming', kind: 'outro', label: 'Suoming Outro (incoming)', skillId: '1006209', windowSeconds: 8, target: 'incoming', mods: [{ stat: 'dmgBonus:Electro', value: 0.20 }], assumption: '"Electro DMG Amplification" in the additive bucket. Unison Boon holders also gain 25% Resonance Skill amp (add a custom buff).' },
 ];
 
 /**
