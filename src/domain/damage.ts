@@ -22,6 +22,7 @@ import {
 } from './characterMods.ts';
 import { jiyanOutroLanceSpec } from './jiyan.ts';
 import { camellyaOutroTwiningSpec } from './camellya.ts';
+import { hsinOutroSpec } from './hsin.ts';
 import { xiangliyaoOutroChainRuleSpec } from './xiangliyao.ts';
 import {
   havocBaneDefReduction,
@@ -279,12 +280,13 @@ export interface DamageContext {
   conviction?: number;
   /** Havoc Bane stacks on the target — percentage DEF reduction. */
   targetHavocBaneStacks?: number;
-  /** Kit-state inputs for per-character modules (Zani Blazes, Xuanling Voice Flux, Chisa rings/state). */
+  /** Kit-state inputs for per-character modules (Zani Blazes, Xuanling Voice Flux, Chisa rings/state, Suoming Seal Master). */
   blazesConsumed?: number;
   nightfallBlazes?: number;
   ringsConsumed?: number;
   voiceFlux?: boolean;
   wovenMyriad?: boolean;
+  sealMaster?: boolean;
   /** Tune Strain - Interfered stacks on the target (total-DMG amp). */
   tuneStrainStacks?: number;
 }
@@ -524,6 +526,49 @@ export function computeXiangliyaoChainRuleDamage(ctx: XiangliyaoChainRuleDamageC
   return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
 }
 
+export interface HsinOutroDamageContext {
+  sheet: StatSheet;
+  /** Outro motion value from `hsinOutroSpec` (100% ATK, no chain scaling). */
+  motionValue: number;
+  baseAtk: { character: number; weapon: number };
+  attackerLevel: number;
+  enemy: EnemyProfile;
+  crit: CritMode;
+  /** Havoc Bane stacks on the target — percentage DEF reduction. */
+  targetHavocBaneStacks?: number;
+}
+
+/**
+ * Hsin's Outro damage (hsin.ts prose spec). Electro attribute bucket only —
+ * no action-type bucket is stated in kit, and the outro hit is not a
+ * coordinated attack (unlike the Jiyan lance); no kit mods; otherwise the
+ * standard formula tree.
+ */
+export function computeHsinOutroDamage(ctx: HsinOutroDamageContext): DamageResult {
+  const { sheet, enemy } = ctx;
+  const abilityStat = computeAtk(ctx.baseAtk.character, ctx.baseAtk.weapon, sheet);
+  const baseDamage = computeBaseAbilityDamage(abilityStat, ctx.motionValue);
+  const resTotal = enemy.baseResistance.Electro + sheet.resistancePenetration;
+  const resistances =
+    computeResMultiplier(resTotal) *
+    computeDefMultiplier({
+      attackerLevel: ctx.attackerLevel,
+      enemyLevel: enemy.level,
+      enemyDefOverride: enemy.enemyDefOverride,
+      defIgnore: sheet.defIgnore,
+      defReduction: sheet.defReduction,
+      enemyDefPctReduction: havocBaneDefReduction(ctx.targetHavocBaneStacks ?? 0),
+    }) *
+    computeDmgReductionTotal(enemy.dmgReductionBase, enemy.dmgReductionAdditional) *
+    computeElemReductionTotal(enemy.elemReductionBase, enemy.elemReductionAdditional);
+  const bonuses =
+    computeDmgBonusPercent(sheet, 'Electro', 'forte', 0, false) *
+    computeDmgAmplifyTotal(sheet.amplify, enemy.amplifyTarget) *
+    computeSpecialDmgPercent(sheet.specialBase, sheet.specialBonus) *
+    computeCritMultiplier(sheet.critRate, sheet.critDmg, ctx.crit);
+  return { damage: baseDamage * resistances * bonuses, baseDamage, resistances, bonuses };
+}
+
 /**
  * Snapshot rows whose prose exempts them from DMG Bonus. Keys are
  * `characterId|skillId|motionName` (exact snapshot motion names):
@@ -595,6 +640,18 @@ export function computeDamage(ctx: DamageContext): DamageResult {
       targetHavocBaneStacks: ctx.targetHavocBaneStacks,
     });
   }
+  const hsinOutro = hsinOutroSpec(ctx.characterId, skill, ctx.motionName);
+  if (hsinOutro !== null) {
+    return computeHsinOutroDamage({
+      sheet,
+      motionValue: hsinOutro.motionValue,
+      baseAtk: ctx.baseAtk,
+      attackerLevel: ctx.attackerLevel,
+      enemy,
+      crit: ctx.crit,
+      targetHavocBaneStacks: ctx.targetHavocBaneStacks,
+    });
+  }
   const motion = resolveMotion(skill, ctx.motionName, ctx.forteLevel);
   if (motion.isHealing) {
     return { damage: 0, baseDamage: 0, resistances: 1, bonuses: 1 };
@@ -628,6 +685,7 @@ export function computeDamage(ctx: DamageContext): DamageResult {
       ringsConsumed: ctx.ringsConsumed,
       voiceFlux: ctx.voiceFlux,
       wovenMyriad: ctx.wovenMyriad,
+      sealMaster: ctx.sealMaster,
     },
   );
   const baseDamage = rawBaseDamage * kitMods.motionMultiplier * cartethyiaMotionMultiplier(

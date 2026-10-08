@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { SnapshotRefreshError } from '../../data/activeSnapshot.ts';
 import { loadBundledSnapshot } from '../../data/index.ts';
 import type {
   CharacterData,
@@ -6,11 +7,14 @@ import type {
   SonataSetData,
   WeaponData,
 } from '../../data/schema.ts';
+import { useSnapshotStore } from '../../state/snapshotStore.ts';
 import { filterByName } from '../filter.ts';
 import { statLabel, toDisplayValue } from '../format.ts';
 import { GameIcon } from '../components/GameIcon.tsx';
-import { inputClass, labelClass } from '../components/classes.ts';
+import { btnOutline, inputClass, labelClass } from '../components/classes.ts';
+import { ToastStack } from '../components/feedback.tsx';
 import { AttributeDot, PageHeader } from '../components/ui.tsx';
+import { useToasts } from '../toasts.ts';
 
 type Tab = 'characters' | 'weapons' | 'echoes' | 'sonatas';
 
@@ -170,10 +174,44 @@ function SonataDetail({ set }: { set: SonataSetData }) {
 }
 
 export function DatabasePage() {
-  const snapshot = loadBundledSnapshot();
+  const snapshot = useSnapshotStore((s) => s.snapshot);
+  const source = useSnapshotStore((s) => s.source);
+  const resolving = useSnapshotStore((s) => s.resolving);
+  const refreshing = useSnapshotStore((s) => s.refreshing);
+  const ensureSnapshotLoaded = useSnapshotStore((s) => s.ensureLoaded);
+  const refreshSnapshot = useSnapshotStore((s) => s.refresh);
   const [tab, setTab] = useState<Tab>('characters');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
+
+  useEffect(() => {
+    void ensureSnapshotLoaded();
+  }, [ensureSnapshotLoaded]);
+
+  const activeDate = snapshot.fetchedAt.slice(0, 10);
+  const bundledDate = loadBundledSnapshot().fetchedAt.slice(0, 10);
+
+  const handleCheckForUpdates = (): void => {
+    void refreshSnapshot().then(
+      (outcome) => {
+        if (outcome.status === 'updated') {
+          pushToast(`Game data updated to ${outcome.snapshot.fetchedAt.slice(0, 10)}.`, 'success');
+        } else {
+          pushToast(`Already up to date (${outcome.snapshot.fetchedAt.slice(0, 10)}).`, 'info');
+        }
+      },
+      (err: unknown) => {
+        if (err instanceof SnapshotRefreshError && err.kind === 'newer-than-app') {
+          pushToast(`New data needs an app update — still on ${activeDate}.`, 'danger');
+        } else if (err instanceof SnapshotRefreshError && err.kind === 'invalid') {
+          pushToast(`Provider data failed validation — still on ${activeDate}.`, 'danger');
+        } else {
+          pushToast(`Couldn't reach encore.moe — still on ${activeDate}.`, 'danger');
+        }
+      },
+    );
+  };
 
   const switchTab = (next: Tab): void => {
     setTab(next);
@@ -307,8 +345,38 @@ export function DatabasePage() {
         title="Database"
         description={
           <>
-            Sourced from encore.moe · {snapshot.fetchedAt.slice(0, 10)} · {snapshot.echoDefs.length} of 311
+            Sourced from encore.moe · {activeDate} · {snapshot.echoDefs.length} of 311
             echoes have verified cost data (the rest are skipped, never guessed).
+          </>
+        }
+        actions={
+          <>
+            <span
+              aria-live="polite"
+              title={
+                resolving
+                  ? 'Consulting the local data cache…'
+                  : source === 'cache'
+                    ? `Serving cached data from ${activeDate} (bundled data is ${bundledDate})`
+                    : `Using bundled data from ${bundledDate}`
+              }
+              className="rounded border border-line-strong bg-canvas px-1.5 py-1 font-mono text-[10px] tracking-[0.08em] text-fog uppercase tnum"
+            >
+              {resolving
+                ? 'Checking cache…'
+                : source === 'cache'
+                  ? `Cached · ${activeDate}`
+                  : `Bundled · ${bundledDate}`}
+            </span>
+            <button
+              type="button"
+              onClick={handleCheckForUpdates}
+              disabled={refreshing}
+              title="Fetch the latest game data from encore.moe in the background"
+              className={btnOutline}
+            >
+              {refreshing ? 'Checking…' : 'Check for updates'}
+            </button>
           </>
         }
       />
@@ -351,6 +419,7 @@ export function DatabasePage() {
           {renderDetail()}
         </div>
       </div>
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </section>
   );
 }

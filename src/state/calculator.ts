@@ -101,6 +101,7 @@ interface CalculatorState {
         | 'ringsConsumed'
         | 'voiceFlux'
         | 'wovenMyriad'
+        | 'sealMaster'
         | 'tuneStrainStacks'
         | 'tuneResponseStacks'
         | 'tuneBreakMultiplier'
@@ -264,6 +265,7 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
         }
         if (typeof patch.voiceFlux === 'boolean') next.voiceFlux = patch.voiceFlux;
         if (typeof patch.wovenMyriad === 'boolean') next.wovenMyriad = patch.wovenMyriad;
+        if (typeof patch.sealMaster === 'boolean') next.sealMaster = patch.sealMaster;
         if (patch.tuneStrainStacks !== undefined && Number.isInteger(patch.tuneStrainStacks)) {
           next.tuneStrainStacks = Math.min(10, Math.max(0, patch.tuneStrainStacks));
         }

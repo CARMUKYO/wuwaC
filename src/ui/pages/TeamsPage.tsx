@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { loadBundledSnapshot } from '../../data/index.ts';
 import { TEAM_BUFFS } from '../../data/teamBuffs.ts';
 import { teamSonataCoverage } from '../../domain/teams.ts';
 import { useInventoryStore } from '../../state/inventory.ts';
+import { useSnapshotStore } from '../../state/snapshotStore.ts';
 import { useTeamStore } from '../../state/teamStore.ts';
 import { GameIcon } from '../components/GameIcon.tsx';
 import { statLabel, toDisplayValue } from '../format.ts';
@@ -22,7 +22,8 @@ export function TeamsPage() {
   const echoes = useInventoryStore((s) => s.echoes);
   const inventoryLoaded = useInventoryStore((s) => s.loaded);
   const loadInventory = useInventoryStore((s) => s.load);
-  const snapshot = loadBundledSnapshot();
+  const snapshot = useSnapshotStore((s) => s.snapshot);
+  const ensureSnapshotLoaded = useSnapshotStore((s) => s.ensureLoaded);
 
   const [name, setName] = useState('');
   const [members, setMembers] = useState(['', '', '']);
@@ -35,6 +36,9 @@ export function TeamsPage() {
   useEffect(() => {
     if (!inventoryLoaded) void loadInventory();
   }, [inventoryLoaded, loadInventory]);
+  useEffect(() => {
+    void ensureSnapshotLoaded();
+  }, [ensureSnapshotLoaded]);
 
   const characterName = (id: string): string =>
     snapshot.characters.find((c) => c.id === id)?.name ?? id;

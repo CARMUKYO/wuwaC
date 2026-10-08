@@ -3,9 +3,11 @@ import type { CharacterSkill, MotionBonusKind, SkillKind } from '../data/schema.
 import { aemeathSkillMods } from './aemeath.ts';
 import { chisaSkillMods, isChisaParameterMotion, type ChisaModInputs } from './chisa.ts';
 import { galbrenaSkillMods } from './galbrena.ts';
+import { hsinSkillMods } from './hsin.ts';
 import { jiyanOutroLanceSpec } from './jiyan.ts';
 import { lynaeSkillMods } from './lynae.ts';
 import type { NegativeStatusType } from './negativeStatus.ts';
+import { suomingSkillMods, type SuomingModInputs } from './suoming.ts';
 import { xuanlingSkillMods, type XuanlingModInputs } from './xuanling.ts';
 import { zaniMotionMultiplier, type ZaniModInputs } from './zani.ts';
 
@@ -44,7 +46,7 @@ export function characterResonanceModes(characterId: string): ResonanceMode[] {
  * Phase 4 grows this into the Resonance Mode registry.
  */
 
-export interface KitStateInputs extends ZaniModInputs, XuanlingModInputs, ChisaModInputs {}
+export interface KitStateInputs extends ZaniModInputs, XuanlingModInputs, ChisaModInputs, SuomingModInputs {}
 
 export interface ResolvedSkillMods {
   motionMultiplier: number;
@@ -165,6 +167,26 @@ export function characterSkillMods(
       critDmgExtra: 0,
       defIgnoreExtra: 0,
     };
+  } else if (characterId === 'hsin') {
+    const hsin = hsinSkillMods(characterId, resonanceChain, motionDmgType);
+    mods = {
+      motionMultiplier: hsin.motionMultiplier,
+      dmgBonusExtra: hsin.dmgBonusExtra,
+      amplifyExtra: 0,
+      critRateExtra: 0,
+      critDmgExtra: 0,
+      defIgnoreExtra: 0,
+    };
+  } else if (characterId === 'suoming') {
+    const suoming = suomingSkillMods(characterId, motionName, inputs);
+    mods = {
+      motionMultiplier: suoming.motionMultiplier,
+      dmgBonusExtra: suoming.dmgBonusExtra,
+      amplifyExtra: 0,
+      critRateExtra: 0,
+      critDmgExtra: 0,
+      defIgnoreExtra: 0,
+    };
   } else {
     mods = { ...NEUTRAL_MODS };
   }
@@ -225,6 +247,13 @@ export function characterStatusBlocks(characterId: string): NegativeStatusType[]
  * - Baizhi "Remnant Entities Damage" (Liberation 1000403: stacks "are
  *   automatically consumed to perform Coordinated Attacks"; HP-scaling
  *   per its motion row; the Healing twin scores 0 and is not listed).
+ * - Hsin "Soaring Pillar DMG" (Liberation 1006103 Edict: "summon a
+ *   Soaring Pillar ... as a Coordinated Attack to strike the target
+ *   once"; one block per trigger, 21-stack/1s pacing is rotation
+ *   realism).
+ * - Suoming "Resonance Liberation - Blight Rain, Miasmic Thunder DMG"
+ *   (Liberation 1006203: "a Thunder Crest is summoned as a Coordinated
+ *   Attack on the target"; one block per trigger, 1/s up to 6).
  * Deliberately unlisted (2026-09-17): Cantarella "Tidal Surge DMG" and
  * "Phantom Sting Stage 3 DMG" merely TRIGGER 3 coordinated attacks each
  * — Tidal/Ripple MV parity (0.85) proves the triggered damage is not
@@ -242,6 +271,8 @@ const COORDINATED_MOTIONS: Record<string, string[]> = {
   zhezhi: ['Inklit Spirit DMG'],
   cantarella: ['Diffusion DMG'],
   baizhi: ['Remnant Entities Damage'],
+  hsin: ['Soaring Pillar DMG'],
+  suoming: ['Resonance Liberation - Blight Rain, Miasmic Thunder DMG'],
 };
 
 export function characterCoordinatedMotions(characterId: string): string[] {

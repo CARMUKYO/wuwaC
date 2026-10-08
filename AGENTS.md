@@ -49,8 +49,19 @@ UI (React components)
   step, not hand-typed — see `docs/WUWA_GAME_REFERENCE.md` section 8 for
   the full fetch-validate-cache-fallback pipeline. What the rest of the
   app actually reads at runtime is a bundled/cached snapshot, never a
-  direct blocking fetch on page load. Beyond that sync step, this layer
-  is plain data — no game-math functions live here.
+  direct blocking fetch on page load. Runtime contract (`data/activeSnapshot.ts`,
+  React bridge `state/snapshotStore.ts`): fallback order is validated
+  IndexedDB cache (`gamedataCache`/`active` row: payload + FNV checksum,
+  re-validated on every read) -> bundled `snapshot.json` -> opportunistic
+  background provider refresh that never blocks load (one attempt per
+  session when the active snapshot is older than 7 days, plus manual
+  "Check for updates" on the Database page). Version decides who serves
+  (matching-or-newer cache wins), age decides when to revalidate, and a
+  refresh candidate is adopted only if strictly newer — anything else
+  keeps serving current data silently. The CLI sync and the browser
+  refresh share one pipeline (`data/providerSync.ts`); never fork a
+  second one. Beyond that sync step, this layer is plain data — no
+  game-math functions live here.
 - **Domain layer**: pure functions, e.g. `computeStats(character, weapon,
   echoes, sonataBonuses) -> StatSheet` and `computeDamage(statSheet,
   skill, enemy) -> number`. Fully unit-testable without rendering

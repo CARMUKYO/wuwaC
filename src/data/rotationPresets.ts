@@ -20,6 +20,7 @@ import { DENIA_ROTATION_PRESETS } from './rotationPreset-denia.ts';
 import { ENCORE_ROTATION_PRESETS } from './rotationPreset-encore.ts';
 import { GALBRENA_ROTATION_PRESETS } from './rotationPreset-galbrena.ts';
 import { HIYUKI_ROTATION_PRESETS } from './rotationPreset-hiyuki.ts';
+import { HSIN_ROTATION_PRESETS } from './rotationPreset-hsin.ts';
 import { JIANXIN_ROTATION_PRESETS } from './rotationPreset-jianxin.ts';
 // -- auditor-2 zone: iuno..rebecca (imports for rotationPreset-<id>.ts go here) --
 import { IUNO_ROTATION_PRESETS } from './rotationPreset-iuno.ts';
@@ -127,6 +128,7 @@ export const ROTATION_PRESETS: RotationPreset[] = [
   ...ENCORE_ROTATION_PRESETS,
   ...GALBRENA_ROTATION_PRESETS,
   ...HIYUKI_ROTATION_PRESETS,
+  ...HSIN_ROTATION_PRESETS,
   ...JIANXIN_ROTATION_PRESETS,
   // -- auditor-2 zone entries --
   ...IUNO_ROTATION_PRESETS,

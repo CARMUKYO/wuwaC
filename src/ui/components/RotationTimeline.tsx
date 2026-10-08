@@ -30,6 +30,7 @@ type KitStatePatch = Partial<
     | 'ringsConsumed'
     | 'voiceFlux'
     | 'wovenMyriad'
+    | 'sealMaster'
     | 'tuneStrainStacks'
     | 'tuneResponseStacks'
     | 'tuneBreakMultiplier'
@@ -681,6 +682,16 @@ export function RotationTimeline(props: RotationTimelineProps) {
                               onChange={() => onSetBlockKitState(block.id, { voiceFlux: !(block.voiceFlux ?? false) })}
                             />
                             <span>Voice Flux active (S6 Heavy +40%)</span>
+                          </label>
+                        )}
+                        {!specialKind && character.id === 'suoming' && (
+                          <label className="flex items-center gap-2 text-xs text-fog">
+                            <input
+                              type="checkbox"
+                              checked={block.sealMaster ?? false}
+                              onChange={() => onSetBlockKitState(block.id, { sealMaster: !(block.sealMaster ?? false) })}
+                            />
+                            <span>Seal Master active (Unfurled ×2, 12s)</span>
                           </label>
                         )}
                         {!specialKind && character.id === 'chisa' && skillKind === 'forte' && (

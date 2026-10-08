@@ -549,6 +549,10 @@ describe('coordinated-motion registry', () => {
     expect(characterCoordinatedMotions('zhezhi')).toEqual(['Inklit Spirit DMG']);
     expect(characterCoordinatedMotions('cantarella')).toEqual(['Diffusion DMG']);
     expect(characterCoordinatedMotions('baizhi')).toEqual(['Remnant Entities Damage']);
+    expect(characterCoordinatedMotions('hsin')).toEqual(['Soaring Pillar DMG']);
+    expect(characterCoordinatedMotions('suoming')).toEqual([
+      'Resonance Liberation - Blight Rain, Miasmic Thunder DMG',
+    ]);
     expect(characterCoordinatedMotions('jiyan')).toEqual([]);
     expect(isCoordinatedMotion('yinlin', 'Judgment Strike Damage')).toBe(true);
     expect(isCoordinatedMotion('yinlin', 'Chameleon Cipher Damage')).toBe(false);
@@ -559,7 +563,7 @@ describe('coordinated-motion registry', () => {
 
   it('resolves every registry entry against the snapshot', () => {
     const missing: string[] = [];
-    for (const id of ['yinlin', 'verina', 'yuanwu', 'mortefi', 'zhezhi', 'cantarella', 'baizhi']) {
+    for (const id of ['yinlin', 'verina', 'yuanwu', 'mortefi', 'zhezhi', 'cantarella', 'baizhi', 'hsin', 'suoming']) {
       const character = snapshot.characters.find((c) => c.id === id)!;
       const names = new Set(character.skills.flatMap((s) => s.motionValues.map((m) => m.name)));
       for (const motion of characterCoordinatedMotions(id)) {
@@ -725,6 +729,123 @@ describe('wave 3 chain motion composition (Roccia/Qingxiao/Lynae)', () => {
     ).toBe(1);
     expect(
       characterSkillMods('lynae', 4, lLib, 'Prismatic Overblast DMG', 'liberation', 10).motionMultiplier,
+    ).toBe(1);
+  });
+});
+
+describe('wave 5 chain motion composition (Hsin/Suoming)', () => {
+  const hsin = snapshot.characters.find((c) => c.id === 'hsin')!;
+  const hIntro = hsin.skills.find((s) => s.kind === 'intro')!;
+  const hLib = hsin.skills.find((s) => s.kind === 'liberation')!;
+  const hForte = hsin.skills.find((s) => s.kind === 'forte')!;
+  const suoming = snapshot.characters.find((c) => c.id === 'suoming')!;
+  const sIntro = suoming.skills.find((s) => s.kind === 'intro')!;
+  const sLib = suoming.skills.find((s) => s.kind === 'liberation')!;
+  const sForte = suoming.skills.find((s) => s.kind === 'forte')!;
+  const sBasic = suoming.skills.find((s) => s.kind === 'basic')!;
+
+  it('stacks Hsin S1 + S6 Manifold additively (1.45 -> 1.55), plain intros untouched', () => {
+    const row = 'Intro Skill - Answering Form: Manifold Unison DMG';
+    expect(characterSkillMods('hsin', 1, hIntro, row, 'skill', 10).motionMultiplier).toBeCloseTo(1.45, 10);
+    expect(characterSkillMods('hsin', 5, hIntro, row, 'skill', 10).motionMultiplier).toBeCloseTo(1.45, 10);
+    expect(characterSkillMods('hsin', 6, hIntro, row, 'skill', 10).motionMultiplier).toBeCloseTo(1.55, 10);
+    expect(
+      characterSkillMods('hsin', 6, hIntro, 'Intro Skill - Answering Form DMG in Resonance Mode - Unison', 'intro', 10)
+        .motionMultiplier,
+    ).toBe(1);
+  });
+
+  it('gates Hsin S2 to the Realm / Horizons heavies on the shared forte skill', () => {
+    expect(
+      characterSkillMods('hsin', 2, hForte, 'Heavy Attack - Answering Form: Realm Wanderer DMG', 'skill', 10)
+        .motionMultiplier,
+    ).toBeCloseTo(1.6, 10);
+    expect(
+      characterSkillMods('hsin', 2, hForte, 'Heavy Attack - Illumining Form: Stilling All Horizons DMG', 'skill', 10)
+        .motionMultiplier,
+    ).toBeCloseTo(1.6, 10);
+    expect(
+      characterSkillMods('hsin', 1, hForte, 'Heavy Attack - Answering Form: Realm Wanderer DMG', 'skill', 10)
+        .motionMultiplier,
+    ).toBe(1);
+    expect(
+      characterSkillMods('hsin', 6, hForte, 'Resonance Skill - Illumining Form: Pillars Aligned DMG', 'skill', 10)
+        .motionMultiplier,
+    ).toBe(1);
+  });
+
+  it('stacks Hsin S3 Pillars MV with the Unison crit branch (0.65 -> 0.80), Soaring Pillar untouched', () => {
+    const pillars = characterSkillMods('hsin', 3, hLib, 'Pillars Across Heaven DMG', 'skill', 10);
+    expect(pillars.motionMultiplier).toBeCloseTo(1.7, 10);
+    expect(pillars.critDmgExtra).toBeCloseTo(0.65, 10);
+    expect(characterSkillMods('hsin', 6, hLib, 'Pillars Across Heaven DMG', 'skill', 10).critDmgExtra).toBeCloseTo(
+      0.8,
+      10,
+    );
+    const soaring = characterSkillMods('hsin', 6, hLib, 'Soaring Pillar DMG', 'liberation', 10);
+    expect(soaring.motionMultiplier).toBe(1);
+    expect(soaring.critDmgExtra).toBe(0);
+  });
+
+  it('applies Hsin S6 Skill taken + DEF ignore to skill-typed motions only', () => {
+    const wanderer = characterSkillMods('hsin', 6, hForte, 'Heavy Attack - Answering Form: Realm Wanderer DMG', 'skill', 10);
+    expect(wanderer.dmgBonusExtra).toBeCloseTo(0.4, 10);
+    expect(wanderer.defIgnoreExtra).toBeCloseTo(0.2, 10);
+    // Liberation-kind but skill-considered: Pillars counts as Resonance Skill DMG.
+    const pillars = characterSkillMods('hsin', 6, hLib, 'Pillars Across Heaven DMG', 'skill', 10);
+    expect(pillars.dmgBonusExtra).toBeCloseTo(0.4, 10);
+    expect(pillars.defIgnoreExtra).toBeCloseTo(0.2, 10);
+    const basic = hsin.skills.find((s) => s.kind === 'basic')!;
+    const stage = characterSkillMods('hsin', 6, basic, 'Basic Attack - Answering Form Stage 1 DMG', 'basic', 10);
+    expect(stage.dmgBonusExtra).toBe(0);
+    expect(stage.defIgnoreExtra).toBe(0);
+    expect(
+      characterSkillMods('hsin', 5, hForte, 'Heavy Attack - Answering Form: Realm Wanderer DMG', 'skill', 10)
+        .dmgBonusExtra,
+    ).toBe(0);
+  });
+
+  it('gates Suoming S1 to all four intro rows', () => {
+    for (const motion of sIntro.motionValues) {
+      expect(characterSkillMods('suoming', 1, sIntro, motion.name, 'basic', 10).motionMultiplier).toBeCloseTo(1.6, 10);
+      expect(characterSkillMods('suoming', 0, sIntro, motion.name, 'basic', 10).motionMultiplier).toBe(1);
+    }
+    expect(sIntro.motionValues).toHaveLength(4);
+  });
+
+  it('gates Suoming S5 to Miasma Lock, not the Thunder Crest twin', () => {
+    expect(
+      characterSkillMods('suoming', 5, sLib, 'Resonance Liberation - Umbral Canopy: Miasma Lock DMG', 'liberation', 10)
+        .motionMultiplier,
+    ).toBeCloseTo(1.4, 10);
+    expect(
+      characterSkillMods('suoming', 5, sLib, 'Resonance Liberation - Blight Rain, Miasmic Thunder DMG', 'liberation', 10)
+        .motionMultiplier,
+    ).toBe(1);
+  });
+
+  it('gates Suoming S6 to both Engraved Heart rows', () => {
+    expect(
+      characterSkillMods('suoming', 6, sForte, 'Basic Attack - Umbral Canopy: Engraved Heart DMG', 'basic', 10)
+        .motionMultiplier,
+    ).toBeCloseTo(1.5, 10);
+    expect(
+      characterSkillMods('suoming', 6, sForte, 'Basic Attack - Umbral Canopy: Engraved Heart DMG (Hold)', 'basic', 10)
+        .motionMultiplier,
+    ).toBeCloseTo(1.5, 10);
+    expect(
+      characterSkillMods('suoming', 6, sForte, 'Resonance Skill - Unfurled Canopy: Unforsaken Mind DMG', 'basic', 10)
+        .motionMultiplier,
+    ).toBe(1);
+  });
+
+  it('routes Suoming Seal Master through the dispatcher with per-block input', () => {
+    const row = 'Basic Attack - Unfurled Canopy Stage 1 DMG';
+    expect(characterSkillMods('suoming', 0, sBasic, row, 'basic', 10, { sealMaster: true }).motionMultiplier).toBe(2);
+    expect(characterSkillMods('suoming', 0, sBasic, row, 'basic', 10, {}).motionMultiplier).toBe(1);
+    expect(
+      characterSkillMods('suoming', 0, sBasic, 'Dodge Counter - Unfurled Canopy DMG', 'basic', 10, { sealMaster: true })
+        .motionMultiplier,
     ).toBe(1);
   });
 });

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { loadBundledSnapshot } from '../../data/index.ts';
-import type { RosterEntry } from '../../data/schema.ts';
+import type { RosterEntry, Snapshot } from '../../data/schema.ts';
 import { useRosterStore } from '../../state/roster.ts';
+import { useSnapshotStore } from '../../state/snapshotStore.ts';
 import { GameIcon } from '../components/GameIcon.tsx';
 import { SliderField } from '../components/SliderField.tsx';
 import { btnDangerGhost, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
@@ -11,8 +11,7 @@ import { useToasts } from '../toasts.ts';
 import { MotifEmptyState } from '../components/motif.tsx';
 import { AttributeDot, PageHeader } from '../components/ui.tsx';
 
-function defaultsFor(characterId: string): RosterEntry {
-  const snapshot = loadBundledSnapshot();
+function defaultsFor(snapshot: Snapshot, characterId: string): RosterEntry {
   const character = snapshot.characters.find((c) => c.id === characterId)!;
   const weapon =
     snapshot.weapons.find((w) => w.weaponType === character.weaponType) ?? snapshot.weapons[0];
@@ -34,13 +33,17 @@ export function RosterPage() {
   const load = useRosterStore((s) => s.load);
   const upsert = useRosterStore((s) => s.upsert);
   const remove = useRosterStore((s) => s.remove);
-  const snapshot = loadBundledSnapshot();
+  const snapshot = useSnapshotStore((s) => s.snapshot);
+  const ensureSnapshotLoaded = useSnapshotStore((s) => s.ensureLoaded);
   const [addingId, setAddingId] = useState('');
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
   useEffect(() => {
     if (!loaded) void load();
   }, [loaded, load]);
+  useEffect(() => {
+    void ensureSnapshotLoaded();
+  }, [ensureSnapshotLoaded]);
 
   const characterName = (id: string): string =>
     snapshot.characters.find((c) => c.id === id)?.name ?? id;
@@ -79,7 +82,7 @@ export function RosterPage() {
               onClick={() => {
                 if (addingId === '') return;
                 const id = addingId;
-                void upsert(defaultsFor(id)).then(() => {
+                void upsert(defaultsFor(snapshot, id)).then(() => {
                   setAddingId('');
                   pushToast(`${characterName(id)} joined the roster.`);
                 });

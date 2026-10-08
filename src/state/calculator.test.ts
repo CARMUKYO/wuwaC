@@ -252,6 +252,7 @@ describe('calculator store', () => {
       ringsConsumed: 150,
       voiceFlux: true,
       wovenMyriad: true,
+      sealMaster: true,
     });
     const b = useCalculatorStore.getState().blocks[0];
     expect(b.targetHavocBaneStacks).toBe(9);
@@ -260,6 +261,7 @@ describe('calculator store', () => {
     expect(b.ringsConsumed).toBe(100);
     expect(b.voiceFlux).toBe(true);
     expect(b.wovenMyriad).toBe(true);
+    expect(b.sealMaster).toBe(true);
     useCalculatorStore.getState().setBlockKitState(row.id, {
       tuneStrainStacks: 99,
       tuneResponseStacks: -4,

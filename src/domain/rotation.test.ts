@@ -164,6 +164,22 @@ describe('calculateRotation', () => {
     expect(result.dpr).toBe(result.blocks[0].damage);
   });
 
+  it('scores Hsin outro blocks as 100% ATK hits, not buff carriers', () => {
+    const hsin = snapshot.characters.find((c) => c.id === 'hsin')!;
+    const outro = hsin.skills.find((s) => s.kind === 'outro')!;
+    expect(outro.motionValues).toHaveLength(0);
+    const input = {
+      ...baseInput([{ id: 'o', skillId: outro.id, motionName: '', forteLevel: 1, activeBuffIds: [] }]),
+      character: hsin,
+    };
+    const result = calculateRotation({ ...input, roster: { ...input.roster, characterId: 'hsin' } });
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0].buffCarrier).toBe(false);
+    expect(result.blocks[0].label).toMatch(/Thousand Lanterns/);
+    expect(result.blocks[0].damage).toBeGreaterThan(0);
+    expect(result.dpr).toBe(result.blocks[0].damage);
+  });
+
   it('scores echo-skill blocks from their carried values', () => {
     const echoBlock: ActionBlock = {
       id: 'echo', skillId: '', motionName: 'Lorelei', forteLevel: 1, activeBuffIds: [],

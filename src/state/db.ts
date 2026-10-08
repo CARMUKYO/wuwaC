@@ -14,7 +14,11 @@ class WuwaDb extends Dexie {
   roster!: EntityTable<RosterEntry, 'characterId'>;
   builds!: EntityTable<Build, 'id'>;
   teams!: EntityTable<Team, 'id'>;
-  /** Synced encore.moe snapshot metadata + `fetchedAt` (§8.2 cache). */
+  /**
+   * Synced encore.moe snapshot (§8.2 runtime cache). Single row with
+   * `id: 'active'` holding the last validated payload + metadata. Payload
+   * and checksum are unindexed, so no Dexie version bump was needed.
+   */
   gamedataCache!: EntityTable<GameDataCacheRow, 'id'>;
 
   constructor() {

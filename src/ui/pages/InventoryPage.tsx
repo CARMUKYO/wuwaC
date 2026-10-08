@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadBundledSnapshot } from '../../data/index.ts';
 import {
   exportKameraEchoes,
   KAMERA_ORIGIN,
@@ -10,6 +9,7 @@ import {
 import type { OwnedEcho } from '../../data/schema.ts';
 import { echoDefIssues, useInventoryStore } from '../../state/inventory.ts';
 import { seedInventory } from '../../state/seed.ts';
+import { useSnapshotStore } from '../../state/snapshotStore.ts';
 import { EchoForm, type EchoFormValues } from '../components/EchoForm.tsx';
 import { EchoList } from '../components/EchoList.tsx';
 import { btnGhost, btnOutline, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
@@ -59,11 +59,15 @@ export function InventoryPage() {
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const snapshot = useSnapshotStore((s) => s.snapshot);
+  const ensureSnapshotLoaded = useSnapshotStore((s) => s.ensureLoaded);
+
   useEffect(() => {
     if (!loaded) void load();
   }, [loaded, load]);
-
-  const snapshot = loadBundledSnapshot();
+  useEffect(() => {
+    void ensureSnapshotLoaded();
+  }, [ensureSnapshotLoaded]);
 
   const defName = (echoDefId: string): string =>
     snapshot.echoDefs.find((d) => d.id === echoDefId)?.name ?? echoDefId;
@@ -328,6 +332,7 @@ export function InventoryPage() {
         ) : (
           <EchoList
             echoes={visible}
+            snapshot={snapshot}
             onEdit={setEditing}
             onDelete={(id) => {
               void removeEcho(id).then(() => pushToast('Echo deleted.'));

@@ -114,6 +114,39 @@ describe('chain presets', () => {
     });
   });
 
+  it('transcribes Wave 5 Hsin/Suoming ranks (Unison branches rank-split by Boon cap)', () => {
+    const hsin = CHAIN_PRESETS.filter((e) => e.characterId === 'hsin');
+    // S1 Manifold (1.45 at 3 Boon) + S2 realm/horizons + S3 Pillars MV/crit +
+    // S4 sheet/team + S5 note + S6 Manifold rider/Pillars rider/DEFig.
+    expect(hsin.filter((e) => e.scope === 'motion')).toHaveLength(8);
+    expect(hsin.filter((e) => e.scope === 'sheet')).toHaveLength(1);
+    expect(hsin.filter((e) => e.scope === 'team')).toHaveLength(1);
+    expect(hsin.filter((e) => e.scope === 'note')).toHaveLength(1);
+    const hsinAt = (rank: number): typeof hsin => hsin.filter((e) => e.rank === rank);
+    expect(hsinAt(1)).toHaveLength(1);
+    // S6 Manifold rider completes the S1 additive stack: 1.45 x (1.55/1.45) = 1.55.
+    const s6Manifold = hsinAt(6).find((e) => e.scope === 'motion' && e.motionNameIncludes === 'manifold unison');
+    expect(s6Manifold?.scope === 'motion' ? s6Manifold.motionMultiplier : 0).toBeCloseTo(1.55 / 1.45, 12);
+    // S6 DEF ignore is bucket-wide (skill dmgType, no name/kind filter).
+    const s6Def = hsinAt(6).find((e) => e.scope === 'motion' && e.defIgnoreExtra === 0.2);
+    expect(s6Def?.scope).toBe('motion');
+    if (s6Def?.scope === 'motion') {
+      expect(s6Def.motionNameIncludes).toBeUndefined();
+      expect(s6Def.skillKind).toBeUndefined();
+      expect(s6Def.dmgType).toBe('skill');
+    }
+    const suoming = CHAIN_PRESETS.filter((e) => e.characterId === 'suoming');
+    expect(suoming.filter((e) => e.scope === 'motion')).toHaveLength(3);
+    expect(suoming.filter((e) => e.scope === 'sheet')).toHaveLength(3);
+    expect(suoming.filter((e) => e.scope === 'note')).toHaveLength(0);
+    const s1 = suoming.find((e) => e.rank === 1);
+    expect(s1?.scope === 'motion' ? s1.motionMultiplier : 0).toBe(1.6);
+    const s2 = suoming.find((e) => e.rank === 2);
+    expect(s2?.scope === 'sheet' ? s2.mods : []).toEqual([{ stat: 'critDmg', value: 0.4 }]);
+    // The incoming-Resonator part documents WHY no team entry exists.
+    expect(s2?.scope === 'sheet' ? (s2.assumption ?? '') : '').toContain('equal wielder twin');
+  });
+
   it('transcribes Wave 3 Roccia/Qingxiao/Lynae conversions (snapshot + live prose)', () => {
     // Roccia S4/S6: "Basic Attack Real Fantasy" is the forte skill's whole
     // Stage 1–3 cycle (snapshot 1002707), so skillKind:'forte' with no name
@@ -186,6 +219,7 @@ describe('chain presets', () => {
       ['danjin@6', 20],
       ['encore@4', 30],
       ['hiyuki@4', 30],
+      ['hsin@4', 30],
       ['jiyan@4', 30],
       ['lingyang@4', 30],
       ['lumi@6', 20],

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { parseEchoSkillHits } from '../../data/echoSkills.ts';
-import { findEchoDef, loadBundledSnapshot } from '../../data/index.ts';
+import { findEchoDef } from '../../data/index.ts';
 import { presetsForCharacter, presetToBlocks } from '../../data/rotationPresets.ts';
+import type { Snapshot } from '../../data/schema.ts';
 import { isBuffOnlySkill } from '../../domain/characterMods.ts';
 import type { CritMode } from '../../domain/damage.ts';
 import { buildEnemyProfile } from '../../domain/enemy.ts';
@@ -10,6 +11,7 @@ import { resolveTeamBuffs } from '../../domain/teamBuffs.ts';
 import { useCalculatorStore } from '../../state/calculator.ts';
 import { useInventoryStore } from '../../state/inventory.ts';
 import { useRosterStore } from '../../state/roster.ts';
+import { useSnapshotStore } from '../../state/snapshotStore.ts';
 import { useTeamStore } from '../../state/teamStore.ts';
 import { EnemyConfig } from '../components/EnemyConfig.tsx';
 import { RotationOptimizer } from '../components/RotationOptimizer.tsx';
@@ -19,7 +21,7 @@ import { btnOutline, labelClass, selectClass } from '../components/classes.ts';
 import { Alert, PageHeader, Panel } from '../components/ui.tsx';
 
 /** Default weapon for a character: first of its type, else the first weapon. */
-function defaultWeaponFor(snapshot: ReturnType<typeof loadBundledSnapshot>, characterId: string): string {
+function defaultWeaponFor(snapshot: Snapshot, characterId: string): string {
   const character = snapshot.characters.find((c) => c.id === characterId);
   if (!character) return '';
   return (
@@ -28,7 +30,8 @@ function defaultWeaponFor(snapshot: ReturnType<typeof loadBundledSnapshot>, char
 }
 
 export function CalculatorPage() {
-  const snapshot = loadBundledSnapshot();
+  const snapshot = useSnapshotStore((s) => s.snapshot);
+  const ensureSnapshotLoaded = useSnapshotStore((s) => s.ensureLoaded);
   const calc = useCalculatorStore();
   const rosterEntries = useRosterStore((s) => s.entries);
   const rosterLoaded = useRosterStore((s) => s.loaded);
@@ -53,6 +56,9 @@ export function CalculatorPage() {
   useEffect(() => {
     if (!teamsLoaded) void loadTeams();
   }, [teamsLoaded, loadTeams]);
+  useEffect(() => {
+    void ensureSnapshotLoaded();
+  }, [ensureSnapshotLoaded]);
 
   const handleImportTeamBuffs = (): void => {
     const pickedTeam = teams.find((t) => t.id === importTeamId);

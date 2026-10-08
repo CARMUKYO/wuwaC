@@ -42,6 +42,7 @@ export interface ScoreContext {
   ringsConsumed?: number;
   voiceFlux?: boolean;
   wovenMyriad?: boolean;
+  sealMaster?: boolean;
   tuneStrainStacks?: number;
 }
 
@@ -92,6 +93,7 @@ export function scoreSheet(spec: ObjectiveSpec, sheet: StatSheet, ctx: ScoreCont
         ringsConsumed: ctx.ringsConsumed,
         voiceFlux: ctx.voiceFlux,
         wovenMyriad: ctx.wovenMyriad,
+        sealMaster: ctx.sealMaster,
         tuneStrainStacks: ctx.tuneStrainStacks,
       }).damage;
     }

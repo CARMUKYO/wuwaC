@@ -85,4 +85,32 @@ describe('rotation presets', () => {
     expect(presetsForCharacter('aemeath').map((p) => p.id)).toEqual(['aemeath-prydwen-easy']);
     expect(presetsForCharacter('no-such-character')).toEqual([]);
   });
+
+  it('maps the Hsin dual-mode presets to their calculator blocks', () => {
+    expect(presetsForCharacter('hsin').map((p) => p.id)).toEqual([
+      'hsin-prydwen-electro-flare',
+      'hsin-prydwen-unison',
+    ]);
+    const flare = presetToBlocks(ROTATION_PRESETS.find((p) => p.id === 'hsin-prydwen-electro-flare')!);
+    expect(flare).toHaveLength(16);
+    expect(flare[0]).toEqual({
+      skillId: '1006106',
+      motionName: 'Intro Skill - Answering Form DMG in Resonance Mode - Electro Flare',
+      forteLevel: 10,
+      activeBuffIds: [],
+    });
+    // The Heartlock collapse rides the Illumining Stage 2 hit.
+    expect(flare[6]).toEqual({
+      skillId: '1006101',
+      motionName: 'Basic Attack - Illumining Form: Modular Heartlock DMG',
+      forteLevel: 10,
+      activeBuffIds: [],
+    });
+    expect(flare[15]).toEqual({ skillId: '1006109', motionName: '', forteLevel: 10, activeBuffIds: [] });
+    const unison = presetToBlocks(ROTATION_PRESETS.find((p) => p.id === 'hsin-prydwen-unison')!);
+    expect(unison).toHaveLength(14);
+    expect(unison[0].motionName).toBe('Intro Skill - Answering Form: Manifold Unison DMG');
+    expect(unison[5].motionName).toBe('Intro Skill - Illumining Form: Manifold Unison DMG');
+    expect(unison[13]).toEqual({ skillId: '1006109', motionName: '', forteLevel: 10, activeBuffIds: [] });
+  });
 });

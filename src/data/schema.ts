@@ -469,6 +469,8 @@ export const rotationBlockSpecSchema = z.object({
   voiceFlux: z.boolean().optional(),
   /** Woven Myriad - Convergence active — Chisa liberation state. */
   wovenMyriad: z.boolean().optional(),
+  /** Seal Master active — Suoming Unfurled Canopy MVs doubled (12s). */
+  sealMaster: z.boolean().optional(),
   /** Tune Strain - Interfered stacks on the target (total-DMG amp). */
   tuneStrainStacks: z.number().int().min(0).max(10).optional(),
   /** Trail (or equivalent) stacks consumed by a Tune Rupture response. */
@@ -595,12 +597,21 @@ export const teamSchema = z
   });
 export type Team = z.infer<typeof teamSchema>;
 
-/** Row for the `gamedataCache` Dexie table (reference doc §8.2). */
+/**
+ * Row for the `gamedataCache` Dexie table (reference doc §8.2). Single row
+ * (`id: 'active'`) holding the last validated provider snapshot. The payload
+ * is re-validated against `snapshotSchema` on every read — a row that fails
+ * validation (or its checksum) is treated as missing, never served.
+ */
 export const gameDataCacheRowSchema = z.object({
   id: z.string().min(1),
   fetchedAt: z.string().datetime({ offset: true }),
   provider: z.literal('encore.moe'),
   snapshotVersion: z.number().int().positive(),
+  /** FNV-1a checksum over the canonical payload JSON (corruption guard). */
+  checksum: z.string().min(1),
+  /** Raw snapshot payload — validated on read, never trusted blindly. */
+  payload: z.unknown(),
 });
 export type GameDataCacheRow = z.infer<typeof gameDataCacheRowSchema>;
 

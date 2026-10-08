@@ -4,10 +4,12 @@ import { snapshotSchema, type Snapshot } from './schema.ts';
 /**
  * Data layer entry point.
  *
- * v1: validates and serves the bundled snapshot shipped with the app.
- * TODO(Phase 5): full fallback order — IndexedDB cache (fresh) -> bundled
- * snapshot -> explicit user-triggered live refresh with non-blocking
- * fallback (reference doc §8.2).
+ * Sync bundled access: validates and serves the bundled snapshot shipped
+ * with the app. Kept intact for tests, write-path validation, and sync
+ * contexts (the UI's async entry point is `loadActiveSnapshot()` in
+ * `./activeSnapshot.ts`, which implements the full fallback order —
+ * IndexedDB cache -> bundled snapshot -> background provider refresh
+ * with non-blocking fallback, reference doc §8.2).
  */
 let cached: Snapshot | null = null;
 

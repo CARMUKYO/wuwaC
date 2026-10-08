@@ -52,6 +52,9 @@
       importer, docs, and 85 echo defs updated; placeholders TODO resolved.
 
 ## User-side reminders
+- [ ] **Suoming rotation preset** — no citable guide rotation exists pre-Phase-2
+      (Prydwen page is a stub as of 2026-10-03, no Game8/wiki guide found);
+      transcribe from Prydwen/Game8 once published.
 - [ ] **Chisa ring-bonus units** — needs in-game tooltip observation; no citable
       source exists.
 - [ ] **`.agents/` untracked dir** — planner output; keep or delete.
@@ -69,5 +72,22 @@ old-spec compat verified. (Plan: .agents/plans/2026-09-18-rotation-timestamps.md
 2. Search scaling (defer). Branch-and-bound stays deferred per search.ts — bench shows ~60k combos/s with
 exactness intact. Revisit only if real inventories outgrow exhaustive search.
 
-3. Data freshness. Snapshot is 2026-09-12; new characters/weapons since then are simply absent. A re-sync +
-placeholder-verification pass (placeholders.ts TODO) is cheap maintenance that keeps everything else honest.
+3. Data freshness. DONE 2026-10-03 (runtime snapshot layer — data updates no
+longer need a redeploy): `loadBundledSnapshot()` kept intact; new async
+`loadActiveSnapshot()` resolves cache -> bundled, and a background/manual
+refresh re-syncs through the SHARED provider pipeline (`providerSync.ts`,
+same code the CLI runs). Freshness policy: version decides who serves
+(matching-or-newer cache wins, older falls back), age decides when to
+revalidate (7-day staleness threshold, one background attempt per session),
+adoption needs a strictly newer candidate (higher version, or same version
+with newer `fetchedAt`). Invalid/unreachable/older provider data keeps
+serving current silently. Decisions: (a) pages seed from bundled and swap
+in place (Skeleton-first would flash on every navigation and break
+sync-render tests); (b) reused the existing `gamedataCache` store (single
+`active` row, payload+checksum unindexed — no Dexie migration) instead of
+a second table; (c) newer-than-app payloads are held out until the schema
+updates (the zod literal pins the usable version); (d) `EchoForm`,
+write-path validation, and seeders stay on the sync bundled loader.
+Follow-ups: lazy-load the bundled snapshot out of the JS bundle (still
+shipped inline); partial `--chars`/`--weapons` syncs still write empty
+sonata/echo arrays (pre-existing, preserved as-is).

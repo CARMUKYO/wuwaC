@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadBundledSnapshot } from '../../data/index.ts';
 import { serializeBuilds, useLibraryStore } from '../../state/library.ts';
+import { useSnapshotStore } from '../../state/snapshotStore.ts';
 import { decodeBuildLink, encodeBuildLink } from '../../state/share.ts';
 import { GameIcon } from '../components/GameIcon.tsx';
 import { btnDangerGhost, btnGhost, btnOutline, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
@@ -27,7 +27,8 @@ export function BuildsPage() {
   const load = useLibraryStore((s) => s.load);
   const removeBuild = useLibraryStore((s) => s.removeBuild);
   const importBuilds = useLibraryStore((s) => s.importBuilds);
-  const snapshot = loadBundledSnapshot();
+  const snapshot = useSnapshotStore((s) => s.snapshot);
+  const ensureSnapshotLoaded = useSnapshotStore((s) => s.ensureLoaded);
 
   const [paste, setPaste] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +39,9 @@ export function BuildsPage() {
   useEffect(() => {
     if (!loaded) void load();
   }, [loaded, load]);
+  useEffect(() => {
+    void ensureSnapshotLoaded();
+  }, [ensureSnapshotLoaded]);
 
   // Open a shared build from the URL hash (once per mount).
   useEffect(() => {

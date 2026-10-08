@@ -23,6 +23,7 @@ import { negativeStatusDef } from './negativeStatus.ts';
 import { characterResonanceModes, type ResonanceMode } from './characterMods.ts';
 import { jiyanOutroLanceSpec } from './jiyan.ts';
 import { camellyaOutroTwiningSpec } from './camellya.ts';
+import { hsinOutroSpec } from './hsin.ts';
 import { xiangliyaoOutroChainRuleSpec } from './xiangliyao.ts';
 import { computeStats, type StatSheet } from './stats.ts';
 
@@ -384,7 +385,8 @@ export function scoreRotationBlocks(
     // Jiyan's outro looks buff-carrier-shaped but scores its coordinated
     // lance through computeDamage (one block = one lance trigger).
     // Camellya's Twining scores the same way (base 329.24% only), as does
-    // Xiangli Yao's Chain Rule (base 237.63%, one block per trigger).
+    // Xiangli Yao's Chain Rule (base 237.63%, one block per trigger) and
+    // Hsin's outro hit (base 100% ATK, one block per Outro cast).
     const lance = skill.motionValues.length === 0
       ? jiyanOutroLanceSpec(characterId, skill, block.motionName)
       : null;
@@ -394,7 +396,10 @@ export function scoreRotationBlocks(
     const chainRule = skill.motionValues.length === 0 && lance === null && twining === null
       ? xiangliyaoOutroChainRuleSpec(characterId, skill, block.motionName)
       : null;
-    if (skill.motionValues.length === 0 && lance === null && twining === null && chainRule === null) {
+    const hsinOutro = skill.motionValues.length === 0 && lance === null && twining === null && chainRule === null
+      ? hsinOutroSpec(characterId, skill, block.motionName)
+      : null;
+    if (skill.motionValues.length === 0 && lance === null && twining === null && chainRule === null && hsinOutro === null) {
       return { skillId: skill.id, motionName: block.motionName, label: skill.label, damage: 0, share: 0, buffCarrier: true, startSeconds };
     }
     const { damage } = computeDamage({
@@ -418,9 +423,10 @@ export function scoreRotationBlocks(
       ringsConsumed: block.ringsConsumed,
       voiceFlux: block.voiceFlux,
       wovenMyriad: block.wovenMyriad,
+      sealMaster: block.sealMaster,
       tuneStrainStacks: block.tuneStrainStacks,
     });
-    const proseLabel = lance !== null ? `${skill.label} (coordinated lance)` : twining !== null ? `${skill.label} (Twining)` : chainRule !== null ? `${skill.label} (Chain Rule)` : skill.label;
+    const proseLabel = lance !== null ? `${skill.label} (coordinated lance)` : twining !== null ? `${skill.label} (Twining)` : chainRule !== null ? `${skill.label} (Chain Rule)` : hsinOutro !== null ? `${skill.label} (Thousand Lanterns)` : skill.label;
     return { skillId: skill.id, motionName: block.motionName, label: proseLabel, damage, share: 0, buffCarrier: false, startSeconds };
   });
 

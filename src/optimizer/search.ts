@@ -35,6 +35,7 @@ export interface KitStateRequest {
   ringsConsumed?: number;
   voiceFlux?: boolean;
   wovenMyriad?: boolean;
+  sealMaster?: boolean;
   tuneStrainStacks?: number;
 }
 
