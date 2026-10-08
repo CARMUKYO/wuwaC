@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/wuwaC/',
   plugins: [react(), tailwindcss()],
   test: {
     projects: [
