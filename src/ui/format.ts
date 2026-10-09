@@ -19,6 +19,11 @@ export function toDisplayValue(stat: StatKey, stored: number): string {
   return String(Math.round(stored * 100 * 1e6) / 1e6);
 }
 
+/** Display text with its unit: "9.3%" for ratio stats, "30" for flats. */
+export function formatStatValue(stat: StatKey, stored: number): string {
+  return `${toDisplayValue(stat, stored)}${isPercentStat(stat) ? '%' : ''}`;
+}
+
 /**
  * Stats whose sheet semantics admit negatives. Today only
  * `resistancePenetration`: RES shred is modeled as negative penetration,

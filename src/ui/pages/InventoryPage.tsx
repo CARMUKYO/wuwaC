@@ -11,11 +11,14 @@ import { echoDefIssues, useInventoryStore } from '../../state/inventory.ts';
 import { seedInventory } from '../../state/seed.ts';
 import { useSnapshotStore } from '../../state/snapshotStore.ts';
 import { EchoForm, type EchoFormValues } from '../components/EchoForm.tsx';
-import { EchoList } from '../components/EchoList.tsx';
-import { btnGhost, btnOutline, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
+import { EchoStatus } from '../components/EchoStatus.tsx';
+import { EchoTable } from '../components/EchoTable.tsx';
+import { Mascot } from '../components/Mascot.tsx';
+import { btnGhost, btnOutline, btnPrimary, inputClass } from '../components/classes.ts';
 import { Skeleton, ToastStack } from '../components/feedback.tsx';
 import { useToasts } from '../toasts.ts';
-import { Alert, EmptyState, PageHeader } from '../components/ui.tsx';
+import { Alert, CostPips, EmptyState, PageHeader, Window } from '../components/ui.tsx';
+import { inventorySummary } from '../echoDisplay.ts';
 import { toDisplayValue } from '../format.ts';
 
 function toFormValues(echo: OwnedEcho): EchoFormValues {
@@ -52,6 +55,8 @@ export function InventoryPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<OwnedEcho | null>(null);
   const [sonataFilter, setSonataFilter] = useState('');
+  const [costFilter, setCostFilter] = useState<1 | 3 | 4 | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [seedSonata, setSeedSonata] = useState('');
   const [preview, setPreview] = useState<(KameraImportResult & { fileName: string }) | null>(null);
   const [transferError, setTransferError] = useState<string | null>(null);
@@ -102,7 +107,13 @@ export function InventoryPage() {
     }
   };
   const flagged = echoes.filter((e) => echoDefIssues(e, snapshot.echoDefs).length > 0);
-  const visible = sonataFilter === '' ? echoes : echoes.filter((e) => e.sonataId === sonataFilter);
+  const filtering = sonataFilter !== '' || costFilter !== null;
+  const visible = echoes.filter(
+    (e) => (sonataFilter === '' || e.sonataId === sonataFilter) && (costFilter === null || e.cost === costFilter),
+  );
+  const selected = visible.find((e) => e.id === selectedId) ?? null;
+  const countByCost = new Map<number, number>();
+  for (const echo of echoes) countByCost.set(echo.cost, (countByCost.get(echo.cost) ?? 0) + 1);
   const countBySonata = new Map<string, number>();
   for (const echo of echoes) {
     countBySonata.set(echo.sonataId, (countBySonata.get(echo.sonataId) ?? 0) + 1);
@@ -114,10 +125,10 @@ export function InventoryPage() {
         title={
           <>
             Echo Inventory
-            {loaded && echoes.length > 0 && sonataFilter === '' && (
+            {loaded && echoes.length > 0 && !filtering && (
               <span className="text-accent-text"> ({echoes.length})</span>
             )}
-            {loaded && echoes.length > 0 && sonataFilter !== '' && (
+            {loaded && echoes.length > 0 && filtering && (
               <span className="text-accent-text"> ({visible.length}/{echoes.length})</span>
             )}
           </>
@@ -199,9 +210,8 @@ export function InventoryPage() {
       )}
 
       {preview !== null && (
-        <div className="animate-tt-rise mt-4 border-2 border-line bg-panel p-4">
-          <h3 className="font-display text-xl leading-tight font-semibold text-ink">Import {preview.fileName}</h3>
-          <p className="mt-1 text-sm text-fog">
+        <Window title={`Import ${preview.fileName}`} className="animate-tt-rise mt-6">
+          <p className="text-sm text-fog">
             {`${preview.drafts.length} ${preview.drafts.length === 1 ? 'echo' : 'echoes'} ready to add, ${preview.issues.length} skipped. Adding is additive — existing rows are untouched.`}
           </p>
           {preview.drafts.length > 0 && (
@@ -247,7 +257,7 @@ export function InventoryPage() {
               Cancel
             </button>
           </div>
-        </div>
+        </Window>
       )}
 
       {flagged.length > 0 && (
@@ -257,7 +267,7 @@ export function InventoryPage() {
       )}
 
       {adding && (
-        <div className="animate-tt-rise mt-4 border-2 border-line bg-panel p-4">
+        <Window title="Add Echo" label="Add an echo" className="animate-tt-rise mt-6">
           <EchoForm
             submitLabel="Add Echo"
             onSubmit={async (draft) => {
@@ -273,11 +283,11 @@ export function InventoryPage() {
           >
             Cancel
           </button>
-        </div>
+        </Window>
       )}
 
       {editing !== null && (
-        <div className="animate-tt-rise mt-4 border-2 border-line bg-panel p-4">
+        <Window title="Edit Echo" bar="b" label="Edit an echo" className="animate-tt-rise mt-6">
           <EchoForm
             key={editing.id}
             initial={toFormValues(editing)}
@@ -295,47 +305,107 @@ export function InventoryPage() {
           >
             Cancel
           </button>
+        </Window>
+      )}
+
+      {loaded && (
+        <div className="mt-8 flex flex-wrap items-center gap-6">
+          <Mascot />
+          <div className="relative min-w-0 max-w-md flex-1 basis-64">
+            <div className="px-frame-flat bg-panel px-4 py-3 text-sm text-ink">
+              {inventorySummary({ loaded, echoes, flagged: flagged.length })}
+            </div>
+            <span
+              aria-hidden="true"
+              className="absolute top-1/2 -left-[12px] hidden h-[9px] w-[9px] -translate-y-1/2 bg-outline sm:block"
+            />
+          </div>
+          <div className="flex flex-wrap gap-4" role="group" aria-label="Filter by cost">
+            {([1, 3, 4] as const).map((cost) => {
+              const active = costFilter === cost;
+              return (
+                <button
+                  key={cost}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setCostFilter(active ? null : cost)}
+                  className={`px-card min-w-24 px-3 py-2 text-left transition-terminal ${
+                    active ? 'bg-seal-wash' : 'bg-panel hover:bg-panel-2'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-xs font-bold text-fog">
+                    <CostPips cost={cost} />
+                    {cost}-cost
+                  </span>
+                  <span className="block font-display text-3xl leading-none font-bold text-ink tnum">
+                    {countByCost.get(cost) ?? 0}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {loaded && echoes.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <label htmlFor="inventory-sonata-filter" className={labelClass}>
-            Sonata set
-          </label>
-          <select
-            id="inventory-sonata-filter"
-            value={sonataFilter}
-            onChange={(e) => setSonataFilter(e.target.value)}
-            className={`${inputClass} w-auto min-w-56`}
-          >
-            <option value="">All sets</option>
-            {snapshot.sonataSets.map((set) => (
-              <option key={set.id} value={set.id}>
-                {`${set.name} (${countBySonata.get(set.id) ?? 0})`}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div className="mt-4">
-        {!loaded ? (
-          <Skeleton lines={4} />
-        ) : echoes.length === 0 ? (
-          <EmptyState>No echoes yet — add your first Echo above to start building your gear box.</EmptyState>
-        ) : visible.length === 0 ? (
-          <EmptyState>No echoes with this Sonata set — pick All sets to see the full inventory.</EmptyState>
-        ) : (
-          <EchoList
-            echoes={visible}
-            snapshot={snapshot}
-            onEdit={setEditing}
-            onDelete={(id) => {
-              void removeEcho(id).then(() => pushToast('Echo deleted.'));
-            }}
-          />
-        )}
+      <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <Window
+          title="Echo Box"
+          label="Echo box"
+          bodyClassName=""
+          actions={
+            loaded && echoes.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <label htmlFor="inventory-sonata-filter" className="text-sm font-bold whitespace-nowrap">
+                  Sonata set
+                </label>
+                <select
+                  id="inventory-sonata-filter"
+                  value={sonataFilter}
+                  onChange={(e) => setSonataFilter(e.target.value)}
+                  className={`${inputClass} w-auto min-w-44 text-ink`}
+                >
+                  <option value="">All sets</option>
+                  {snapshot.sonataSets.map((set) => (
+                    <option key={set.id} value={set.id}>
+                      {`${set.name} (${countBySonata.get(set.id) ?? 0})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : undefined
+          }
+        >
+          {!loaded ? (
+            <div className="p-4">
+              <Skeleton lines={4} />
+            </div>
+          ) : echoes.length === 0 ? (
+            <div className="p-4">
+              <EmptyState>No echoes yet — add your first Echo above to start building your gear box.</EmptyState>
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="p-4">
+              <EmptyState>
+                {sonataFilter !== ''
+                  ? 'No echoes with this Sonata set — pick All sets to see the full inventory.'
+                  : 'No echoes at this cost — tap the cost tile again to clear it.'}
+              </EmptyState>
+            </div>
+          ) : (
+            <EchoTable echoes={visible} snapshot={snapshot} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
+          )}
+        </Window>
+        <EchoStatus
+          echo={selected}
+          snapshot={snapshot}
+          onEdit={setEditing}
+          onDelete={(id) => {
+            void removeEcho(id).then(() => {
+              setSelectedId((cur) => (cur === id ? null : cur));
+              pushToast('Echo deleted.');
+            });
+          }}
+        />
       </div>
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </section>

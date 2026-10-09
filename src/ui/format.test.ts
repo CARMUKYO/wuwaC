@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPercentStat, parseDisplayValue, statLabel, toDisplayValue } from './format.ts';
+import { formatStatValue, isPercentStat, parseDisplayValue, statLabel, toDisplayValue } from './format.ts';
 
 describe('isPercentStat', () => {
   it('treats hp/atk/def as flat, everything else as percent-style', () => {
@@ -65,5 +65,14 @@ describe('statLabel', () => {
     expect(statLabel('dmgBonus:Aero')).toBe('Aero DMG');
     expect(statLabel('dmgBonus:skill')).toBe('Resonance Skill DMG');
     expect(statLabel('dmgBonus:coordinated')).toBe('Coordinated Attack DMG');
+  });
+});
+
+describe('formatStatValue', () => {
+  it('appends % to ratio stats and nothing to flats', () => {
+    expect(formatStatValue('critRate', 0.063)).toBe('6.3%');
+    expect(formatStatValue('critDmg', 0.126)).toBe('12.6%');
+    expect(formatStatValue('atk', 30)).toBe('30');
+    expect(formatStatValue('hp', 320)).toBe('320');
   });
 });

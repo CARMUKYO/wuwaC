@@ -3,9 +3,10 @@
 // runtime in a later phase.
 interface InitialsBadgeProps {
   name: string;
+  tint?: string;
 }
 
-export function InitialsBadge({ name }: InitialsBadgeProps) {
+export function InitialsBadge({ name, tint }: InitialsBadgeProps) {
   const initials = name
     .split(/\s+/)
     .map((part) => part[0])
@@ -16,6 +17,7 @@ export function InitialsBadge({ name }: InitialsBadgeProps) {
   return (
     <span
       aria-hidden="true"
+      style={tint === undefined ? undefined : { backgroundColor: tint }}
       className="inline-flex h-9 w-9 shrink-0 items-center justify-center border-2 border-line-strong bg-panel-2 font-display text-base font-semibold text-accent-text"
     >
       {initials}

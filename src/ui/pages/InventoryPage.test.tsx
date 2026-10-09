@@ -20,6 +20,12 @@ async function addEchoViaUi(user: ReturnType<typeof userEvent.setup>, nickname?:
   await user.click(screen.getByRole('button', { name: /^add echo$/i }));
 }
 
+/** Select an echo in the Echo Box and return the Status window it opens. */
+async function selectEcho(user: ReturnType<typeof userEvent.setup>, name: string): Promise<HTMLElement> {
+  await user.click(within(screen.getByRole('table')).getByRole('button', { name }));
+  return screen.getByRole('region', { name: 'Status' });
+}
+
 describe('InventoryPage', () => {
   it('shows an empty state with zero echoes', async () => {
     render(<InventoryPage />);
@@ -55,14 +61,14 @@ describe('InventoryPage', () => {
     render(<InventoryPage />);
     await addEchoViaUi(user, 'Page Echo');
 
-    const row = screen.getByText('Page Echo').closest('li')!;
-    await user.click(within(row).getByRole('button', { name: /edit/i }));
+    const status = await selectEcho(user, 'Page Echo');
+    await user.click(within(status).getByRole('button', { name: /edit/i }));
     const nameField = screen.getByLabelText(/nickname/i);
     await user.clear(nameField);
     await user.type(nameField, 'Renamed');
     await user.click(screen.getByRole('button', { name: /save/i }));
 
-    await screen.findByText('Renamed');
+    await within(screen.getByRole('table')).findByRole('button', { name: 'Renamed' });
     expect(screen.queryByText('Page Echo')).not.toBeInTheDocument();
     const rows = await db.ownedEchoes.toArray();
     expect(rows).toHaveLength(1);
@@ -74,8 +80,8 @@ describe('InventoryPage', () => {
     render(<InventoryPage />);
     await addEchoViaUi(user, 'Page Echo');
 
-    const row = screen.getByText('Page Echo').closest('li')!;
-    await user.click(within(row).getByRole('button', { name: /delete/i }));
+    const status = await selectEcho(user, 'Page Echo');
+    await user.click(within(status).getByRole('button', { name: /delete/i }));
 
     expect(await screen.findByText(/no echoes yet/i)).toBeInTheDocument();
     expect(await db.ownedEchoes.count()).toBe(0);
@@ -313,13 +319,78 @@ describe('InventoryPage', () => {
     expect(await screen.findByText(/re-linking — press edit/i)).toBeInTheDocument();
     expect(screen.getByText(/needs re-link:/i)).toBeInTheDocument();
 
-    const row = screen.getByText('Old Echo').closest('li')!;
-    await user.click(within(row).getByRole('button', { name: /edit/i }));
+    const status = await selectEcho(user, 'Old Echo');
+    await user.click(within(status).getByRole('button', { name: /edit/i }));
     await user.selectOptions(screen.getByLabelText(/^echo$/i), 'hooscamp');
     await user.click(screen.getByRole('button', { name: /save/i }));
 
     // Cost force-fixed to the def (1), banner clears.
     expect(await db.ownedEchoes.get('orphan-1')).toMatchObject({ echoDefId: 'hooscamp', cost: 1 });
     expect(screen.queryByText(/re-linking — press edit/i)).not.toBeInTheDocument();
+  });
+
+  describe('Pixel Arcade box', () => {
+    const base: OwnedEcho = {
+      id: 'a',
+      label: 'Alpha',
+      echoDefId: 'hooscamp',
+      sonataId: 'sierra-gale',
+      cost: 1,
+      level: 25,
+      rarity: 5,
+      mainStat: { stat: 'atkPct', value: 0.18 },
+      substats: [
+        { stat: 'critRate', value: 0.093 },
+        { stat: 'atk', value: 30 },
+      ],
+      equippedTo: null,
+      origin: 'manual',
+    };
+
+    it('puts substats in aligned columns and shows roll tiers in the Status window', async () => {
+      await db.ownedEchoes.add(base);
+      const user = userEvent.setup();
+      render(<InventoryPage />);
+      await screen.findByText('Alpha');
+
+      const row = screen.getByText('Alpha').closest('tr')!;
+      const cells = within(row).getAllByRole('cell');
+      // Echo | Cost | Lv | Main | CR | CD | ATK% | ER | Roll | Other
+      expect(cells[4]).toHaveTextContent('9.3%');
+      expect(cells[5]).toHaveTextContent('–');
+      expect(cells[9]).toHaveTextContent('ATK 30');
+      // critRate tier 6/8 (75) and atk 1/4 (25) average to a roll value of 50.
+      expect(within(row).getByRole('img', { name: 'Roll value 50 of 100' })).toBeInTheDocument();
+
+      const status = await selectEcho(user, 'Alpha');
+      expect(within(status).getByRole('img', { name: 'Crit Rate roll tier 6 of 8' })).toBeInTheDocument();
+      expect(within(status).getByRole('img', { name: 'ATK roll tier 1 of 4' })).toBeInTheDocument();
+    });
+
+    it('filters the box with the cost tiles and clears on a second press', async () => {
+      await db.ownedEchoes.bulkAdd([
+        base,
+        { ...base, id: 'b', label: 'Bravo', cost: 3, mainStat: { stat: 'atkPct', value: 0.3 } },
+      ]);
+      const user = userEvent.setup();
+      render(<InventoryPage />);
+      await screen.findByText('Alpha');
+
+      const tile = screen.getByRole('button', { name: /3-cost/ });
+      await user.click(tile);
+      expect(tile).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+      expect(screen.getByText('Bravo')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /echo inventory/i })).toHaveTextContent('(1/2)');
+
+      await user.click(tile);
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+
+    it('summarises the box in the speech bubble', async () => {
+      await db.ownedEchoes.add(base);
+      render(<InventoryPage />);
+      expect(await screen.findByText(/You're holding 1 echo across 1 Sonata set/)).toBeInTheDocument();
+    });
   });
 });
