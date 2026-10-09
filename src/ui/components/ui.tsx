@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { Attribute } from '../../data/schema.ts';
+import { useReveal } from '../motion.ts';
 
 /* Shared terminal primitives. One source of truth for panel chrome so
  * pages stay consistent without restyling each other. Accessible names
@@ -79,8 +80,13 @@ export function Window({
 }) {
   const labelledBy = label ?? (typeof title === 'string' ? title : undefined);
   const barClass = bar === 'a' ? 'bg-bar-a text-bar-a-ink' : 'bg-bar-b text-bar-b-ink';
+  const { ref, visible } = useReveal<HTMLElement>();
   return (
-    <section aria-label={labelledBy} className={`px-frame bg-panel ${className}`}>
+    <section
+      ref={ref}
+      aria-label={labelledBy}
+      className={`px-frame px-reveal bg-panel ${visible ? 'is-visible' : ''} ${className}`}
+    >
       {(title !== undefined || actions !== undefined) && (
         <div
           className={`flex flex-wrap items-center justify-between gap-2 border-b-[3px] border-outline px-3 py-1.5 ${barClass}`}
@@ -150,7 +156,11 @@ export function SegmentMeter({
   return (
     <span role="img" aria-label={label} className="inline-flex gap-0.5 border-2 border-outline bg-panel p-0.5">
       {Array.from({ length: total }, (_, i) => (
-        <span key={i} className={`${METER_BLOCK[size]} ${i < lit ? 'bg-meter' : 'bg-panel-3'}`} />
+        <span
+          key={i}
+          style={{ '--i': i } as CSSProperties}
+          className={`${METER_BLOCK[size]} ${i < lit ? 'px-meter-on bg-meter' : 'bg-panel-3'}`}
+        />
       ))}
     </span>
   );

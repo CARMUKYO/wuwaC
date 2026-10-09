@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App.tsx';
 import { useAppStore } from './state/store.ts';
@@ -34,5 +34,14 @@ describe('App shell', () => {
     await user.click(toggle);
     expect(document.documentElement.dataset.theme).toBe('ink');
     expect(screen.getAllByRole('button', { name: /switch to paper theme/i })).not.toHaveLength(0);
+  });
+
+  it('navigates from the phone bottom tab bar', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const tabs = screen.getByRole('navigation', { name: 'Section tabs' });
+    await user.click(within(tabs).getByRole('button', { name: /teams/i }));
+    expect(within(tabs).getByRole('button', { name: /teams/i })).toHaveAttribute('aria-current', 'page');
+    expect(useAppStore.getState().activeSection).toBe('teams');
   });
 });

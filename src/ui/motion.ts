@@ -56,3 +56,60 @@ export function useAnimatedNumber(target: number, durationMs = 350): number {
   }, [target, durationMs, canAnimate]);
   return display;
 }
+
+/**
+ * Reveal-on-scroll: `visible` flips true the first time the element enters
+ * the viewport. Starts (and stays) visible under reduced motion or without
+ * IntersectionObserver (SSR/tests), so content is never stuck hidden.
+ */
+export function useReveal<T extends Element>(): { ref: (node: T | null) => void; visible: boolean } {
+  const reduced = usePrefersReducedMotion();
+  const supported = typeof window !== 'undefined' && typeof window.IntersectionObserver === 'function';
+  const [seen, setSeen] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const ref = (node: T | null): void => {
+    observerRef.current?.disconnect();
+    observerRef.current = null;
+    if (node === null || !supported || reduced || seen) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setSeen(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '0px 0px -40px 0px' },
+    );
+    observer.observe(node);
+    observerRef.current = observer;
+  };
+  return { ref, visible: seen || reduced || !supported };
+}
+
+/**
+ * Typewriter reveal of `text`, `charsPerTick` characters every `tickMs`.
+ * Restarts when the text changes; shows the full text at once under
+ * reduced motion or without timers.
+ */
+export function useTypewriter(text: string, tickMs = 22, charsPerTick = 2): string {
+  const reduced = usePrefersReducedMotion();
+  const canAnimate = !reduced && typeof setInterval === 'function';
+  const [shown, setShown] = useState(canAnimate ? 0 : text.length);
+  const [prevText, setPrevText] = useState(text);
+  if (prevText !== text) {
+    setPrevText(text);
+    setShown(canAnimate ? 0 : text.length);
+  }
+  useEffect(() => {
+    if (!canAnimate) return;
+    const id = setInterval(() => {
+      setShown((n) => {
+        const next = Math.min(text.length, n + charsPerTick);
+        if (next >= text.length) clearInterval(id);
+        return next;
+      });
+    }, tickMs);
+    return () => clearInterval(id);
+  }, [text, tickMs, charsPerTick, canAnimate]);
+  return canAnimate ? text.slice(0, shown) : text;
+}

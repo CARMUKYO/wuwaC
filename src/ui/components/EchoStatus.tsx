@@ -6,6 +6,7 @@ import { echoDisplayName, echoScore, sonataName } from '../echoDisplay.ts';
 import { formatStatValue, statLabel } from '../format.ts';
 import { sonataTint } from '../sonataTint.ts';
 import { btnCyan, btnDangerGhost } from './classes.ts';
+import { AnimatedNumber } from './feedback.tsx';
 import { GameIcon } from './GameIcon.tsx';
 import { CostPips, SegmentMeter, Window } from './ui.tsx';
 
@@ -34,6 +35,7 @@ export function EchoStatus({
   const score = echoScore(echo);
   return (
     <Window title="Status" bar="b" label="Status">
+      <div key={echo.id} className="animate-tt-rise">
       <div className="flex items-center gap-3">
         <GameIcon name={name} iconUrl={def?.iconUrl} size="lg" tint={sonataTint(echo.sonataId)} />
         <div className="min-w-0">
@@ -97,7 +99,7 @@ export function EchoStatus({
         <div className="mt-3 flex items-center justify-between gap-2 text-sm">
           <span className="text-fog">Roll value</span>
           <span className="flex items-center gap-2">
-            <span className="font-display text-xl font-bold tnum">{Math.round(score)}</span>
+            <AnimatedNumber value={score} className="font-display text-xl font-bold" />
             <SegmentMeter filled={rollValueBlocks(score)} total={10} label={`Roll value ${Math.round(score)} of 100`} />
           </span>
         </div>
@@ -110,6 +112,7 @@ export function EchoStatus({
         <button type="button" onClick={() => onDelete(echo.id)} className={`${btnDangerGhost} min-h-11`}>
           Delete
         </button>
+      </div>
       </div>
     </Window>
   );

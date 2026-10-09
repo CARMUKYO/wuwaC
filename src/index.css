@@ -432,6 +432,21 @@ details[open] > summary::before {
   to { background-position: -200% 0; }
 }
 
+@keyframes px-hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes px-fill {
+  0% { transform: scaleY(0.2); opacity: 0.3; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+
+@keyframes px-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
 @keyframes tt-toast-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -450,6 +465,34 @@ details[open] > summary::before {
   .animate-tt-rise { animation: tt-rise 180ms ease; }
   .animate-tt-pop { animation: tt-pop 220ms ease; }
   .animate-tt-toast { animation: tt-toast-in 200ms ease; }
+
+  /* Pixel icons hop one step on hover of their tab. */
+  .group:hover .px-icon-hop { animation: px-hop 360ms steps(2, jump-none) 1; }
+
+  /* Meter blocks fill in left-to-right (set --i per block). */
+  .px-meter-on {
+    transform-origin: center bottom;
+    animation: px-fill 220ms steps(3, jump-end) backwards;
+    animation-delay: calc(var(--i, 0) * 35ms);
+  }
+
+  /* List rows rise in with a short stagger (set --i, capped by the caller). */
+  .px-stagger {
+    animation: tt-rise 220ms ease backwards;
+    animation-delay: calc(var(--i, 0) * 25ms);
+  }
+
+  /* Interactive tiles lift a pixel step on hover and press down on tap. */
+  .px-lift { transition: transform 120ms steps(2, jump-none), background-color 120ms ease; }
+  .px-lift:hover { transform: translateY(-3px); }
+  .px-lift:active { transform: translateY(1px); }
+
+  /* Windows slide up once as they scroll into view (see useReveal). */
+  .px-reveal { transition: opacity 260ms ease, transform 260ms ease; }
+  .px-reveal:not(.is-visible) { opacity: 0; transform: translateY(12px); }
+
+  /* Blinking block caret for the speech bubble while it types. */
+  .px-caret { animation: px-blink 900ms steps(1) infinite; }
 
   /* Damage/score bars ease toward their new width on recompute. */
   .score-bar-fill { transition: width 300ms ease; }

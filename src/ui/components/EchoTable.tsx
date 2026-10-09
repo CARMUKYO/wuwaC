@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { findEchoDef } from '../../data/index.ts';
 import type { OwnedEcho, Snapshot, StatKey } from '../../data/schema.ts';
 import { rollValueBlocks } from '../../domain/rollValue.ts';
@@ -37,8 +38,8 @@ export function EchoTable({ echoes, snapshot, selectedId, onSelect }: EchoTableP
   const defs = snapshot.echoDefs;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[800px] border-collapse text-sm">
-        <thead>
+      <table className="w-full border-collapse text-sm max-md:block md:min-w-[800px]">
+        <thead className="max-md:hidden">
           <tr className="border-b-2 border-outline text-left font-display text-sm text-fog">
             <th scope="col" className="px-3 py-2 font-semibold">
               Echo
@@ -65,8 +66,8 @@ export function EchoTable({ echoes, snapshot, selectedId, onSelect }: EchoTableP
             </th>
           </tr>
         </thead>
-        <tbody>
-          {echoes.map((echo) => {
+        <tbody className="max-md:block">
+          {echoes.map((echo, index) => {
             const issues = echoDefIssues(echo, defs);
             const def = findEchoDef(snapshot, echo.echoDefId);
             const name = echoDisplayName(snapshot, echo);
@@ -76,11 +77,12 @@ export function EchoTable({ echoes, snapshot, selectedId, onSelect }: EchoTableP
             return (
               <tr
                 key={echo.id}
-                className={`animate-tt-fade border-b-2 border-dashed border-line transition-terminal ${
+                style={{ '--i': Math.min(index, 12) } as CSSProperties}
+                className={`px-stagger border-b-2 border-dashed border-line transition-terminal max-md:grid max-md:grid-cols-4 max-md:gap-x-3 max-md:gap-y-2 max-md:px-3 max-md:py-3 ${
                   selected ? 'bg-seal-wash' : 'hover:bg-panel-2'
                 }`}
               >
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 max-md:col-span-4 max-md:p-0">
                   <div className="flex items-center gap-2">
                     <GameIcon name={name} iconUrl={def?.iconUrl} tint={sonataTint(echo.sonataId)} />
                     <div className="min-w-0">
@@ -88,7 +90,7 @@ export function EchoTable({ echoes, snapshot, selectedId, onSelect }: EchoTableP
                         type="button"
                         onClick={() => onSelect(echo.id)}
                         aria-pressed={selected}
-                        className="block max-w-44 truncate py-2 text-left font-display text-base leading-tight font-semibold text-ink hover:text-accent-text"
+                        className="block max-w-44 truncate py-2 max-md:max-w-60 text-left font-display text-base leading-tight font-semibold text-ink hover:text-accent-text"
                       >
                         {name}
                       </button>
@@ -99,26 +101,30 @@ export function EchoTable({ echoes, snapshot, selectedId, onSelect }: EchoTableP
                     </div>
                   </div>
                 </td>
-                <td className="px-2 py-2">
+                <td data-label="Cost" className="px-2 py-2 max-md:p-0 max-md:before:block max-md:before:text-xs max-md:before:font-normal max-md:before:text-fog max-md:before:content-[attr(data-label)]">
                   <span className="inline-flex items-center gap-1.5 tnum">
                     <CostPips cost={echo.cost} />
                     <span className="text-xs text-fog">C{echo.cost}</span>
                   </span>
                 </td>
-                <td className="px-2 py-2 text-right tnum">{echo.level}</td>
-                <td className="px-2 py-2 whitespace-nowrap">
+                <td data-label="Lv" className="px-2 py-2 text-right tnum max-md:p-0 max-md:text-left max-md:before:block max-md:before:text-xs max-md:before:font-normal max-md:before:text-fog max-md:before:content-[attr(data-label)]">{echo.level}</td>
+                <td data-label="Main" className="px-2 py-2 whitespace-nowrap max-md:col-span-2 max-md:p-0 max-md:before:block max-md:before:text-xs max-md:before:font-normal max-md:before:text-fog max-md:before:content-[attr(data-label)]">
                   <span className="text-ink">{statLabel(echo.mainStat.stat)}</span>{' '}
                   <span className="font-bold tnum">{formatStatValue(echo.mainStat.stat, echo.mainStat.value)}</span>
                 </td>
                 {SUBSTAT_COLUMNS.map((c) => {
                   const sub = echo.substats.find((s) => s.stat === c.stat);
                   return (
-                    <td key={c.stat} className="px-2 py-2 text-right tnum">
+                    <td
+                      key={c.stat}
+                      data-label={c.header}
+                      className="px-2 py-2 text-right tnum max-md:p-0 max-md:text-left max-md:before:block max-md:before:text-xs max-md:before:font-normal max-md:before:text-fog max-md:before:content-[attr(data-label)]"
+                    >
                       {sub === undefined ? <Dash /> : formatStatValue(sub.stat, sub.value)}
                     </td>
                   );
                 })}
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 max-md:col-span-4 max-md:p-0">
                   {score === null ? (
                     <Dash />
                   ) : (
@@ -129,7 +135,7 @@ export function EchoTable({ echoes, snapshot, selectedId, onSelect }: EchoTableP
                     />
                   )}
                 </td>
-                <td className="px-2 py-2 text-xs whitespace-nowrap text-fog tnum">
+                <td className="px-2 py-2 text-xs whitespace-nowrap text-fog tnum max-md:col-span-4 max-md:p-0 max-md:whitespace-normal">
                   {others.length === 0 ? (
                     <Dash />
                   ) : (

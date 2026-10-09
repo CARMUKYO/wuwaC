@@ -15,8 +15,9 @@ import { EchoStatus } from '../components/EchoStatus.tsx';
 import { EchoTable } from '../components/EchoTable.tsx';
 import { Mascot } from '../components/Mascot.tsx';
 import { btnGhost, btnOutline, btnPrimary, inputClass } from '../components/classes.ts';
-import { Skeleton, ToastStack } from '../components/feedback.tsx';
+import { AnimatedNumber, Skeleton, ToastStack } from '../components/feedback.tsx';
 import { useToasts } from '../toasts.ts';
+import { usePrefersReducedMotion, useTypewriter } from '../motion.ts';
 import { Alert, CostPips, EmptyState, PageHeader, Window } from '../components/ui.tsx';
 import { inventorySummary } from '../echoDisplay.ts';
 import { toDisplayValue } from '../format.ts';
@@ -44,6 +45,32 @@ function toFormValues(echo: OwnedEcho): EchoFormValues {
   };
 }
 
+/**
+ * Mascot speech bubble. The visible text types out (aria-hidden, with the
+ * untyped remainder kept invisible so the bubble never resizes); the full
+ * sentence is always available to assistive tech.
+ */
+function SpeechBubble({ text }: { text: string }) {
+  const typed = useTypewriter(text);
+  const done = typed.length >= text.length;
+  return (
+    <div className="relative min-w-0 max-w-md flex-1">
+      <div className="px-frame-flat bg-panel px-4 py-3 text-sm text-ink">
+        <span className="sr-only">{text}</span>
+        <span aria-hidden="true">
+          {typed}
+          {!done && <span className="px-caret inline-block h-[1em] w-[0.5em] translate-y-[2px] bg-accent-text" />}
+          <span className="invisible">{text.slice(typed.length)}</span>
+        </span>
+      </div>
+      <span
+        aria-hidden="true"
+        className="absolute top-1/2 -left-[12px] h-[9px] w-[9px] -translate-y-1/2 bg-outline"
+      />
+    </div>
+  );
+}
+
 export function InventoryPage() {
   const echoes = useInventoryStore((s) => s.echoes);
   const loaded = useInventoryStore((s) => s.loaded);
@@ -62,6 +89,8 @@ export function InventoryPage() {
   const [transferError, setTransferError] = useState<string | null>(null);
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
   const fileRef = useRef<HTMLInputElement>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = usePrefersReducedMotion();
 
   const snapshot = useSnapshotStore((s) => s.snapshot);
   const ensureSnapshotLoaded = useSnapshotStore((s) => s.ensureLoaded);
@@ -309,18 +338,12 @@ export function InventoryPage() {
       )}
 
       {loaded && (
-        <div className="mt-8 flex flex-wrap items-center gap-6">
-          <Mascot />
-          <div className="relative min-w-0 max-w-md flex-1 basis-64">
-            <div className="px-frame-flat bg-panel px-4 py-3 text-sm text-ink">
-              {inventorySummary({ loaded, echoes, flagged: flagged.length })}
-            </div>
-            <span
-              aria-hidden="true"
-              className="absolute top-1/2 -left-[12px] hidden h-[9px] w-[9px] -translate-y-1/2 bg-outline sm:block"
-            />
+        <div className="mt-6 flex flex-col gap-6 sm:mt-8 lg:flex-row lg:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-6">
+            <Mascot />
+            <SpeechBubble text={inventorySummary({ loaded, echoes, flagged: flagged.length })} />
           </div>
-          <div className="flex flex-wrap gap-4" role="group" aria-label="Filter by cost">
+          <div className="grid grid-cols-3 gap-4 sm:flex sm:flex-wrap" role="group" aria-label="Filter by cost">
             {([1, 3, 4] as const).map((cost) => {
               const active = costFilter === cost;
               return (
@@ -329,7 +352,7 @@ export function InventoryPage() {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setCostFilter(active ? null : cost)}
-                  className={`px-card min-w-24 px-3 py-2 text-left transition-terminal ${
+                  className={`px-card px-lift min-h-16 px-3 py-2 text-left sm:min-w-24 ${
                     active ? 'bg-seal-wash' : 'bg-panel hover:bg-panel-2'
                   }`}
                 >
@@ -337,9 +360,10 @@ export function InventoryPage() {
                     <CostPips cost={cost} />
                     {cost}-cost
                   </span>
-                  <span className="block font-display text-3xl leading-none font-bold text-ink tnum">
-                    {countByCost.get(cost) ?? 0}
-                  </span>
+                  <AnimatedNumber
+                    value={countByCost.get(cost) ?? 0}
+                    className="block font-display text-3xl leading-none font-bold text-ink"
+                  />
                 </button>
               );
             })}
@@ -392,9 +416,23 @@ export function InventoryPage() {
               </EmptyState>
             </div>
           ) : (
-            <EchoTable echoes={visible} snapshot={snapshot} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
+            <EchoTable
+              echoes={visible}
+              snapshot={snapshot}
+              selectedId={selected?.id ?? null}
+              onSelect={(id) => {
+                setSelectedId(id);
+                // Below lg the Status window sits under the whole list — bring it into view.
+                if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 1023px)').matches) {
+                  requestAnimationFrame(() =>
+                    statusRef.current?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' }),
+                  );
+                }
+              }}
+            />
           )}
         </Window>
+        <div ref={statusRef} className="scroll-mt-4 lg:sticky lg:top-4">
         <EchoStatus
           echo={selected}
           snapshot={snapshot}
@@ -406,6 +444,7 @@ export function InventoryPage() {
             });
           }}
         />
+        </div>
       </div>
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </section>

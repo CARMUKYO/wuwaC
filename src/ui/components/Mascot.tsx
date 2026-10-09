@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { PIXEL_ICON_SIZE, bitmapPath, type ColourIndex } from './pixelIcons.ts';
 
 /**
@@ -52,28 +52,91 @@ function Placeholder({ px }: { px: number }) {
   );
 }
 
-function Sprite({ px }: { px: number }) {
+/**
+ * Freeze the GIF on the frame it is showing: drawing an animated <img> to a
+ * canvas captures its current frame. False when canvas is unavailable
+ * (jsdom, locked-down browsers) so the caller can fall back to the still.
+ */
+function freezeFrame(img: HTMLImageElement, canvas: HTMLCanvasElement, px: number): boolean {
+  try {
+    const ratio = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const size = img.clientWidth || px;
+    canvas.width = Math.round(size * ratio);
+    canvas.height = Math.round(size * ratio);
+    const ctx = canvas.getContext('2d');
+    if (!ctx || !img.complete || img.naturalWidth === 0) return false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Hover (mouse) or tap (touch/pen) pauses the GIF on its current frame;
+ * leaving or tapping again resumes. Decorative, so not focusable.
+ */
+/** `px` is the intrinsic size; `sizeClass` may make it responsive. */
+function Sprite({ px, sizeClass }: { px: number; sizeClass?: string }) {
   const [failed, setFailed] = useState(false);
+  /** null = playing; 'canvas' = frozen on the live frame; 'still' = fallback still image. */
+  const [paused, setPaused] = useState<null | 'canvas' | 'still'>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   if (failed) return <Placeholder px={px} />;
+
+  const pause = (): void => {
+    const img = imgRef.current;
+    const canvas = canvasRef.current;
+    setPaused(img && canvas && freezeFrame(img, canvas, px) ? 'canvas' : 'still');
+  };
+  const resume = (): void => setPaused(null);
+
   return (
-    <picture>
-      <source media="(prefers-reduced-motion: reduce)" srcSet={MASCOT_STILL_URL} />
-      <img
-        src={MASCOT_URL}
-        alt=""
-        width={px}
-        height={px}
-        draggable={false}
-        onError={() => setFailed(true)}
-        className="block"
+    <span
+      data-paused={paused !== null}
+      className={`relative inline-block ${sizeClass ?? ''}`}
+      style={sizeClass === undefined ? { width: px, height: px } : undefined}
+      onPointerEnter={(e) => {
+        if (e.pointerType === 'mouse') pause();
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType === 'mouse') resume();
+      }}
+      onPointerUp={(e) => {
+        if (e.pointerType !== 'mouse') {
+          if (paused === null) pause();
+          else resume();
+        }
+      }}
+    >
+      <picture className="block h-full w-full">
+        <source media="(prefers-reduced-motion: reduce)" srcSet={MASCOT_STILL_URL} />
+        <img
+          ref={imgRef}
+          src={paused === 'still' ? MASCOT_STILL_URL : MASCOT_URL}
+          alt=""
+          width={px}
+          height={px}
+          draggable={false}
+          onError={() => setFailed(true)}
+          className={`block h-full w-full select-none ${paused === 'canvas' ? 'invisible' : ''}`}
+        />
+      </picture>
+      <canvas
+        ref={canvasRef}
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 h-full w-full ${paused === 'canvas' ? '' : 'hidden'}`}
       />
-    </picture>
+    </span>
   );
 }
 
 /**
- * Decorative mascot. The GIF supplies its own animation, so nothing here
- * moves it: `banner` is a 140px square, `logo` a 44px mark in the top bar.
+ * Decorative mascot. The GIF supplies its own animation; hovering (or
+ * tapping on touch screens) pauses her. `banner` is a square that shrinks
+ * on phones, `logo` a 44px mark in the top bar.
  */
 export function Mascot({ variant = 'banner' }: { variant?: 'banner' | 'logo' }) {
   if (variant === 'logo') {
@@ -84,8 +147,8 @@ export function Mascot({ variant = 'banner' }: { variant?: 'banner' | 'logo' }) 
     );
   }
   return (
-    <div aria-hidden="true" className="flex h-[140px] w-[140px] shrink-0 items-center justify-center">
-      <Sprite px={132} />
+    <div aria-hidden="true" className="flex shrink-0 items-center justify-center">
+      <Sprite px={132} sizeClass="size-24 sm:size-[132px]" />
     </div>
   );
 }

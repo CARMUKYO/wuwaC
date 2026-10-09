@@ -93,7 +93,7 @@ const TOAST_DOT: Record<Toast['tone'], string> = {
 export function ToastStack({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
   if (toasts.length === 0) return null;
   return (
-    <div aria-live="polite" className="fixed right-4 bottom-4 z-50 flex w-72 flex-col gap-2">
+    <div aria-live="polite" className="fixed inset-x-4 bottom-20 z-50 flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-72 md:bottom-4">
       {toasts.map((toast) => (
         <div
           key={toast.id}

@@ -201,12 +201,14 @@ interface Team {
   (colours from `--color-icon-*`). Mascot: `Mascot.tsx` renders `public/aemeath-ames.gif` (own
   animation; nothing bounces it) with `public/aemeath-ames-still.png` for
   prefers-reduced-motion, falling back to a pixel placeholder if the art is
-  absent. The art is user-supplied — don't add more character art. Theme
+  absent; hover (mouse) or tap (touch) freezes her on the current frame via
+  canvas. Phones (<md) get a fixed bottom tab bar instead of the top nav. The art is user-supplied — don't add more character art. Theme
   state lives in `src/state/theme.ts`.
 - Roll quality (Echo substat tiers, 10-block roll value) is the pure module
   `src/domain/rollValue.ts` over `SUB_STAT_TIERS`; UI only renders it.
 - UI dynamics: live-feedback primitives in `src/ui/components/feedback.tsx` +
-  `src/ui/toasts.ts`, motion hooks in `src/ui/motion.ts`, command palette in
+  `src/ui/toasts.ts`, motion hooks in `src/ui/motion.ts` (`useAnimatedNumber`,
+  `useReveal` for scroll-in Windows, `useTypewriter` for the mascot bubble), command palette in
   `src/ui/components/palette.tsx`, free-text suggest in
   `src/ui/components/SuggestInput.tsx`. All keyframes
   live in the Motion section of `src/index.css` (reduced-motion safe);
