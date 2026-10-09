@@ -1,91 +1,162 @@
 @import "tailwindcss";
 
 /*
- * WuWa Optimizer — "Paper & Seal" design system.
+ * WuWa Optimizer — "Pixel Arcade" design system.
  *
- * Light-first, inspired by the game's own menus: warm paper ground, ink
- * text, and a single vermilion seal-red accent (the Tacet-stamp red), with
- * pine-teal and clay tones for status. A dark "ink" variant redefines the
- * same tokens under [data-theme="ink"] — components only ever reference
- * the semantic names below, never raw hex.
+ * Light-first, calm arcade feel: a soft blush ground, plum ink text, and a
+ * single pink accent. Chrome (nav, headings, window title bars, buttons,
+ * big numbers, meters) is set in Pixelify Sans inside stepped pixel
+ * frames; body text, table values and forms use Nunito. The dark variant
+ * redefines the same tokens under [data-theme="ink"] — components only
+ * ever reference the semantic names below, never raw hex.
  *
- * Display type is Barlow Condensed, body is Barlow, and all
- * metadata/numbers use JetBrains Mono with tabular figures.
+ * `seal` is the accent *fill* (buttons, active tab). The accent as *text*
+ * (links, focus ring, headings) is `accent-text`, which is darker in the
+ * light theme so it clears 4.5:1 on every ground.
  */
 
 @theme {
-  --font-display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
-  --font-sans: "Barlow", "Helvetica Neue", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-display: "Pixelify Sans", "Press Start 2P", ui-monospace, monospace;
+  --font-sans: "Nunito", system-ui, sans-serif;
+  /* No true mono: stat values use Nunito with tabular numerals. */
+  --font-mono: "Nunito", system-ui, sans-serif;
 
-  /* Paper (default light theme). */
-  --color-canvas: #f1eee6;
-  --color-panel: #faf8f2;
-  --color-panel-2: #e8e3d5;
-  --color-panel-3: #dbd4c0;
-  --color-line: #d5cfbd;
-  --color-line-strong: #b3ab94;
+  /* Light (default). */
+  --color-canvas: #fbf4f1;
+  --color-panel: #ffffff;
+  --color-panel-2: #f6eef0;
+  --color-panel-3: #e8dce0;
+  --color-line: #e2d4d9;
+  --color-line-strong: #d8c6cd;
 
-  --color-ink: #1d1f1c;
-  --color-fog: #565c55;
-  --color-dim: #71766d;
+  --color-ink: #2b2540;
+  --color-fog: #6b6380;
+  /* Decorative only (empty-cell dash, disabled hairlines) — fails text contrast. */
+  --color-dim: #b9afbf;
 
-  --color-seal: #bf3d1c;
-  --color-seal-bright: #a33315;
-  --color-seal-deep: #7c2a10;
-  --color-seal-wash: #f5ddd0;
-  --color-seal-ink: #fff9f4;
+  --color-outline: #2b2540;
+  --color-outline-on-accent: #2b2540;
+  --color-drop: #ead7de;
+
+  --color-seal: #f7a8bc;
+  --color-seal-bright: #f48fa9;
+  --color-seal-deep: #b4365a;
+  --color-seal-wash: #fff0f4;
+  --color-seal-ink: #2b2540;
+  --color-accent-text: #b4365a;
+
+  --color-bar-a: #bfeaf2;
+  --color-bar-a-ink: #2b2540;
+  --color-bar-b: #ffd3de;
+  --color-bar-b-ink: #2b2540;
+  --color-meter: #5fc6d8;
+  --color-pip: #d9557a;
+  --color-secondary-btn: #bfeaf2;
+  --color-secondary-btn-ink: #2b2540;
+  --color-sticker: #ffffff;
+  --color-shadow-ellipse: #2b2540;
 
   --color-tide: #0f766e;
-  --color-tide-wash: #d8ece5;
-  --color-ember: #b3261e;
-  --color-ember-wash: #f6dcd6;
-  --color-ember-ink: #a02118;
-  --color-amber: #92400e;
-  --color-amber-wash: #f3e6c8;
+  --color-tide-wash: #dcf1ea;
+  --color-ember: #a3253f;
+  --color-ember-wash: #fbe3e6;
+  --color-ember-ink: #a3253f;
+  --color-amber: #8a4a0b;
+  --color-amber-wash: #fbebcb;
   --color-glacio: #0369a1;
   --color-fusion: #c2410c;
   --color-electro: #6d28d9;
   --color-aero: #15803d;
   --color-spectro: #7a6200;
   --color-havoc: #be185d;
+
+  /* Sonata tints for echo tiles. */
+  --color-set-molten-rift: #ffe3d6;
+  --color-set-void-thunder: #e7defa;
+  --color-set-celestial-light: #fff2c2;
+  --color-set-freezing-frost: #d9f0fa;
+  --color-set-sierra-gale: #ddf3e2;
+
+  /* Pixel icon bitmaps (index 1 = outline, 2/3/4 = per-icon colours). */
+  --color-icon-outline: #2b2540;
+  --color-icon-chest-2: #e9a15b;
+  --color-icon-chest-3: #f6c98a;
+  --color-icon-chest-4: #ffe58a;
+  --color-icon-head-2: #f4a6b8;
+  --color-icon-head-3: #ffe3d6;
+  --color-icon-head-4: #e46b86;
+  --color-icon-sword-2: #f4a6b8;
+  --color-icon-sword-3: #9ba3c4;
+  --color-icon-sword-4: #e6f2ff;
+  --color-icon-heart-2: #f07c98;
+  --color-icon-heart-4: #ffffff;
+  --color-icon-book-2: #7fd3e2;
+  --color-icon-book-3: #4ba8ba;
+  --color-icon-book-4: #ffffff;
+  --color-icon-disk-2: #a9b2e6;
+  --color-icon-disk-3: #e6f2ff;
+  --color-icon-disk-4: #ffffff;
 }
 
-/* Ink (dark theme): same tokens, re-grounded. Wins over the layered
- * @theme :root because unlayered author styles beat cascade layers. */
+/* Dark theme: same tokens, re-grounded. Wins over the layered @theme
+ * :root because unlayered author styles beat cascade layers. */
 [data-theme="ink"] {
   color-scheme: dark;
 
-  --color-canvas: #0d100f;
-  --color-panel: #141816;
-  --color-panel-2: #1c2320;
-  --color-panel-3: #28312d;
-  --color-line: #25302b;
-  --color-line-strong: #3c4a44;
+  --color-canvas: #1a1726;
+  --color-panel: #24203a;
+  --color-panel-2: #2e2948;
+  --color-panel-3: #3a3554;
+  --color-line: #3a3554;
+  --color-line-strong: #4a4168;
 
-  --color-ink: #e9e7dc;
-  --color-fog: #a2aba2;
-  --color-dim: #7d877f;
+  --color-ink: #f3eaf0;
+  --color-fog: #b3a9c4;
+  --color-dim: #6e6688;
 
-  --color-seal: #e0572f;
-  --color-seal-bright: #ef7046;
-  --color-seal-deep: #7c2a10;
-  --color-seal-wash: #2a130b;
-  --color-seal-ink: #230f06;
+  --color-outline: #5b4f80;
+  --color-outline-on-accent: #14111f;
+  --color-drop: #0e0c16;
 
-  --color-tide: #5ec8a6;
-  --color-tide-wash: #0d2019;
-  --color-ember: #e0684e;
-  --color-ember-wash: #26110c;
-  --color-ember-ink: #f0a895;
-  --color-amber: #e0b34e;
-  --color-amber-wash: #231a09;
+  --color-seal: #f7a8bc;
+  --color-seal-bright: #fbbccb;
+  --color-seal-deep: #ff9db6;
+  --color-seal-wash: #3a2740;
+  --color-seal-ink: #2b2540;
+  --color-accent-text: #ff9db6;
+
+  --color-bar-a: #1f4a57;
+  --color-bar-a-ink: #e6fbff;
+  --color-bar-b: #5a2c45;
+  --color-bar-b-ink: #ffe6ee;
+  --color-meter: #5fc6d8;
+  --color-pip: #ff8fab;
+  --color-secondary-btn: #8fdcea;
+  --color-secondary-btn-ink: #2b2540;
+  --color-sticker: #ffffff;
+  --color-shadow-ellipse: #000000;
+
+  --color-tide: #6fd6b5;
+  --color-tide-wash: #1b3a36;
+  --color-ember: #ff9aaa;
+  --color-ember-wash: #3d1f2b;
+  --color-ember-ink: #ff9aaa;
+  --color-amber: #f0c26a;
+  --color-amber-wash: #3b3020;
   --color-glacio: #8fd6e8;
-  --color-fusion: #ef7d54;
+  --color-fusion: #ff9a70;
   --color-electro: #c9a7f5;
   --color-aero: #8fd6a0;
   --color-spectro: #e8cf7a;
-  --color-havoc: #e08aa8;
+  --color-havoc: #f08aae;
+
+  --color-set-molten-rift: #4d3036;
+  --color-set-void-thunder: #3a3160;
+  --color-set-celestial-light: #4a4226;
+  --color-set-freezing-frost: #233f52;
+  --color-set-sierra-gale: #26453a;
+
+  --color-icon-outline: #14111f;
 }
 
 :root {
@@ -97,12 +168,14 @@ body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: var(--color-seal-deep);
-  color: #fff9f4;
+  background: var(--color-seal);
+  color: var(--color-seal-ink);
 }
 
 /* Faint terminal grid over the page ground. Flat, theme-aware. */
@@ -164,7 +237,7 @@ input[type="range"].terminal-range::-webkit-slider-thumb {
   height: 14px;
   border-radius: 3px;
   background: var(--color-seal);
-  border: 1px solid var(--color-seal-deep);
+  border: 2px solid var(--color-outline);
   cursor: pointer;
 }
 input[type="range"].terminal-range::-moz-range-thumb {
@@ -172,7 +245,7 @@ input[type="range"].terminal-range::-moz-range-thumb {
   height: 14px;
   border-radius: 3px;
   background: var(--color-seal);
-  border: 1px solid var(--color-seal-deep);
+  border: 2px solid var(--color-outline);
   cursor: pointer;
 }
 input[type="range"].terminal-range::-moz-range-track {
@@ -188,7 +261,7 @@ select optgroup {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-seal);
+  outline: 2px solid var(--color-accent-text);
   outline-offset: 2px;
 }
 
@@ -253,7 +326,7 @@ details > summary::before {
   content: "▸";
   display: inline-block;
   margin-right: 0.35rem;
-  color: var(--color-seal);
+  color: var(--color-accent-text);
   font-size: 0.7em;
 }
 details[open] > summary::before {

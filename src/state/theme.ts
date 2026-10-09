@@ -17,7 +17,7 @@ function applyTheme(theme: Theme): void {
     document.documentElement.dataset.theme = theme;
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'ink' ? '#0d100f' : '#f1eee6');
+      ?.setAttribute('content', theme === 'ink' ? '#1a1726' : '#fbf4f1');
   }
   try {
     localStorage.setItem(STORAGE_KEY, theme);

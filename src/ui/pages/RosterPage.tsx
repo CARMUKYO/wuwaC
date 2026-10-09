@@ -125,7 +125,7 @@ export function RosterPage() {
                       <div className="min-w-0">
                         <h3 className="truncate font-display text-2xl leading-none font-semibold tracking-wide text-ink">{name}</h3>
                         {character && (
-                          <p className="mt-1 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.14em] text-dim uppercase">
+                          <p className="mt-1 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.14em] text-fog uppercase">
                             <AttributeDot attribute={character.attribute} />
                             {character.attribute} · {character.weaponType}
                           </p>
@@ -221,7 +221,7 @@ export function RosterPage() {
                   {scorable.length > 0 && (
                     <div className="mt-4">
                       <Collapsible title="Forte levels" defaultOpen>
-                        <p className="mb-2 font-mono text-[11px] tracking-[0.08em] text-dim uppercase">
+                        <p className="mb-2 font-mono text-[11px] tracking-[0.08em] text-fog uppercase">
                           Unset shows 10 — touch to store
                         </p>
                         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -245,7 +245,7 @@ export function RosterPage() {
                   {character && character.forteNodes.length > 0 && (
                     <div className="mt-4">
                       <Collapsible title="Forte nodes unlocked" defaultOpen>
-                        <p className="mb-2 font-mono text-[11px] tracking-[0.08em] text-dim uppercase">
+                        <p className="mb-2 font-mono text-[11px] tracking-[0.08em] text-fog uppercase">
                           Untouched = all active
                         </p>
                         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">

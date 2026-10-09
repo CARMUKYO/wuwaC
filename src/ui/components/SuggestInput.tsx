@@ -110,7 +110,7 @@ export function SuggestInput({
             className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-line-strong bg-panel p-1 shadow-lg"
           >
             {matches.length === 0 ? (
-              <li className="px-2 py-1.5 text-sm text-dim">No matches — custom ids still work.</li>
+              <li className="px-2 py-1.5 text-sm text-fog">No matches — custom ids still work.</li>
             ) : (
               matches.map((option, i) => (
                 <li key={option.value}>
@@ -129,7 +129,7 @@ export function SuggestInput({
                   >
                     <span className="min-w-0 truncate">{option.label}</span>
                     {option.hint !== undefined && (
-                      <span className="shrink-0 font-mono text-[10px] tracking-[0.08em] text-dim uppercase">
+                      <span className="shrink-0 font-mono text-[10px] tracking-[0.08em] text-fog uppercase">
                         {option.hint}
                       </span>
                     )}

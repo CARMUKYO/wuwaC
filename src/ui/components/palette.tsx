@@ -97,11 +97,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               onClose();
             }
           }}
-          className="w-full border-b border-line bg-panel px-4 py-3 text-sm text-ink outline-none placeholder:text-dim"
+          className="w-full border-b border-line bg-panel px-4 py-3 text-sm text-ink outline-none placeholder:text-fog"
         />
         <ul id="palette-listbox" role="listbox" aria-label="Commands" className="max-h-64 overflow-y-auto p-1.5">
           {actions.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-dim">No matching command.</li>
+            <li className="px-3 py-2 text-sm text-fog">No matching command.</li>
           ) : (
             actions.map((action, i) => (
               <li key={action.id}>
@@ -119,7 +119,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                   }`}
                 >
                   <span className="font-medium">{action.label}</span>
-                  <span className="shrink-0 font-mono text-[10px] tracking-[0.14em] text-dim uppercase">
+                  <span className="shrink-0 font-mono text-[10px] tracking-[0.14em] text-fog uppercase">
                     {action.hint}
                   </span>
                 </button>

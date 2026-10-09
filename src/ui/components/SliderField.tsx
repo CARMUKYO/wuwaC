@@ -22,7 +22,7 @@ export function SliderField({ id, label, value, min, max, step = 1, display, onC
       <label htmlFor={id} className="block font-mono text-[11px] font-medium tracking-[0.08em] text-fog uppercase">
         <span className="flex items-baseline justify-between gap-2">
           <span className="min-w-0 truncate">{label}</span>
-          <span className="shrink-0 font-display text-xl leading-none font-semibold tracking-wide text-seal tnum" aria-hidden="true">
+          <span className="shrink-0 font-display text-xl leading-none font-semibold tracking-wide text-accent-text tnum" aria-hidden="true">
             {display ?? value}
           </span>
         </span>
@@ -51,7 +51,7 @@ export function SliderField({ id, label, value, min, max, step = 1, display, onC
             if (!Number.isFinite(num)) return;
             onChange(num);
           }}
-          className="w-20 shrink-0 rounded-md border border-line-strong bg-canvas px-2 py-1 font-mono text-xs text-ink tnum transition-terminal hover:border-dim focus:border-seal"
+          className="w-20 shrink-0 rounded-md border border-line-strong bg-canvas px-2 py-1 font-mono text-xs text-ink tnum transition-terminal hover:border-fog focus:border-seal"
         />
       </div>
     </div>

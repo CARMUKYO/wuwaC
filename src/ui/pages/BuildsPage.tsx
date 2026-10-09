@@ -153,7 +153,7 @@ export function BuildsPage() {
                     />
                     <div className="min-w-0">
                       <p className="truncate font-display text-xl leading-tight font-semibold tracking-wide text-ink">{build.name}</p>
-                      <p className="mt-0.5 font-mono text-[11px] tracking-[0.06em] text-dim uppercase tnum">
+                      <p className="mt-0.5 font-mono text-[11px] tracking-[0.06em] text-fog uppercase tnum">
                         {characterName(build.characterId)}
                         {build.score !== undefined && (
                           <>

@@ -37,7 +37,7 @@ export function Collapsible({
       >
         <span
           aria-hidden="true"
-          className={`inline-block text-[0.7em] text-seal transition-transform duration-150 ${
+          className={`inline-block text-[0.7em] text-accent-text transition-transform duration-150 ${
             isOpen ? 'rotate-90' : ''
           }`}
         >
@@ -45,7 +45,7 @@ export function Collapsible({
         </span>
         <span className="min-w-0">
           {eyebrow !== undefined && (
-            <span className="block font-mono text-[10px] font-medium tracking-[0.22em] text-seal uppercase">
+            <span className="block font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">
               {eyebrow}
             </span>
           )}

@@ -4,7 +4,7 @@
 export const labelClass = 'block font-mono text-[11px] font-medium tracking-[0.08em] text-fog uppercase';
 
 export const inputClass =
-  'w-full rounded-md border border-line-strong bg-canvas px-2.5 py-1.5 text-sm text-ink transition-terminal placeholder:text-dim hover:border-dim focus:border-seal';
+  'w-full rounded-md border border-line-strong bg-canvas px-2.5 py-1.5 text-sm text-ink transition-terminal placeholder:text-fog hover:border-fog focus:border-seal';
 
 export const selectClass = inputClass;
 
@@ -13,7 +13,7 @@ export const btnBase =
 
 export const btnPrimary = `${btnBase} bg-seal text-seal-ink hover:bg-seal-bright`;
 
-export const btnOutline = `${btnBase} border border-line-strong text-ink hover:border-dim hover:bg-panel-2 font-medium`;
+export const btnOutline = `${btnBase} border border-line-strong text-ink hover:border-fog hover:bg-panel-2 font-medium`;
 
 export const btnGhost = `${btnBase} text-fog hover:bg-panel-2 hover:text-ink font-medium`;
 

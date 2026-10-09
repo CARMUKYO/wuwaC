@@ -302,12 +302,12 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
           ))}
         </select>
         {filteredDefs.length === 0 && (
-          <p className="mt-1 text-xs text-dim">No echoes match — clear the search or cost filter.</p>
+          <p className="mt-1 text-xs text-fog">No echoes match — clear the search or cost filter.</p>
         )}
         {def && (
           <div className="mt-2 rounded-md border border-line bg-canvas p-2.5 text-xs text-fog">
             <p>
-              <span className="font-display text-base font-semibold tracking-wide text-seal">{def.name}</span>
+              <span className="font-display text-base font-semibold tracking-wide text-accent-text">{def.name}</span>
               <span className="font-mono text-[11px]">
                 {' · '}{def.element ?? 'No element'} · Cost {def.cost} · {def.sonataIds.map(sonataName).join(' / ')}
               </span>
@@ -554,7 +554,7 @@ function MainStatSlider({ defCost, stat, valueText, onPick }: {
         onChange={(e) => onPick(snap(Number(e.target.value)))}
         className="terminal-range w-full"
       />
-      <p className="font-mono text-[11px] text-dim tnum">
+      <p className="font-mono text-[11px] text-fog tnum">
         5★ Lv25 reference: {toDisplayValue(stat, range.min)} – {toDisplayValue(stat, range.max)}
       </p>
     </div>

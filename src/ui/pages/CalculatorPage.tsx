@@ -367,7 +367,7 @@ export function CalculatorPage() {
           </div>
 
           <fieldset className="mt-5">
-            <legend className="font-mono text-[11px] tracking-[0.08em] text-dim uppercase">Skill levels (1-10)</legend>
+            <legend className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Skill levels (1-10)</legend>
             <div className="mt-2 grid gap-x-4 gap-y-3 md:grid-cols-2">
               {scorable.map((skill) => (
                 <SliderField
@@ -382,7 +382,7 @@ export function CalculatorPage() {
               ))}
             </div>
             {buffOnly.length > 0 && (
-              <p className="mt-2 text-xs text-dim">
+              <p className="mt-2 text-xs text-fog">
                 Buff-only (no damage component — add below as buff carriers):{' '}
                 {buffOnly.map((s) => s.label).join(', ')}
               </p>
@@ -391,7 +391,7 @@ export function CalculatorPage() {
 
           {character.forteNodes.length > 0 && (
             <fieldset className="mt-5">
-              <legend className="font-mono text-[11px] tracking-[0.08em] text-dim uppercase">Forte nodes unlocked</legend>
+              <legend className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Forte nodes unlocked</legend>
               <div className="mt-2 grid gap-1 md:grid-cols-2">
                 {character.forteNodes.map((node) => {
                   const unlocked = calc.forteUnlockedIds === null
@@ -455,7 +455,7 @@ export function CalculatorPage() {
         }
       >
         {echoes.length === 0 ? (
-          <p className="mt-2 text-xs text-dim">
+          <p className="mt-2 text-xs text-fog">
             No echoes in inventory yet — add some on the Inventory tab first.
           </p>
         ) : (
@@ -498,7 +498,7 @@ export function CalculatorPage() {
         <section aria-label="Rotation builder" className="mt-6">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <p className="font-mono text-[11px] font-medium tracking-[0.22em] text-seal uppercase">The main event</p>
+              <p className="font-mono text-[11px] font-medium tracking-[0.22em] text-accent-text uppercase">The main event</p>
               <h3 className="font-display text-3xl leading-none font-semibold tracking-wide text-ink">Rotation Builder</h3>
             </div>
             <div className="w-40">
@@ -650,7 +650,7 @@ export function CalculatorPage() {
               </p>
             )}
             {(scoring?.result?.appliedAssumptions.length ?? 0) > 0 && (
-              <p className="mt-2 text-xs text-dim" title={(scoring?.result?.appliedAssumptions ?? []).join('\n')}>
+              <p className="mt-2 text-xs text-fog" title={(scoring?.result?.appliedAssumptions ?? []).join('\n')}>
                 Assumes: {(scoring?.result?.appliedAssumptions ?? []).join('; ')}
               </p>
             )}

@@ -69,7 +69,7 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
       ) : (
         <>
           <span className="text-fog">Theme</span>
-          <span className="text-seal">{theme === 'paper' ? 'Paper' : 'Ink'}</span>
+          <span className="text-accent-text">{theme === 'paper' ? 'Paper' : 'Ink'}</span>
         </>
       )}
     </button>
@@ -94,7 +94,7 @@ function PaletteButton({ compact = false, onOpen }: { compact?: boolean; onOpen:
       ) : (
         <>
           <span className="text-fog">Command</span>
-          <span className="rounded border border-line-strong px-1.5 py-px text-[10px] text-dim">
+          <span className="rounded border border-line-strong px-1.5 py-px text-[10px] text-fog">
             Ctrl K
           </span>
         </>
@@ -114,7 +114,7 @@ function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
           <p className="font-display text-2xl leading-none font-semibold tracking-wide text-ink">
             WuWa Optimizer
           </p>
-          <p className="mt-1 font-mono text-[10px] tracking-[0.28em] text-seal uppercase">
+          <p className="mt-1 font-mono text-[10px] tracking-[0.28em] text-accent-text uppercase">
             Resonator terminal
           </p>
         </div>
@@ -141,7 +141,7 @@ function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
               />
               <span
                 className={`font-mono text-[11px] font-medium tnum ${
-                  active ? 'text-seal' : 'text-dim group-hover:text-fog'
+                  active ? 'text-accent-text' : 'text-fog group-hover:text-fog'
                 }`}
               >
                 {String(i + 1).padStart(2, '0')}
@@ -154,7 +154,7 @@ function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
                 >
                   {label}
                 </span>
-                <span className="block truncate font-mono text-[10px] tracking-[0.14em] text-dim uppercase">
+                <span className="block truncate font-mono text-[10px] tracking-[0.14em] text-fog uppercase">
                   {blurb}
                 </span>
               </span>
@@ -167,7 +167,7 @@ function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
         <ThemeToggle />
         <FrequencyStrip seed="sidebar" bars={36} className="h-5 w-full opacity-60" />
         <div className="rule" aria-hidden="true" />
-        <p className="font-mono text-[10px] leading-relaxed tracking-[0.14em] text-dim uppercase">
+        <p className="font-mono text-[10px] leading-relaxed tracking-[0.14em] text-fog uppercase">
           Local-first
           <br />
           Nothing leaves this browser

@@ -52,7 +52,7 @@ export function EchoList({ echoes, snapshot, onEdit, onDelete }: EchoListProps) 
                 <CostPips cost={echo.cost} />
                 <span>C{echo.cost} · Lv{echo.level}</span>
               </span>
-              <span className="text-dim">|</span>
+              <span className="text-fog">|</span>
               <span className="text-ink">
                 {statLabel(echo.mainStat.stat)} {toDisplayValue(echo.mainStat.stat, echo.mainStat.value)}
               </span>

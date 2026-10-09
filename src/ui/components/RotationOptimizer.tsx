@@ -145,7 +145,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
   return (
     <section aria-label="Optimize for this rotation" className="overflow-hidden rounded-lg border border-line bg-panel">
       <div className="freq-ticks px-4 pt-4 pb-3">
-        <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-seal uppercase">Solver // Exhaustive search</p>
+        <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">Solver // Exhaustive search</p>
         <h3 className="font-display text-2xl leading-tight font-semibold tracking-wide text-ink">Optimize for This Rotation</h3>
       </div>
       <div className="p-4 pt-3">
@@ -156,7 +156,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
         </p>
       )}
       {tooFew ? (
-        <p className="mt-2 text-xs text-dim">
+        <p className="mt-2 text-xs text-fog">
           You need at least 5 echoes in your inventory to run the optimizer.
         </p>
       ) : (
@@ -221,7 +221,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
       )}
 
       {status.kind === 'running' && (
-        <p className="mt-3 font-mono text-xs tracking-[0.08em] text-seal tnum" role="status">
+        <p className="mt-3 font-mono text-xs tracking-[0.08em] text-accent-text tnum" role="status">
           Evaluated {status.evaluated} of {status.total} combos…
         </p>
       )}
@@ -248,7 +248,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
                 });
                 return (
                   <li key={key} className="rounded-lg border border-line bg-canvas px-4 py-3">
-                    <p className="font-mono text-[11px] tracking-[0.14em] text-dim uppercase tnum">
+                    <p className="font-mono text-[11px] tracking-[0.14em] text-fog uppercase tnum">
                       Rank #{i + 1}
                       {uplift !== null && (
                         <span className={`ml-2 ${uplift >= 0 ? 'text-tide' : 'text-ember'}`}>
@@ -271,7 +271,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
                       </p>
                     )}
                     {build.appliedAssumptions.length > 0 && (
-                      <p className="mt-0.5 text-xs text-dim" title={build.appliedAssumptions.join('\n')}>
+                      <p className="mt-0.5 text-xs text-fog" title={build.appliedAssumptions.join('\n')}>
                         Assumes: {build.appliedAssumptions.join('; ')}
                       </p>
                     )}
@@ -320,7 +320,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
               })}
             </ol>
           )}
-          <p className="mt-3 font-mono text-[11px] text-dim tnum">
+          <p className="mt-3 font-mono text-[11px] text-fog tnum">
             Scored {result.evaluated} combos
             {result.prunedEchoes.length > 0 && `, pruned ${result.prunedEchoes.length} dominated echoes`}.
           </p>

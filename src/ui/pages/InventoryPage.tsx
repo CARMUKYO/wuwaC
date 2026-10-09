@@ -117,10 +117,10 @@ export function InventoryPage() {
           <>
             Echo Inventory
             {loaded && echoes.length > 0 && sonataFilter === '' && (
-              <span className="text-seal"> ({echoes.length})</span>
+              <span className="text-accent-text"> ({echoes.length})</span>
             )}
             {loaded && echoes.length > 0 && sonataFilter !== '' && (
-              <span className="text-seal"> ({visible.length}/{echoes.length})</span>
+              <span className="text-accent-text"> ({visible.length}/{echoes.length})</span>
             )}
           </>
         }
@@ -135,7 +135,7 @@ export function InventoryPage() {
                     value={seedSonata}
                     onChange={(e) => setSeedSonata(e.target.value)}
                     title="Restrict seeded echoes to one Sonata set"
-                    className="rounded-md border border-dashed border-dim bg-panel px-2 py-1.5 font-mono text-xs text-fog"
+                    className="rounded-md border border-dashed border-fog bg-panel px-2 py-1.5 font-mono text-xs text-fog"
                   >
                     <option value="">Any set</option>
                     {snapshot.sonataSets.map((set) => (
@@ -148,7 +148,7 @@ export function InventoryPage() {
                     type="button"
                     onClick={() => void seedInventory(30, seedSonata === '' ? undefined : seedSonata)}
                     title="Adds 30 random echoes from synced defs for optimizer testing"
-                    className="rounded-md border border-dashed border-dim px-3 py-1.5 text-sm text-fog hover:bg-panel-2"
+                    className="rounded-md border border-dashed border-fog px-3 py-1.5 text-sm text-fog hover:bg-panel-2"
                   >
                     Seed 30 random
                   </button>
@@ -202,7 +202,7 @@ export function InventoryPage() {
 
       {preview !== null && (
         <div className="animate-tt-rise mt-4 rounded-lg border border-line bg-panel p-4">
-          <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-seal uppercase">Kamera import</p>
+          <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">Kamera import</p>
           <h3 className="font-display text-xl leading-tight font-semibold tracking-wide text-ink">Import {preview.fileName}</h3>
           <p className="mt-1 text-sm text-fog">
             {`${preview.drafts.length} ${preview.drafts.length === 1 ? 'echo' : 'echoes'} ready to add, ${preview.issues.length} skipped. Adding is additive — existing rows are untouched.`}

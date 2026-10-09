@@ -38,8 +38,8 @@ function CharacterDetail({ character }: { character: CharacterData }) {
         <GameIcon name={character.name} iconUrl={character.iconUrl} size="lg" />
         <div className="min-w-0">
           <h3 className="font-display text-3xl leading-none font-semibold tracking-wide text-ink">{character.name}</h3>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] tracking-[0.08em] text-dim uppercase">
-            <span className="text-seal">{'★'.repeat(character.rarity)}</span>
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] tracking-[0.08em] text-fog uppercase">
+            <span className="text-accent-text">{'★'.repeat(character.rarity)}</span>
             <span className="inline-flex items-center gap-1.5">
               <AttributeDot attribute={character.attribute} />
               <span>{character.attribute}</span>
@@ -51,19 +51,19 @@ function CharacterDetail({ character }: { character: CharacterData }) {
       <p className="mt-3 font-mono text-[11px] text-fog tnum">
         Base at Lv 90 — HP {top.hp} · ATK {top.atk} · DEF {top.def}
       </p>
-      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-seal uppercase">Skills</h4>
+      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-accent-text uppercase">Skills</h4>
       <ul className="mt-1.5 space-y-1">
         {character.skills.map((skill) => (
           <li key={skill.id} className="text-xs text-fog">
             <span className="text-ink">{skill.label}</span>
-            <span className="text-dim">
+            <span className="text-fog">
               {' '}
               · {skill.motionValues.length} motion component{skill.motionValues.length === 1 ? '' : 's'} · scales {skill.scaling}
             </span>
           </li>
         ))}
       </ul>
-      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-seal uppercase">Forte nodes</h4>
+      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-accent-text uppercase">Forte nodes</h4>
       <ul className="mt-1.5 space-y-1 font-mono text-[11px] text-fog tnum">
         {character.forteNodes.map((node) => (
           <li key={node.id}>
@@ -71,13 +71,13 @@ function CharacterDetail({ character }: { character: CharacterData }) {
           </li>
         ))}
       </ul>
-      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-seal uppercase">Resonance chain</h4>
+      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-accent-text uppercase">Resonance chain</h4>
       <ul className="mt-1.5 space-y-1.5">
         {character.resonanceChain.map((rank) => (
           <li key={rank.rank} className="text-xs text-fog">
-            <span className="font-mono text-[11px] font-medium text-seal tnum">S{rank.rank}</span>{' '}
+            <span className="font-mono text-[11px] font-medium text-accent-text tnum">S{rank.rank}</span>{' '}
             <span className="font-medium text-ink">{rank.name}</span>
-            <span className="text-dim"> — {rank.description}</span>
+            <span className="text-fog"> — {rank.description}</span>
           </li>
         ))}
       </ul>
@@ -93,8 +93,8 @@ function WeaponDetail({ weapon }: { weapon: WeaponData }) {
         <GameIcon name={weapon.name} iconUrl={weapon.iconUrl} size="lg" />
         <div className="min-w-0">
           <h3 className="font-display text-3xl leading-none font-semibold tracking-wide text-ink">{weapon.name}</h3>
-          <p className="mt-1.5 font-mono text-[11px] tracking-[0.08em] text-dim uppercase">
-            <span className="text-seal">{'★'.repeat(weapon.rarity)}</span> · {weapon.weaponType}
+          <p className="mt-1.5 font-mono text-[11px] tracking-[0.08em] text-fog uppercase">
+            <span className="text-accent-text">{'★'.repeat(weapon.rarity)}</span> · {weapon.weaponType}
           </p>
         </div>
       </div>
@@ -106,7 +106,7 @@ function WeaponDetail({ weapon }: { weapon: WeaponData }) {
             weapon.secondaryStat.byLevel[weapon.secondaryStat.byLevel.length - 1].value,
           )}`}
       </p>
-      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-seal uppercase">Passive: {weapon.passive.name}</h4>
+      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-accent-text uppercase">Passive: {weapon.passive.name}</h4>
       <p className="mt-1.5 text-xs leading-relaxed text-fog">{weapon.passive.description}</p>
     </article>
   );
@@ -119,7 +119,7 @@ function EchoDetail({ echo, sonataNameOf }: { echo: EchoDefData; sonataNameOf: (
         <GameIcon name={echo.name} iconUrl={echo.iconUrl} size="lg" />
         <div className="min-w-0">
           <h3 className="font-display text-3xl leading-none font-semibold tracking-wide text-ink">{echo.name}</h3>
-          <p className="mt-1.5 font-mono text-[11px] tracking-[0.08em] text-dim uppercase">
+          <p className="mt-1.5 font-mono text-[11px] tracking-[0.08em] text-fog uppercase">
             Cost {echo.cost} · {echo.element ?? 'No element'}
           </p>
         </div>
@@ -127,13 +127,13 @@ function EchoDetail({ echo, sonataNameOf }: { echo: EchoDefData; sonataNameOf: (
       <p className="mt-3 text-xs text-fog">
         Sonata: {echo.sonataIds.map(sonataNameOf).join(' · ')}
       </p>
-      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-seal uppercase">Main-stat pool</h4>
+      <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-accent-text uppercase">Main-stat pool</h4>
       <p className="mt-1.5 font-mono text-[11px] text-fog">
         {echo.allowedMainStats.map((s) => statLabel(s)).join(', ')}
       </p>
       {echo.skillDescription && (
         <>
-          <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-seal uppercase">
+          <h4 className="mt-4 font-mono text-[11px] tracking-[0.14em] text-accent-text uppercase">
             Echo skill{echo.skillCooldown !== undefined && ` (CD ${echo.skillCooldown}s)`}
           </h4>
           <p className="mt-1.5 text-xs leading-relaxed text-fog">{echo.skillDescription}</p>
@@ -150,13 +150,13 @@ function SonataDetail({ set }: { set: SonataSetData }) {
       <ul className="mt-3 space-y-2">
         {set.bonuses.map((bonus, i) => (
           <li key={i} className="text-xs text-fog">
-            <span className="mr-1.5 rounded border border-line-strong bg-canvas px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-seal uppercase">
+            <span className="mr-1.5 rounded border border-line-strong bg-canvas px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-accent-text uppercase">
               {bonus.pieceCount}-piece
             </span>
             {bonus.effect.kind === 'stat' ? (
               <>
                 {statLabel(bonus.effect.stat)} +{toDisplayValue(bonus.effect.stat, bonus.effect.value)}
-                <span className="ml-1 text-dim">(structured)</span>
+                <span className="ml-1 text-fog">(structured)</span>
               </>
             ) : bonus.effect.kind === 'conditional' ? (
               <>
@@ -234,7 +234,7 @@ export function DatabasePage() {
               onClick={() => setSelectedId(c.id)}
               aria-current={selectedId === c.id ? 'true' : undefined}
               className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-terminal ${
-                selectedId === c.id ? 'bg-panel-2 text-seal' : 'text-fog hover:bg-panel-2 hover:text-ink'
+                selectedId === c.id ? 'bg-panel-2 text-accent-text' : 'text-fog hover:bg-panel-2 hover:text-ink'
               }`}
             >
               <GameIcon name={c.name} iconUrl={c.iconUrl} size="sm" />
@@ -256,7 +256,7 @@ export function DatabasePage() {
               onClick={() => setSelectedId(w.id)}
               aria-current={selectedId === w.id ? 'true' : undefined}
               className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-terminal ${
-                selectedId === w.id ? 'bg-panel-2 text-seal' : 'text-fog hover:bg-panel-2 hover:text-ink'
+                selectedId === w.id ? 'bg-panel-2 text-accent-text' : 'text-fog hover:bg-panel-2 hover:text-ink'
               }`}
             >
               <GameIcon name={w.name} iconUrl={w.iconUrl} size="sm" />
@@ -278,7 +278,7 @@ export function DatabasePage() {
               onClick={() => setSelectedId(e.id)}
               aria-current={selectedId === e.id ? 'true' : undefined}
               className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-terminal ${
-                selectedId === e.id ? 'bg-panel-2 text-seal' : 'text-fog hover:bg-panel-2 hover:text-ink'
+                selectedId === e.id ? 'bg-panel-2 text-accent-text' : 'text-fog hover:bg-panel-2 hover:text-ink'
               }`}
             >
               <GameIcon name={e.name} iconUrl={e.iconUrl} size="sm" />
@@ -299,7 +299,7 @@ export function DatabasePage() {
             onClick={() => setSelectedId(s.id)}
             aria-current={selectedId === s.id ? 'true' : undefined}
             className={`block w-full rounded-md px-2 py-1.5 text-left text-sm transition-terminal ${
-              selectedId === s.id ? 'bg-panel-2 text-seal' : 'text-fog hover:bg-panel-2 hover:text-ink'
+              selectedId === s.id ? 'bg-panel-2 text-accent-text' : 'text-fog hover:bg-panel-2 hover:text-ink'
             }`}
           >
             {s.name}
@@ -310,24 +310,24 @@ export function DatabasePage() {
   };
 
   const renderDetail = (): ReactNode => {
-    if (selectedId === null) return <p className="text-sm text-dim">Select an entry to inspect it.</p>;
+    if (selectedId === null) return <p className="text-sm text-fog">Select an entry to inspect it.</p>;
     if (tab === 'characters') {
       const character = snapshot.characters.find((c) => c.id === selectedId);
-      if (!character) return <p className="text-sm text-dim">Entry not found.</p>;
+      if (!character) return <p className="text-sm text-fog">Entry not found.</p>;
       return <CharacterDetail character={character} />;
     }
     if (tab === 'weapons') {
       const weapon = snapshot.weapons.find((w) => w.id === selectedId);
-      if (!weapon) return <p className="text-sm text-dim">Entry not found.</p>;
+      if (!weapon) return <p className="text-sm text-fog">Entry not found.</p>;
       return <WeaponDetail weapon={weapon} />;
     }
     if (tab === 'echoes') {
       const echo = snapshot.echoDefs.find((e) => e.id === selectedId);
-      if (!echo) return <p className="text-sm text-dim">Entry not found.</p>;
+      if (!echo) return <p className="text-sm text-fog">Entry not found.</p>;
       return <EchoDetail echo={echo} sonataNameOf={sonataNameOf} />;
     }
     const set = snapshot.sonataSets.find((s) => s.id === selectedId);
-    if (!set) return <p className="text-sm text-dim">Entry not found.</p>;
+    if (!set) return <p className="text-sm text-fog">Entry not found.</p>;
     return <SonataDetail set={set} />;
   };
 
@@ -392,7 +392,7 @@ export function DatabasePage() {
               className={`-mb-px border-b-2 px-3 py-1.5 font-display text-lg font-semibold tracking-wide transition-terminal ${
                 tab === t.id
                   ? 'border-seal text-ink'
-                  : 'border-transparent text-dim hover:border-line-strong hover:text-fog'
+                  : 'border-transparent text-fog hover:border-line-strong hover:text-fog'
               }`}
             >
               {t.label} <span className="font-mono text-[11px] font-medium tnum">({counts[t.id]})</span>
@@ -428,7 +428,7 @@ function List({ rows, empty }: { rows: ReactNode[]; empty: boolean }) {
   if (empty) return <p className="px-2 py-6 text-center text-sm text-fog">No matches — try a different search.</p>;
   return (
     <div>
-      <p key={rows.length} aria-live="polite" className="animate-tt-pop px-2 pt-1 pb-2 font-mono text-[10px] tracking-[0.14em] text-dim uppercase tnum">
+      <p key={rows.length} aria-live="polite" className="animate-tt-pop px-2 pt-1 pb-2 font-mono text-[10px] tracking-[0.14em] text-fog uppercase tnum">
         {rows.length} {rows.length === 1 ? 'entry' : 'entries'}
       </p>
       <div className="max-h-[60vh] space-y-0.5 overflow-y-auto">{rows}</div>

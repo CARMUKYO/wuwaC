@@ -48,7 +48,7 @@ export function PageHeader({
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-[11px] font-medium tracking-[0.22em] text-seal uppercase">{eyebrow}</p>
+          <p className="font-mono text-[11px] font-medium tracking-[0.22em] text-accent-text uppercase">{eyebrow}</p>
           <h2 className="mt-1 font-display text-4xl leading-none font-semibold tracking-wide text-ink">{title}</h2>
           {description !== undefined && <p className="mt-1.5 max-w-2xl text-sm text-fog">{description}</p>}
         </div>
@@ -81,7 +81,7 @@ export function Panel({
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <div className="min-w-0">
             {eyebrow !== undefined && (
-              <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-seal uppercase">{eyebrow}</p>
+              <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">{eyebrow}</p>
             )}
             {title !== undefined && (
               <h3 className="font-display text-xl leading-tight font-semibold tracking-wide text-ink">{title}</h3>

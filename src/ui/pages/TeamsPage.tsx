@@ -159,7 +159,7 @@ export function TeamsPage() {
                             </p>
                           </div>
                           {member.pieces.length === 0 ? (
-                            <p className="mt-1.5 font-mono text-[11px] text-dim">No echoes equipped</p>
+                            <p className="mt-1.5 font-mono text-[11px] text-fog">No echoes equipped</p>
                           ) : (
                             <ul className="mt-1.5 flex flex-wrap gap-1">
                               {member.pieces.map((piece) => (
@@ -173,7 +173,7 @@ export function TeamsPage() {
                             </ul>
                           )}
                           {provided.length === 0 ? (
-                            <p className="mt-1.5 font-mono text-[11px] text-dim">No transcribed team buffs</p>
+                            <p className="mt-1.5 font-mono text-[11px] text-fog">No transcribed team buffs</p>
                           ) : (
                             <ul className="mt-1.5 space-y-1 text-xs text-fog">
                               {provided.map((entry) => (
@@ -194,7 +194,7 @@ export function TeamsPage() {
                     })}
                   </div>
                   {coverage.combined.length > 0 && (
-                    <p className="mt-3 font-mono text-[11px] tracking-[0.06em] text-dim uppercase tnum">
+                    <p className="mt-3 font-mono text-[11px] tracking-[0.06em] text-fog uppercase tnum">
                       Team totals:{' '}
                       <span className="text-fog">{coverage.combined.map((c) => `${c.sonataName} ×${c.count}`).join(' · ')}</span>
                     </p>

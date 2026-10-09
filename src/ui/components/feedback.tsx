@@ -106,7 +106,7 @@ export function ToastStack({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: 
             type="button"
             onClick={() => onDismiss(toast.id)}
             aria-label={`Dismiss: ${toast.message}`}
-            className="shrink-0 rounded px-1 font-mono text-xs text-dim hover:text-ink"
+            className="shrink-0 rounded px-1 font-mono text-xs text-fog hover:text-ink"
           >
             ✕
           </button>
