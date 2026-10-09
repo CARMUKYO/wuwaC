@@ -10,6 +10,7 @@ import type {
 import { useSnapshotStore } from '../../state/snapshotStore.ts';
 import { filterByName } from '../filter.ts';
 import { statLabel, toDisplayValue } from '../format.ts';
+import { DataSafety } from '../components/DataSafety.tsx';
 import { GameIcon } from '../components/GameIcon.tsx';
 import { btnOutline, inputClass, labelClass } from '../components/classes.ts';
 import { ToastStack } from '../components/feedback.tsx';
@@ -418,6 +419,11 @@ export function DatabasePage() {
           {renderDetail()}
         </div>
       </div>
+      <DataSafety onToast={pushToast} />
+      <p className="mt-4 text-xs text-fog">
+        Game data from the encore.moe community API. Fan-made tool, not affiliated with or endorsed by Kuro
+        Games.
+      </p>
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </section>
   );

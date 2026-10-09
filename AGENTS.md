@@ -27,11 +27,35 @@ account system — everything lives in the browser (IndexedDB).
 ```
 npm run dev       # local dev server
 npm run test       # vitest
-npm run build       # production build
+npm run build       # production build (+ service worker, manifest)
+npm run preview    # serve dist/ at http://localhost:4173/wuwaC/
 npm run lint       # eslint
 npm run sync       # offline encore.moe -> src/data/generated/ (manual)
 npm run bench      # optimizer scaling benchmark (manual, not a unit test)
 ```
+
+## Hosting (GitHub Pages)
+
+Deployed at https://carmukyo.github.io/wuwaC/ by `.github/workflows/deploy.yml`
+on push to `main`; `ci.yml` runs lint/test/build on other branches and PRs.
+Still client-only: the app must work offline and from any static host.
+
+- `base: '/wuwaC/'` (`vite.config.ts`) must match the repo name. Reference
+  `public/` files via `import.meta.env.BASE_URL`, never a leading `/`.
+  Routing is hash-based (`#section`, `#b=`), so no 404.html fallback exists.
+- Service worker via vite-plugin-pwa (`registerType: 'prompt'`, build-only).
+  `UpdatePrompt.tsx` (mounted in `main.tsx`, outside `App`) shows the
+  reload banner. Never let the SW cache encore.moe; `activeSnapshot.ts`
+  owns that cache.
+- Build chunks: `snapshot` (game data), `vendor`, and app code are split
+  (`codeSplitting.groups`) so a code-only deploy doesn't re-download the data.
+- User data lives only in visitors' browsers. `state/backup.ts` is the
+  whole-DB export/restore (versioned `wuwa-optimizer-backup` JSON, zod-validated);
+  `state/persistence.ts` requests non-evictable storage. A new user table
+  must be added to the backup format (bump `BACKUP_VERSION`, keep reading v1).
+- The origin `carmukyo.github.io` is shared with every Pages repo of this
+  account: keep IndexedDB/localStorage names prefixed (`wuwa-optimizer`,
+  `wuwa-*`) and never rename existing ones (that orphans users' data).
 
 (Update this block as the real scripts are set up — keep it accurate.)
 
@@ -171,6 +195,9 @@ interface Team {
 
 ## Guardrails
 
+- Real users hold Dexie v1 data in the wild. Never edit an existing
+  `this.version(n).stores(...)`; schema changes add `version(n+1)` with an
+  `.upgrade()` and a test that migrates a v-n row.
 - Never fabricate a specific character's exact multipliers/stats and
   present them as fact. If a real source isn't available, use a
   clearly-labeled placeholder and leave a TODO citing what needs

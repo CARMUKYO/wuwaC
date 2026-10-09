@@ -34,3 +34,9 @@ class WuwaDb extends Dexie {
 }
 
 export const db = new WuwaDb();
+
+/** True once the user has entered anything worth protecting (cache excluded). */
+export async function hasUserData(): Promise<boolean> {
+  const counts = await Promise.all([db.ownedEchoes.count(), db.roster.count(), db.builds.count(), db.teams.count()]);
+  return counts.some((n) => n > 0);
+}

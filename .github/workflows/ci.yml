@@ -1,22 +1,20 @@
-name: Deploy to GitHub Pages
+name: CI
 
 on:
+  pull_request:
   push:
-    branches:
+    branches-ignore:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: 'pages'
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,19 +37,3 @@ jobs:
 
       - name: Build project
         run: npm run build
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: dist
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
