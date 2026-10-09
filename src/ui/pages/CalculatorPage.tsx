@@ -235,7 +235,7 @@ export function CalculatorPage() {
         description="Build a rotation from real kit motions — DPR sums every action, DPS divides by rotation time."
       />
 
-      <Window label="Resonator" title="Resonator" className="mt-4">
+      <Window label="Resonator" title="Resonator" className="mt-6">
       <div className="grid gap-4 md:grid-cols-3">
         <div>
           <label htmlFor="calc-roster" className={labelClass}>
@@ -303,7 +303,7 @@ export function CalculatorPage() {
           Pick a character above — or prefill from your roster — to unlock level and skill inputs.
         </p>
       ) : (
-        <Window label="Investment" title="Investment" className="mt-4">
+        <Window label="Investment" title="Investment" className="mt-6">
           <div className="grid gap-x-4 gap-y-3 md:grid-cols-2">
             <SliderField
               id="calc-level"
@@ -525,7 +525,7 @@ export function CalculatorPage() {
             </p>
           )}
           {teams.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-end gap-2 border-2 border-line bg-panel p-4">
+            <div className="mt-3 flex flex-wrap items-end gap-2 px-card bg-panel p-4">
               <div className="min-w-48 flex-1">
                 <label htmlFor="calc-team-import" className={labelClass}>
                   Import Outro / team buffs from a team
@@ -558,7 +558,7 @@ export function CalculatorPage() {
             </p>
           )}
           {charPresets.length > 0 && (
-            <div className="mt-3 border-2 border-line bg-panel p-4">
+            <div className="mt-3 px-card bg-panel p-4">
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-48 flex-1">
                   <label htmlFor="calc-preset" className={labelClass}>

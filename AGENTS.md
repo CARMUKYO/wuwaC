@@ -186,15 +186,27 @@ interface Team {
 
 - `src` — application source
 - `docs` — project documentation
-- UI styling: `src/index.css` `@theme` tokens (paper default + `[data-theme="ink"]`
-  overrides) consumed via `src/ui/components/classes.ts` (class strings) and
-  `src/ui/components/ui.tsx` (primitives). Never raw hex in components —
-  add a token instead. Theme state lives in `src/state/theme.ts`.
-- UI dynamics: signature motif in `src/ui/components/motif.tsx`
-  (FrequencyStrip, seal stamps), live-feedback primitives in
-  `src/ui/components/feedback.tsx` + `src/ui/toasts.ts`, motion hooks in
-  `src/ui/motion.ts`, command palette in `src/ui/components/palette.tsx`,
-  free-text suggest in `src/ui/components/SuggestInput.tsx`. All keyframes
+- UI styling ("Pixel Arcade", spec in `docs/design/PIXEL_ARCADE_HANDOFF.md`):
+  `src/index.css` `@theme static` tokens (light default + `[data-theme="ink"]`
+  dark overrides) consumed via `src/ui/components/classes.ts` (class strings)
+  and `src/ui/components/ui.tsx` (`Window`, `SegmentMeter`, `CostPips`,
+  `PageHeader`, `Alert`). Never raw hex in components — add a token instead.
+  The accent fill is `seal`; the accent as *text* / focus ring is
+  `accent-text` (never `text-seal`). `text-dim` is decorative only — use
+  `text-fog` for readable secondary text. Pixel frames/buttons are the
+  `px-frame` / `px-card` / `px-button(-primary|-cyan|-danger)` / `px-tag`
+  utilities in `src/index.css` (stepped corners via offset box-shadows, no
+  border-radius — don't put a `shadow-*` utility on them). Pixel icons:
+  bitmaps in `src/ui/components/pixelIcons.ts`, rendered by `PixelIcon.tsx`
+  (colours from `--color-icon-*`). Mascot: `Mascot.tsx`; the sprite is
+  user-supplied art loaded from `MASCOT_URL` and is never committed. Theme
+  state lives in `src/state/theme.ts`.
+- Roll quality (Echo substat tiers, 10-block roll value) is the pure module
+  `src/domain/rollValue.ts` over `SUB_STAT_TIERS`; UI only renders it.
+- UI dynamics: live-feedback primitives in `src/ui/components/feedback.tsx` +
+  `src/ui/toasts.ts`, motion hooks in `src/ui/motion.ts`, command palette in
+  `src/ui/components/palette.tsx`, free-text suggest in
+  `src/ui/components/SuggestInput.tsx`. All keyframes (incl. mascot hop/bob)
   live in the Motion section of `src/index.css` (reduced-motion safe);
   section routing (`#section`, `#b=` reserved) lives in `src/state/store.ts`.
 

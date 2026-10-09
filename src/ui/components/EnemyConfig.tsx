@@ -1,6 +1,7 @@
 import { MAX_ENEMY_LEVEL, MAX_ENEMY_RES } from '../../domain/enemy.ts';
 import { SliderField } from './SliderField.tsx';
 import { inputClass, labelClass } from './classes.ts';
+import { Window } from './ui.tsx';
 
 interface EnemyConfigProps {
   kind: 'mob' | 'boss';
@@ -18,9 +19,8 @@ interface EnemyConfigProps {
  */
 export function EnemyConfig({ kind, level, baseRES, onKindChange, onLevelChange, onRESChange }: EnemyConfigProps) {
   return (
-    <section aria-label="Enemy config" className="border-2 border-line bg-panel p-4">
-      <h3 className="font-display text-xl leading-tight font-semibold text-ink">Enemy Config</h3>
-      <div className="mt-3 grid gap-4 md:grid-cols-3">
+    <Window title="Enemy Config" bar="b">
+      <div className="grid gap-4 md:grid-cols-3">
         <div>
           <label htmlFor="calc-enemy-kind" className={labelClass}>
             Enemy kind
@@ -53,6 +53,6 @@ export function EnemyConfig({ kind, level, baseRES, onKindChange, onLevelChange,
           onChange={(pct) => onRESChange(pct / 100)}
         />
       </div>
-    </section>
+    </Window>
   );
 }

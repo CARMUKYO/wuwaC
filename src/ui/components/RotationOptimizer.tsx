@@ -14,7 +14,7 @@ import { runOptimization, type OptimizationHandle } from '../../optimizer/worker
 import type { OptimizeRequest, SearchData, SearchResult } from '../../optimizer/search.ts';
 import { useLibraryStore } from '../../state/library.ts';
 import { btnOutline, btnPrimary, labelClass, selectClass } from './classes.ts';
-import { Alert } from './ui.tsx';
+import { Alert, Window } from './ui.tsx';
 
 type Status =
   | { kind: 'idle' }
@@ -143,11 +143,8 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
   };
 
   return (
-    <section aria-label="Optimize for this rotation" className="overflow-hidden border-2 border-line bg-panel">
-      <div className="px-4 pt-4 pb-3">
-        <h3 className="font-display text-2xl leading-tight font-semibold text-ink">Optimize for This Rotation</h3>
-      </div>
-      <div className="p-4 pt-3">
+    <Window title="Optimize for This Rotation" label="Optimize for this rotation" bodyClassName="">
+      <div className="p-4">
       {currentDpr !== null && (
         <p className="text-xs text-fog tnum">
           Current picks: {Math.round(currentDpr).toLocaleString()} DPR ·{' '}
@@ -326,6 +323,6 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
         </div>
       )}
       </div>
-    </section>
+    </Window>
   );
 }

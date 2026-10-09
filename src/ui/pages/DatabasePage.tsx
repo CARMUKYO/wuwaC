@@ -391,7 +391,7 @@ export function DatabasePage() {
               className={`-mb-px border-b-2 px-3 py-1.5 font-display text-lg font-semibold transition-terminal ${
                 tab === t.id
                   ? 'border-seal text-ink'
-                  : 'border-transparent text-fog hover:border-line-strong hover:text-fog'
+                  : 'border-transparent text-fog hover:text-fog'
               }`}
             >
               {t.label} <span className="text-xs font-medium tnum">({counts[t.id]})</span>
@@ -413,8 +413,8 @@ export function DatabasePage() {
         </div>
       </div>
       <div key={tab} className="animate-tt-fade mt-4 grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className="border-2 border-line bg-panel p-2">{renderList()}</div>
-        <div key={selectedId ?? 'none'} className="animate-tt-fade border-2 border-line bg-panel p-4">
+        <div className="px-card bg-panel p-2">{renderList()}</div>
+        <div key={selectedId ?? 'none'} className="animate-tt-fade px-card bg-panel p-4">
           {renderDetail()}
         </div>
       </div>

@@ -113,7 +113,7 @@ export function RosterPage() {
                   ? storedWeapon
                   : undefined;
               return (
-                <li key={entry.characterId} className="animate-tt-fade relative border-2 border-line bg-panel p-4">
+                <li key={entry.characterId} className="animate-tt-fade relative px-card bg-panel p-4">
                   <span aria-hidden="true" className="px-tag absolute -top-2.5 right-4 px-2 py-0.5 text-xs">
                     S{entry.resonanceChain}
                   </span>

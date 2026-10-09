@@ -19,6 +19,7 @@ import type { ActionBlock, BlockResult, RotationBuff } from '../../domain/rotati
 import { blockStartTimes, buffAppliesAt, isBlockStale } from '../../domain/rotation.ts';
 import { isPercentStat, parseDisplayValue, statLabel, toDisplayValue } from '../format.ts';
 import { btnDangerGhost, btnGhost, btnOutline, btnSm, inputClass, labelClass } from './classes.ts';
+import { Window } from './ui.tsx';
 import { AnimatedNumber, DeltaChip, ScoreBar } from './feedback.tsx';
 
 type KitStatePatch = Partial<
@@ -283,7 +284,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
       {dpr !== null && dps !== null && (
         <div
           aria-label="Rotation results"
-          className="sticky top-2 z-[5] overflow-hidden border-2 border-line bg-panel shadow-md"
+          className="sticky top-2 z-[5] overflow-hidden px-card bg-panel"
         >
           <div className="px-4 pt-3 pb-2">
             <h3 className="font-display text-2xl leading-tight font-semibold text-ink">Rotation results</h3>
@@ -354,7 +355,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
               const skillKind = skill?.kind;
               const blockCap = maxStatusStacks(block.statusType ?? 'aeroErosion', character.id, resonanceChain);
               return (
-                <li key={block.id} className="animate-tt-fade border-2 border-line bg-panel px-4 py-3">
+                <li key={block.id} className="animate-tt-fade px-card bg-panel px-4 py-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="min-w-0 flex-1 basis-48">
                       <p className="truncate font-display text-lg leading-tight font-semibold text-ink">
@@ -773,8 +774,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
         )}
       </section>
 
-      <section aria-label="Add actions" className="border-2 border-line bg-panel p-4">
-        <h3 className="font-display text-2xl leading-tight font-semibold text-ink">Add Actions</h3>
+      <Window title="Add Actions" label="Add actions">
         {resonanceModes.length > 0 && (
           <div className="mt-3 border-2 border-line bg-canvas p-3">
             <p className="text-xs text-fog">Resonance Mode</p>
@@ -961,10 +961,9 @@ export function RotationTimeline(props: RotationTimelineProps) {
             )}
           </div>
         )}
-      </section>
+      </Window>
 
-      <section aria-label="Buffs" className="border-2 border-line bg-panel p-4">
-        <h3 className="font-display text-2xl leading-tight font-semibold text-ink">Buffs</h3>
+      <Window title="Buffs" bar="b" label="Buffs">
         {buffs.length === 0 ? (
           <p className="mt-1 text-xs text-fog">
             No buffs yet — pick a preset below or add a custom buff with its verified numbers.
@@ -1007,7 +1006,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         const num = Number(e.target.value);
                         if (Number.isFinite(num)) onSetBuffWindow(buff.id, num, buff.windowDurationSeconds ?? 0);
                       }}
-                      className="w-20 border-2 border-line-strong bg-canvas px-2 py-1 text-xs text-ink tnum"
+                      className="min-h-9 w-20 border-2 border-line-strong bg-canvas px-2 py-1 text-xs text-ink tnum"
                     />
                     <label htmlFor={`buff-window-duration-${buff.id}`}>Window duration (s)</label>
                     <input
@@ -1022,7 +1021,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         const num = Number(e.target.value);
                         if (Number.isFinite(num)) onSetBuffWindow(buff.id, buff.windowStartSeconds ?? 0, num);
                       }}
-                      className="w-20 border-2 border-line-strong bg-canvas px-2 py-1 text-xs text-ink tnum"
+                      className="min-h-9 w-20 border-2 border-line-strong bg-canvas px-2 py-1 text-xs text-ink tnum"
                     />
                     {hasWindow && (
                       <button
@@ -1102,7 +1101,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
           Add buff
         </button>
         <p className="mt-1 text-xs text-fog">RES shred is entered as a negative RES Penetration value.</p>
-      </section>
+      </Window>
     </div>
   );
 }

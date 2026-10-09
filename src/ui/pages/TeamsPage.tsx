@@ -78,7 +78,7 @@ export function TeamsPage() {
         </Alert>
       )}
 
-      <Window label="Assemble a team" title="Assemble a team" className="mt-4">
+      <Window label="Assemble a team" title="Assemble a team" className="mt-6">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div>
           <label htmlFor="team-name" className={labelClass}>
@@ -128,7 +128,7 @@ export function TeamsPage() {
             {teams.map((team) => {
               const coverage = teamSonataCoverage(echoes, team, sonataNameOf);
               return (
-                <li key={team.id} className="animate-tt-fade border-2 border-line bg-panel p-4">
+                <li key={team.id} className="animate-tt-fade px-card bg-panel p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="min-w-0 flex-1 basis-48 truncate font-display text-2xl leading-none font-semibold text-ink">{team.name}</h3>
                     <button

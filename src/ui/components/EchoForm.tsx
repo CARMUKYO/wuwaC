@@ -5,7 +5,7 @@ import { MAIN_STAT_POOLS, SUBSTAT_POOL } from '../../data/placeholders.ts';
 import type { StatKey } from '../../data/schema.ts';
 import type { EchoDraft } from '../../state/inventory.ts';
 import { isPercentStat, parseDisplayValue, statLabel, toDisplayValue } from '../format.ts';
-import { btnGhost, btnOutline, btnPrimary, inputClass, labelClass } from './classes.ts';
+import { btnGhost, btnOutline, btnPrimary, chipClass, inputClass, labelClass } from './classes.ts';
 import { Alert } from './ui.tsx';
 
 export interface EchoFormValues {
@@ -281,7 +281,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
                 type="button"
                 aria-pressed={costFilter === c}
                 onClick={() => setCostFilter(costFilter === c ? null : c)}
-                className={`border-2 px-2.5 py-1 text-xs font-medium tnum transition-terminal ${costFilter === c ? 'border-seal bg-seal text-seal-ink' : 'border-line-strong text-fog hover:bg-panel-2'}`}
+                className={chipClass(costFilter === c)}
               >
                 {c}
               </button>

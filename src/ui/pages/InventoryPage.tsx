@@ -347,7 +347,7 @@ export function InventoryPage() {
         </div>
       )}
 
-      <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <Window
           title="Echo Box"
           label="Echo box"

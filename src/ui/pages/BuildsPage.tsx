@@ -142,7 +142,7 @@ export function BuildsPage() {
         ) : (
           <ul className="space-y-2">
             {builds.map((build) => (
-              <li key={build.id} className="animate-tt-fade row-sweep border-2 border-line bg-panel px-4 py-3 transition-terminal hover:border-line-strong">
+              <li key={build.id} className="animate-tt-fade row-sweep px-card bg-panel px-4 py-3 transition-terminal">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex min-w-0 flex-1 basis-52 items-center gap-3">
                     <GameIcon
@@ -187,7 +187,7 @@ export function BuildsPage() {
         )}
       </div>
 
-      <div className="mt-6 border-2 border-line bg-panel p-4">
+      <div className="mt-6 px-card bg-panel p-4">
         <label htmlFor="build-import" className={labelClass}>
           Paste build JSON to import (single build or array)
         </label>
