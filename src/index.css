@@ -53,8 +53,6 @@
   --color-pip: #d9557a;
   --color-secondary-btn: #bfeaf2;
   --color-secondary-btn-ink: #2b2540;
-  --color-sticker: #ffffff;
-  --color-shadow-ellipse: #2b2540;
 
   --color-tide: #0f766e;
   --color-tide-wash: #dcf1ea;
@@ -142,8 +140,6 @@
   --color-pip: #ff8fab;
   --color-secondary-btn: #8fdcea;
   --color-secondary-btn-ink: #2b2540;
-  --color-sticker: #ffffff;
-  --color-shadow-ellipse: #000000;
 
   --color-tide: #6fd6b5;
   --color-tide-wash: #1b3a36;
@@ -272,11 +268,6 @@ body {
   .px-button-danger {
     color: var(--color-ember);
   }
-}
-
-/* Mascot sprite: always crisp, sticker outline via four white drop-shadows. */
-.pixelated {
-  image-rendering: pixelated;
 }
 
 /* Thin ruled divider used under page headers. */
@@ -487,59 +478,6 @@ details[open] > summary::before {
   border: 2px solid var(--color-outline-on-accent);
   font-family: var(--font-display);
   font-weight: 600;
-}
-
-/* Mascot: sticker outline, hop (banner) and 2-frame bob (logo). */
-.sticker {
-  filter: drop-shadow(2px 0 0 var(--color-sticker)) drop-shadow(-2px 0 0 var(--color-sticker))
-    drop-shadow(0 2px 0 var(--color-sticker)) drop-shadow(0 -2px 0 var(--color-sticker));
-}
-.hop {
-  transform-origin: 50% 100%;
-  animation: hop 1.8s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
-}
-.hop:hover {
-  animation-duration: 0.7s;
-}
-.hop-shadow {
-  --hop-shadow-rest: 0.28;
-  --hop-shadow-apex: 0.12;
-  animation: hop-shadow 1.8s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
-}
-[data-theme="ink"] .hop-shadow {
-  --hop-shadow-rest: 0.5;
-  --hop-shadow-apex: 0.2;
-}
-.bob {
-  animation: bob 1s steps(2, jump-none) infinite;
-}
-
-@keyframes hop {
-  0%, 100% { transform: translateY(0) scale(1, 1); }
-  8% { transform: translateY(0) scale(1.1, 0.88); }       /* crouch */
-  24% { transform: translateY(-34px) scale(0.93, 1.09); } /* stretch up */
-  34% { transform: translateY(-38px) scale(1, 1); }       /* apex */
-  48% { transform: translateY(0) scale(1.12, 0.86); }     /* land squash */
-  56% { transform: translateY(0) scale(0.96, 1.04); }
-  64% { transform: translateY(0) scale(1, 1); }           /* rest */
-}
-
-@keyframes hop-shadow {
-  0%, 8%, 48%, 100% { transform: scaleX(1); opacity: var(--hop-shadow-rest); }
-  34% { transform: scaleX(0.55); opacity: var(--hop-shadow-apex); }
-}
-
-@keyframes bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hop,
-  .hop-shadow,
-  .bob {
-    animation: none;
-  }
 }
 
 /* Skeleton shimmer for loading states. Static gradient under
