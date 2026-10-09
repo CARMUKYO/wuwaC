@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { SECTIONS, initSectionRouting, useAppStore, type Section } from './state/store.ts';
 import { useThemeStore } from './state/theme.ts';
 import { CommandPalette } from './ui/components/palette.tsx';
-import { FrequencyStrip } from './ui/components/motif.tsx';
+import { Mascot } from './ui/components/Mascot.tsx';
+import { PixelIcon } from './ui/components/PixelIcon.tsx';
+import type { PixelIconName } from './ui/components/pixelIcons.ts';
+import { btnOutline } from './ui/components/classes.ts';
 import { BuildsPage } from './ui/pages/BuildsPage.tsx';
 import { CalculatorPage } from './ui/pages/CalculatorPage.tsx';
 import { DatabasePage } from './ui/pages/DatabasePage.tsx';
@@ -27,29 +30,7 @@ function ActiveSection({ section }: { section: Section }) {
   }
 }
 
-/** Waveform mark — the Tacet frequency motif. Bars drift via `tt-eq` (CSS-gated). */
-function BrandMark() {
-  const bars = [10, 18, 26, 15, 22, 12, 19];
-  return (
-    <svg width="30" height="24" viewBox="0 0 30 24" aria-hidden="true" className="shrink-0">
-      {bars.map((h, i) => (
-        <rect
-          key={i}
-          x={i * 4}
-          y={(24 - h) / 2}
-          width="2.5"
-          height={h}
-          rx="1"
-          className={`eq-bar ${i === 2 ? 'fill-seal-bright' : 'fill-seal'}`}
-          style={{ animationDelay: `${i * -0.35}s`, animationDuration: `${2.2 + (i % 3) * 0.4}s` }}
-          opacity={i === 2 ? 1 : 0.45 + (i % 3) * 0.15}
-        />
-      ))}
-    </svg>
-  );
-}
-
-function ThemeToggle({ compact = false }: { compact?: boolean }) {
+function ThemeToggle() {
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const next = theme === 'paper' ? 'ink' : 'paper';
@@ -58,155 +39,73 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
       type="button"
       onClick={toggleTheme}
       aria-label={`Switch to ${next} theme`}
-      className={
-        compact
-          ? 'shrink-0 border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:bg-panel-2 hover:text-ink'
-          : 'flex w-full items-center justify-between border-2 border-line-strong px-3 py-2 text-xs transition-terminal hover:bg-panel-2'
-      }
+      className={`${btnOutline} text-sm`}
     >
-      {compact ? (
-        theme.toUpperCase()
-      ) : (
-        <>
-          <span className="text-fog">Theme</span>
-          <span className="text-accent-text">{theme === 'paper' ? 'Paper' : 'Ink'}</span>
-        </>
-      )}
+      {theme === 'paper' ? 'Light' : 'Dark'}
     </button>
   );
 }
 
-function PaletteButton({ compact = false, onOpen }: { compact?: boolean; onOpen: () => void }) {
+function PaletteButton({ onOpen }: { onOpen: () => void }) {
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-label="Open command palette"
       title="Command palette (Ctrl+K)"
-      className={
-        compact
-          ? 'shrink-0 border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:bg-panel-2 hover:text-ink'
-          : 'flex w-full items-center justify-between border-2 border-line-strong px-3 py-2 text-xs transition-terminal hover:bg-panel-2'
-      }
+      className={`${btnOutline} text-sm`}
     >
-      {compact ? (
-        '⌘K'
-      ) : (
-        <>
-          <span className="text-fog">Command</span>
-          <span className="border-2 border-line-strong px-1.5 py-px text-xs text-fog">
-            Ctrl K
-          </span>
-        </>
-      )}
+      Search
+      <kbd className="hidden border-2 border-line-strong px-1 py-px font-sans text-xs text-fog sm:inline">Ctrl K</kbd>
     </button>
   );
 }
 
-function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
-  const activeSection = useAppStore((s) => s.activeSection);
-  const setActiveSection = useAppStore((s) => s.setActiveSection);
-  return (
-    <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-line bg-panel lg:flex">
-      <div className="flex items-center gap-3 px-5 pt-6 pb-5">
-        <BrandMark />
-        <div>
-          <p className="font-display text-2xl leading-none font-semibold text-ink">
-            WuWa Optimizer
-          </p>
-          <p className="mt-1 text-xs text-accent-text">
-            Resonator terminal
-          </p>
-        </div>
-      </div>
-      <div className="rule mx-5" aria-hidden="true" />
-      <nav aria-label="Sections" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {SECTIONS.map(({ id, label, blurb }, i) => {
-          const active = activeSection === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveSection(id)}
-              aria-current={active ? 'page' : undefined}
-              className={`group relative flex w-full items-baseline gap-3 px-3 py-2 text-left transition-terminal ${
-                active ? 'bg-panel-2' : 'hover:bg-panel-2/60'
-              }`}
-            >
-              <span
-                aria-hidden="true"
-                className={`absolute top-2 bottom-2 left-0 w-1 rounded-full bg-seal transition-transform duration-150 ${
-                  active ? 'scale-y-100' : 'scale-y-0 group-hover:scale-y-50'
-                }`}
-              />
-              <span
-                className={`text-xs font-medium tnum ${
-                  active ? 'text-accent-text' : 'text-fog group-hover:text-fog'
-                }`}
-              >
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <span className="min-w-0">
-                <span
-                  className={`block font-display text-lg leading-tight font-semibold ${
-                    active ? 'text-ink' : 'text-fog group-hover:text-ink'
-                  }`}
-                >
-                  {label}
-                </span>
-                <span className="block truncate text-xs text-fog">
-                  {blurb}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </nav>
-      <div className="space-y-3 px-5 py-4">
-        <PaletteButton onOpen={onOpenPalette} />
-        <ThemeToggle />
-        <FrequencyStrip seed="sidebar" bars={36} className="h-5 w-full opacity-60" />
-        <div className="rule" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-fog">
-          Local-first
-          <br />
-          Nothing leaves this browser
-        </p>
-      </div>
-    </aside>
-  );
-}
+const SECTION_ICONS: Record<Section, PixelIconName> = {
+  inventory: 'chest',
+  roster: 'head',
+  calculator: 'sword',
+  teams: 'heart',
+  builds: 'book',
+  database: 'disk',
+};
 
 function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const activeSection = useAppStore((s) => s.activeSection);
   const setActiveSection = useAppStore((s) => s.setActiveSection);
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-panel lg:hidden">
-      <div className="flex items-center gap-3 px-4 pt-3">
-        <BrandMark />
-        <p className="font-display text-xl leading-none font-semibold text-ink">
-          WuWa Optimizer
-        </p>
-        <div className="ml-auto flex gap-1.5">
-          <PaletteButton compact onOpen={onOpenPalette} />
-          <ThemeToggle compact />
+    <header className="border-b-[3px] border-outline bg-panel">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 pt-3 pb-5 sm:px-6 lg:px-10">
+        <div className="flex items-center gap-2">
+          <Mascot variant="logo" />
+          <p className="font-display text-2xl leading-none font-bold text-ink">
+            WuWa<span className="text-accent-text">Opt</span>
+          </p>
+        </div>
+        <nav aria-label="Sections" className="order-3 flex w-full flex-wrap gap-x-2 gap-y-4 lg:order-none lg:w-auto lg:flex-1">
+          {SECTIONS.map(({ id, label }) => {
+            const active = activeSection === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveSection(id)}
+                aria-current={active ? 'page' : undefined}
+                className={`inline-flex min-h-10 items-center gap-2 px-2.5 py-1 font-display text-base font-semibold ${
+                  active ? 'px-button px-button-primary' : 'text-fog transition-terminal hover:bg-panel-2 hover:text-ink'
+                }`}
+              >
+                <PixelIcon name={SECTION_ICONS[id]} />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="ml-auto flex items-center gap-3">
+          <PaletteButton onOpen={onOpenPalette} />
+          <ThemeToggle />
         </div>
       </div>
-      <nav aria-label="Sections" className="mt-2 flex gap-1 overflow-x-auto px-4 pb-3">
-        {SECTIONS.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setActiveSection(id)}
-            aria-current={activeSection === id ? 'page' : undefined}
-            className={`shrink-0 px-3 py-1.5 font-display text-base font-semibold transition-terminal ${
-              activeSection === id ? 'bg-seal text-seal-ink' : 'text-fog hover:bg-panel-2 hover:text-ink'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
     </header>
   );
 }
@@ -231,16 +130,14 @@ function App() {
   }, []);
 
   return (
-    <div className="terminal-ground min-h-screen bg-canvas text-ink transition-terminal">
-      <Sidebar onOpenPalette={() => setPaletteOpen(true)} />
+    <div className="min-h-screen bg-canvas text-ink transition-terminal">
       <TopBar onOpenPalette={() => setPaletteOpen(true)} />
-      <div className="lg:pl-60">
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
-          <div key={activeSection} className="animate-tt-fade">
-            <ActiveSection section={activeSection} />
-          </div>
-        </main>
-      </div>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+        <div key={activeSection} className="animate-tt-fade">
+          <ActiveSection section={activeSection} />
+        </div>
+        <p className="mt-10 text-center text-xs text-fog">Local-first — nothing leaves this browser.</p>
+      </main>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );

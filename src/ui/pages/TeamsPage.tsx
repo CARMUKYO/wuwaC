@@ -9,9 +9,8 @@ import { statLabel, toDisplayValue } from '../format.ts';
 import { btnDangerGhost, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
 import { Skeleton, ToastStack } from '../components/feedback.tsx';
 import { useToasts } from '../toasts.ts';
-import { MotifEmptyState } from '../components/motif.tsx';
 import { SuggestInput } from '../components/SuggestInput.tsx';
-import { Alert, AttributeDot, PageHeader, Window } from '../components/ui.tsx';
+import { Alert, AttributeDot, EmptyState, PageHeader, Window } from '../components/ui.tsx';
 
 export function TeamsPage() {
   const teams = useTeamStore((s) => s.teams);
@@ -123,7 +122,7 @@ export function TeamsPage() {
         {!loaded ? (
           <Skeleton lines={2} />
         ) : teams.length === 0 ? (
-          <MotifEmptyState seed="teams-empty">No teams yet — assemble your first trio above.</MotifEmptyState>
+          <EmptyState>No teams yet — assemble your first trio above.</EmptyState>
         ) : (
           <ul className="space-y-3">
             {teams.map((team) => {

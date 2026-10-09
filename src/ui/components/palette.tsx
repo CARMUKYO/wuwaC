@@ -24,7 +24,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       {
         id: 'theme' as const,
         label: 'Toggle theme',
-        hint: 'Paper / Ink',
+        hint: 'Light / Dark',
         run: () => toggleTheme(),
       },
     ];

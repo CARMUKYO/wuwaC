@@ -6,8 +6,7 @@ import { GameIcon } from '../components/GameIcon.tsx';
 import { btnDangerGhost, btnGhost, btnOutline, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
 import { Skeleton, ToastStack } from '../components/feedback.tsx';
 import { useToasts } from '../toasts.ts';
-import { MotifEmptyState } from '../components/motif.tsx';
-import { Alert, PageHeader } from '../components/ui.tsx';
+import { Alert, EmptyState, PageHeader } from '../components/ui.tsx';
 
 /** Decode a share hash and import it; resolves a user-facing notice. Pure module scope (no hooks). */
 async function importLinkIntoLibrary(
@@ -139,7 +138,7 @@ export function BuildsPage() {
         {!loaded ? (
           <Skeleton lines={3} />
         ) : builds.length === 0 ? (
-          <MotifEmptyState seed="builds-empty">No saved builds yet — save one from the Calculator results.</MotifEmptyState>
+          <EmptyState>No saved builds yet — save one from the Calculator results.</EmptyState>
         ) : (
           <ul className="space-y-2">
             {builds.map((build) => (

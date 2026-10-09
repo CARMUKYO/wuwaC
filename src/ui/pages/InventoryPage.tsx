@@ -15,8 +15,7 @@ import { EchoList } from '../components/EchoList.tsx';
 import { btnGhost, btnOutline, btnPrimary, inputClass, labelClass } from '../components/classes.ts';
 import { Skeleton, ToastStack } from '../components/feedback.tsx';
 import { useToasts } from '../toasts.ts';
-import { MotifEmptyState } from '../components/motif.tsx';
-import { Alert, PageHeader } from '../components/ui.tsx';
+import { Alert, EmptyState, PageHeader } from '../components/ui.tsx';
 import { toDisplayValue } from '../format.ts';
 
 function toFormValues(echo: OwnedEcho): EchoFormValues {
@@ -324,9 +323,9 @@ export function InventoryPage() {
         {!loaded ? (
           <Skeleton lines={4} />
         ) : echoes.length === 0 ? (
-          <MotifEmptyState seed="inventory-empty">No echoes yet — add your first Echo above to start building your gear box.</MotifEmptyState>
+          <EmptyState>No echoes yet — add your first Echo above to start building your gear box.</EmptyState>
         ) : visible.length === 0 ? (
-          <MotifEmptyState seed="inventory-filtered">No echoes with this Sonata set — pick All sets to see the full inventory.</MotifEmptyState>
+          <EmptyState>No echoes with this Sonata set — pick All sets to see the full inventory.</EmptyState>
         ) : (
           <EchoList
             echoes={visible}

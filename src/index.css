@@ -15,7 +15,7 @@
  * light theme so it clears 4.5:1 on every ground.
  */
 
-@theme {
+@theme static {
   --font-display: "Pixelify Sans", "Press Start 2P", ui-monospace, monospace;
   --font-sans: "Nunito", system-ui, sans-serif;
   /* No true mono: stat values use Nunito with tabular numerals. */
@@ -297,7 +297,7 @@ input[type="range"].terminal-range::-webkit-slider-thumb {
   appearance: none;
   width: 14px;
   height: 14px;
-  border-radius: 3px;
+  border-radius: 0;
   background: var(--color-seal);
   border: 2px solid var(--color-outline);
   cursor: pointer;
@@ -305,7 +305,7 @@ input[type="range"].terminal-range::-webkit-slider-thumb {
 input[type="range"].terminal-range::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  border-radius: 3px;
+  border-radius: 0;
   background: var(--color-seal);
   border: 2px solid var(--color-outline);
   cursor: pointer;
@@ -334,12 +334,12 @@ select optgroup {
   input[type="range"].terminal-range::-webkit-slider-thumb {
     width: 22px;
     height: 22px;
-    border-radius: 5px;
+    border-radius: 0;
   }
   input[type="range"].terminal-range::-moz-range-thumb {
     width: 22px;
     height: 22px;
-    border-radius: 5px;
+    border-radius: 0;
   }
   input[type="checkbox"],
   input[type="radio"] {
@@ -397,10 +397,10 @@ details[open] > summary::before {
 
 /* ---- Motion ---------------------------------------------------------- */
 /*
- * Tacet Terminal signature motion. All keyframes live in this section so
+ * Pixel Arcade motion. All keyframes live in this section so
  * the reduced-motion block at the bottom neutralizes every one of them.
  * Rule of thumb: opacity-first, small distances, short durations — the
- * terminal feels alive, never bouncy.
+ * app feels alive, never bouncy.
  */
 
 @keyframes tt-fade {
@@ -417,11 +417,6 @@ details[open] > summary::before {
   0% { transform: scale(1); }
   40% { transform: scale(1.08); }
   100% { transform: scale(1); }
-}
-
-@keyframes tt-eq {
-  0%, 100% { transform: scaleY(0.45); }
-  50% { transform: scaleY(1); }
 }
 
 @keyframes tt-shimmer {
@@ -447,14 +442,6 @@ details[open] > summary::before {
   .animate-tt-rise { animation: tt-rise 180ms ease; }
   .animate-tt-pop { animation: tt-pop 220ms ease; }
   .animate-tt-toast { animation: tt-toast-in 200ms ease; }
-
-  /* Waveform bars (FrequencyStrip, BrandMark). transform-box keeps the
-   * scale anchored to each bar's own box in SVG. */
-  .eq-bar {
-    transform-box: fill-box;
-    transform-origin: center bottom;
-    animation: tt-eq 2.4s ease-in-out infinite;
-  }
 
   /* Damage/score bars ease toward their new width on recompute. */
   .score-bar-fill { transition: width 300ms ease; }
@@ -483,6 +470,59 @@ details[open] > summary::before {
   border: 2px solid var(--color-outline-on-accent);
   font-family: var(--font-display);
   font-weight: 600;
+}
+
+/* Mascot: sticker outline, hop (banner) and 2-frame bob (logo). */
+.sticker {
+  filter: drop-shadow(2px 0 0 var(--color-sticker)) drop-shadow(-2px 0 0 var(--color-sticker))
+    drop-shadow(0 2px 0 var(--color-sticker)) drop-shadow(0 -2px 0 var(--color-sticker));
+}
+.hop {
+  transform-origin: 50% 100%;
+  animation: hop 1.8s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
+}
+.hop:hover {
+  animation-duration: 0.7s;
+}
+.hop-shadow {
+  --hop-shadow-rest: 0.28;
+  --hop-shadow-apex: 0.12;
+  animation: hop-shadow 1.8s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
+}
+[data-theme="ink"] .hop-shadow {
+  --hop-shadow-rest: 0.5;
+  --hop-shadow-apex: 0.2;
+}
+.bob {
+  animation: bob 1s steps(2, jump-none) infinite;
+}
+
+@keyframes hop {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  8% { transform: translateY(0) scale(1.1, 0.88); }       /* crouch */
+  24% { transform: translateY(-34px) scale(0.93, 1.09); } /* stretch up */
+  34% { transform: translateY(-38px) scale(1, 1); }       /* apex */
+  48% { transform: translateY(0) scale(1.12, 0.86); }     /* land squash */
+  56% { transform: translateY(0) scale(0.96, 1.04); }
+  64% { transform: translateY(0) scale(1, 1); }           /* rest */
+}
+
+@keyframes hop-shadow {
+  0%, 8%, 48%, 100% { transform: scaleX(1); opacity: var(--hop-shadow-rest); }
+  34% { transform: scaleX(0.55); opacity: var(--hop-shadow-apex); }
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hop,
+  .hop-shadow,
+  .bob {
+    animation: none;
+  }
 }
 
 /* Skeleton shimmer for loading states. Static gradient under

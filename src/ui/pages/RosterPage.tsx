@@ -8,8 +8,7 @@ import { btnDangerGhost, btnPrimary, inputClass, labelClass } from '../component
 import { Collapsible } from '../components/Collapsible.tsx';
 import { Skeleton, ToastStack } from '../components/feedback.tsx';
 import { useToasts } from '../toasts.ts';
-import { MotifEmptyState } from '../components/motif.tsx';
-import { AttributeDot, PageHeader } from '../components/ui.tsx';
+import { AttributeDot, EmptyState, PageHeader } from '../components/ui.tsx';
 
 function defaultsFor(snapshot: Snapshot, characterId: string): RosterEntry {
   const character = snapshot.characters.find((c) => c.id === characterId)!;
@@ -98,7 +97,7 @@ export function RosterPage() {
         {!loaded ? (
           <Skeleton lines={3} />
         ) : entries.length === 0 ? (
-          <MotifEmptyState seed="roster-empty">No characters tracked yet — add one above.</MotifEmptyState>
+          <EmptyState>No characters tracked yet — add one above.</EmptyState>
         ) : (
           <ul className="space-y-3">
             {entries.map((entry) => {
