@@ -60,8 +60,8 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
       aria-label={`Switch to ${next} theme`}
       className={
         compact
-          ? 'shrink-0 rounded-md border border-line-strong px-2 py-1 font-mono text-[10px] tracking-[0.14em] text-fog uppercase transition-terminal hover:bg-panel-2 hover:text-ink'
-          : 'flex w-full items-center justify-between rounded-md border border-line-strong px-3 py-2 font-mono text-[11px] tracking-[0.14em] uppercase transition-terminal hover:bg-panel-2'
+          ? 'shrink-0 border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:bg-panel-2 hover:text-ink'
+          : 'flex w-full items-center justify-between border-2 border-line-strong px-3 py-2 text-xs transition-terminal hover:bg-panel-2'
       }
     >
       {compact ? (
@@ -85,8 +85,8 @@ function PaletteButton({ compact = false, onOpen }: { compact?: boolean; onOpen:
       title="Command palette (Ctrl+K)"
       className={
         compact
-          ? 'shrink-0 rounded-md border border-line-strong px-2 py-1 font-mono text-[10px] tracking-[0.14em] text-fog uppercase transition-terminal hover:bg-panel-2 hover:text-ink'
-          : 'flex w-full items-center justify-between rounded-md border border-line-strong px-3 py-2 font-mono text-[11px] tracking-[0.14em] uppercase transition-terminal hover:bg-panel-2'
+          ? 'shrink-0 border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:bg-panel-2 hover:text-ink'
+          : 'flex w-full items-center justify-between border-2 border-line-strong px-3 py-2 text-xs transition-terminal hover:bg-panel-2'
       }
     >
       {compact ? (
@@ -94,7 +94,7 @@ function PaletteButton({ compact = false, onOpen }: { compact?: boolean; onOpen:
       ) : (
         <>
           <span className="text-fog">Command</span>
-          <span className="rounded border border-line-strong px-1.5 py-px text-[10px] text-fog">
+          <span className="border-2 border-line-strong px-1.5 py-px text-xs text-fog">
             Ctrl K
           </span>
         </>
@@ -111,10 +111,10 @@ function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
       <div className="flex items-center gap-3 px-5 pt-6 pb-5">
         <BrandMark />
         <div>
-          <p className="font-display text-2xl leading-none font-semibold tracking-wide text-ink">
+          <p className="font-display text-2xl leading-none font-semibold text-ink">
             WuWa Optimizer
           </p>
-          <p className="mt-1 font-mono text-[10px] tracking-[0.28em] text-accent-text uppercase">
+          <p className="mt-1 text-xs text-accent-text">
             Resonator terminal
           </p>
         </div>
@@ -129,7 +129,7 @@ function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
               type="button"
               onClick={() => setActiveSection(id)}
               aria-current={active ? 'page' : undefined}
-              className={`group relative flex w-full items-baseline gap-3 rounded-md px-3 py-2 text-left transition-terminal ${
+              className={`group relative flex w-full items-baseline gap-3 px-3 py-2 text-left transition-terminal ${
                 active ? 'bg-panel-2' : 'hover:bg-panel-2/60'
               }`}
             >
@@ -140,7 +140,7 @@ function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
                 }`}
               />
               <span
-                className={`font-mono text-[11px] font-medium tnum ${
+                className={`text-xs font-medium tnum ${
                   active ? 'text-accent-text' : 'text-fog group-hover:text-fog'
                 }`}
               >
@@ -148,13 +148,13 @@ function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
               </span>
               <span className="min-w-0">
                 <span
-                  className={`block font-display text-lg leading-tight font-semibold tracking-wide ${
+                  className={`block font-display text-lg leading-tight font-semibold ${
                     active ? 'text-ink' : 'text-fog group-hover:text-ink'
                   }`}
                 >
                   {label}
                 </span>
-                <span className="block truncate font-mono text-[10px] tracking-[0.14em] text-fog uppercase">
+                <span className="block truncate text-xs text-fog">
                   {blurb}
                 </span>
               </span>
@@ -167,7 +167,7 @@ function Sidebar({ onOpenPalette }: { onOpenPalette: () => void }) {
         <ThemeToggle />
         <FrequencyStrip seed="sidebar" bars={36} className="h-5 w-full opacity-60" />
         <div className="rule" aria-hidden="true" />
-        <p className="font-mono text-[10px] leading-relaxed tracking-[0.14em] text-fog uppercase">
+        <p className="text-xs leading-relaxed text-fog">
           Local-first
           <br />
           Nothing leaves this browser
@@ -184,7 +184,7 @@ function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
     <header className="sticky top-0 z-10 border-b border-line bg-panel lg:hidden">
       <div className="flex items-center gap-3 px-4 pt-3">
         <BrandMark />
-        <p className="font-display text-xl leading-none font-semibold tracking-wide text-ink">
+        <p className="font-display text-xl leading-none font-semibold text-ink">
           WuWa Optimizer
         </p>
         <div className="ml-auto flex gap-1.5">
@@ -199,7 +199,7 @@ function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
             type="button"
             onClick={() => setActiveSection(id)}
             aria-current={activeSection === id ? 'page' : undefined}
-            className={`shrink-0 rounded-md px-3 py-1.5 font-display text-base font-semibold tracking-wide transition-terminal ${
+            className={`shrink-0 px-3 py-1.5 font-display text-base font-semibold transition-terminal ${
               activeSection === id ? 'bg-seal text-seal-ink' : 'text-fog hover:bg-panel-2 hover:text-ink'
             }`}
           >

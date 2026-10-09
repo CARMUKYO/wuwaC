@@ -33,7 +33,7 @@ export function DeltaChip({ current, previous }: { current: number; previous: nu
   const up = pct > 0;
   return (
     <span
-      className={`rounded px-1 py-px font-mono text-[10px] font-medium tnum ${
+      className={`px-1 py-px text-xs font-medium tnum ${
         up ? 'bg-tide-wash text-tide' : 'bg-ember-wash text-ember'
       }`}
     >
@@ -69,7 +69,7 @@ export function Skeleton({
         <div
           key={i}
           aria-hidden="true"
-          className="skeleton h-12 rounded-lg"
+          className="skeleton h-12"
           style={{ width: `${100 - (i % 3) * 7}%` }}
         />
       ))}
@@ -98,7 +98,7 @@ export function ToastStack({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: 
         <div
           key={toast.id}
           role={toast.tone === 'danger' ? 'alert' : 'status'}
-          className={`animate-tt-toast flex items-center gap-2 rounded-lg border px-3 py-2 text-sm shadow-lg ${TOAST_STYLES[toast.tone]}`}
+          className={`animate-tt-toast flex items-center gap-2 border-2 px-3 py-2 text-sm shadow-lg ${TOAST_STYLES[toast.tone]}`}
         >
           <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${TOAST_DOT[toast.tone]}`} />
           <span className="min-w-0 flex-1">{toast.message}</span>
@@ -106,7 +106,7 @@ export function ToastStack({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: 
             type="button"
             onClick={() => onDismiss(toast.id)}
             aria-label={`Dismiss: ${toast.message}`}
-            className="shrink-0 rounded px-1 font-mono text-xs text-fog hover:text-ink"
+            className="shrink-0 px-1 text-xs text-fog hover:text-ink"
           >
             ✕
           </button>

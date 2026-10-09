@@ -112,7 +112,6 @@ export function InventoryPage() {
   return (
     <section>
       <PageHeader
-        eyebrow="01 // Gear box"
         title={
           <>
             Echo Inventory
@@ -135,7 +134,7 @@ export function InventoryPage() {
                     value={seedSonata}
                     onChange={(e) => setSeedSonata(e.target.value)}
                     title="Restrict seeded echoes to one Sonata set"
-                    className="rounded-md border border-dashed border-fog bg-panel px-2 py-1.5 font-mono text-xs text-fog"
+                    className="border-2 border-dashed border-fog bg-panel px-2 py-1.5 text-xs text-fog"
                   >
                     <option value="">Any set</option>
                     {snapshot.sonataSets.map((set) => (
@@ -148,7 +147,7 @@ export function InventoryPage() {
                     type="button"
                     onClick={() => void seedInventory(30, seedSonata === '' ? undefined : seedSonata)}
                     title="Adds 30 random echoes from synced defs for optimizer testing"
-                    className="rounded-md border border-dashed border-fog px-3 py-1.5 text-sm text-fog hover:bg-panel-2"
+                    className="border-2 border-dashed border-fog px-3 py-1.5 text-sm text-fog hover:bg-panel-2"
                   >
                     Seed 30 random
                   </button>
@@ -201,9 +200,8 @@ export function InventoryPage() {
       )}
 
       {preview !== null && (
-        <div className="animate-tt-rise mt-4 rounded-lg border border-line bg-panel p-4">
-          <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">Kamera import</p>
-          <h3 className="font-display text-xl leading-tight font-semibold tracking-wide text-ink">Import {preview.fileName}</h3>
+        <div className="animate-tt-rise mt-4 border-2 border-line bg-panel p-4">
+          <h3 className="font-display text-xl leading-tight font-semibold text-ink">Import {preview.fileName}</h3>
           <p className="mt-1 text-sm text-fog">
             {`${preview.drafts.length} ${preview.drafts.length === 1 ? 'echo' : 'echoes'} ready to add, ${preview.issues.length} skipped. Adding is additive — existing rows are untouched.`}
           </p>
@@ -260,7 +258,7 @@ export function InventoryPage() {
       )}
 
       {adding && (
-        <div className="animate-tt-rise mt-4 rounded-lg border border-line bg-panel p-4">
+        <div className="animate-tt-rise mt-4 border-2 border-line bg-panel p-4">
           <EchoForm
             submitLabel="Add Echo"
             onSubmit={async (draft) => {
@@ -280,7 +278,7 @@ export function InventoryPage() {
       )}
 
       {editing !== null && (
-        <div className="animate-tt-rise mt-4 rounded-lg border border-line bg-panel p-4">
+        <div className="animate-tt-rise mt-4 border-2 border-line bg-panel p-4">
           <EchoForm
             key={editing.id}
             initial={toFormValues(editing)}

@@ -178,31 +178,93 @@ body {
   color: var(--color-seal-ink);
 }
 
-/* Faint terminal grid over the page ground. Flat, theme-aware. */
-.terminal-ground {
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--color-ink) 6%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--color-ink) 6%, transparent) 1px, transparent 1px);
-  background-size: 28px 28px;
+/* ---- Pixel primitives ------------------------------------------------ */
+/*
+ * Stepped corners come from four offset shadows (no border-radius), plus a
+ * hard drop shadow below. Leave >= 12px around framed elements so the
+ * shadow is not clipped. In @layer components so utilities can override.
+ */
+
+@layer components {
+  .px-frame {
+    box-shadow:
+      0 -3px 0 0 var(--color-outline),
+      0 3px 0 0 var(--color-outline),
+      -3px 0 0 0 var(--color-outline),
+      3px 0 0 0 var(--color-outline),
+      0 9px 0 0 var(--color-drop);
+  }
+
+  /* Frame without the drop shadow (speech bubbles, nested cards). */
+  .px-frame-flat {
+    box-shadow:
+      0 -3px 0 0 var(--color-outline),
+      0 3px 0 0 var(--color-outline),
+      -3px 0 0 0 var(--color-outline),
+      3px 0 0 0 var(--color-outline);
+  }
+
+  /* Thin 2px stepped outline for list cards. */
+  .px-card {
+    box-shadow:
+      0 -2px 0 0 var(--color-outline),
+      0 2px 0 0 var(--color-outline),
+      -2px 0 0 0 var(--color-outline),
+      2px 0 0 0 var(--color-outline);
+  }
+
+  .px-button {
+    --px-o: var(--color-outline);
+    --px-ring:
+      0 -2px 0 0 var(--px-o), 0 2px 0 0 var(--px-o), -2px 0 0 0 var(--px-o), 2px 0 0 0 var(--px-o);
+    background-color: var(--color-panel);
+    color: var(--color-ink);
+    border: 0;
+    box-shadow: var(--px-ring), 0 6px 0 0 var(--color-drop);
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+    cursor: pointer;
+  }
+  .px-button:hover:not(:disabled) {
+    background-color: var(--color-panel-2);
+  }
+  .px-button:active:not(:disabled) {
+    transform: translateY(4px);
+    box-shadow: var(--px-ring), 0 2px 0 0 var(--color-drop);
+  }
+  .px-button:disabled {
+    box-shadow: var(--px-ring);
+  }
+  .px-button-primary {
+    --px-o: var(--color-outline-on-accent);
+    background-color: var(--color-seal);
+    color: var(--color-seal-ink);
+  }
+  .px-button-primary:hover:not(:disabled) {
+    background-color: var(--color-seal-bright);
+  }
+  .px-button-cyan {
+    --px-o: var(--color-outline-on-accent);
+    background-color: var(--color-secondary-btn);
+    color: var(--color-secondary-btn-ink);
+  }
+  .px-button-cyan:hover:not(:disabled) {
+    filter: brightness(1.05);
+  }
+  .px-button-danger {
+    color: var(--color-ember);
+  }
 }
 
-/* Thin ruled divider used under page headers and panel titles. */
+/* Mascot sprite: always crisp, sticker outline via four white drop-shadows. */
+.pixelated {
+  image-rendering: pixelated;
+}
+
+/* Thin ruled divider used under page headers. */
 .rule {
-  border-top: 1px solid var(--color-line);
-}
-
-/* Frequency-tick strip: the Tacet/waveform motif for hero panels. */
-.freq-ticks {
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--color-line-strong) 0,
-    var(--color-line-strong) 1px,
-    transparent 1px,
-    transparent 7px
-  );
-  background-size: 100% 5px;
-  background-repeat: no-repeat;
-  background-position: bottom;
+  border-top: 2px dashed var(--color-line);
 }
 
 /* Tabular numerals everywhere numbers appear in mono contexts. */
@@ -412,19 +474,16 @@ details[open] > summary::before {
   .row-sweep:hover { background-size: 100% 2px; }
 }
 
-/* Seal stamp: the hanko-style mark for specimen plates (sonata sets,
- * attribute tags). Square, vermilion, slightly rotated when free. */
-.seal-stamp {
+/* Small square tag (sonata sets, attribute tags). */
+.px-tag {
   display: inline-flex;
   align-items: center;
   background: var(--color-seal);
   color: var(--color-seal-ink);
-  border-radius: 3px;
+  border: 2px solid var(--color-outline-on-accent);
   font-family: var(--font-display);
   font-weight: 600;
-  letter-spacing: 0.08em;
 }
-.seal-stamp-tilt { transform: rotate(-2deg); }
 
 /* Skeleton shimmer for loading states. Static gradient under
  * reduced motion (the animation simply never applies). */

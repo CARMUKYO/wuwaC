@@ -27,19 +27,17 @@ export function Alert({
   children: ReactNode;
 }) {
   return (
-    <div role={role} className={`rounded-md border px-3 py-2 text-sm ${ALERT_STYLES[tone]} ${className}`}>
+    <div role={role} className={`border-2 px-3 py-2 text-sm ${ALERT_STYLES[tone]} ${className}`}>
       {children}
     </div>
   );
 }
 
 export function PageHeader({
-  eyebrow,
   title,
   description,
   actions,
 }: {
-  eyebrow: string;
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
@@ -48,49 +46,50 @@ export function PageHeader({
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-[11px] font-medium tracking-[0.22em] text-accent-text uppercase">{eyebrow}</p>
-          <h2 className="mt-1 font-display text-4xl leading-none font-semibold tracking-wide text-ink">{title}</h2>
+          <h2 className="font-display text-4xl leading-none font-bold text-ink">{title}</h2>
           {description !== undefined && <p className="mt-1.5 max-w-2xl text-sm text-fog">{description}</p>}
         </div>
-        {actions !== undefined && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        {actions !== undefined && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
       </div>
       <div className="rule mt-3" aria-hidden="true" />
     </div>
   );
 }
 
-export function Panel({
+/**
+ * Pixel window: stepped frame + hard drop shadow, optional coloured title
+ * bar (`a` = cyan "Echo Box" bar, `b` = pink "Status" bar). Replaces Panel.
+ */
+export function Window({
   label,
   title,
-  eyebrow,
+  bar = 'a',
   actions,
   className = '',
+  bodyClassName = 'p-4',
   children,
 }: {
   label?: string;
   title?: ReactNode;
-  eyebrow?: string;
+  bar?: 'a' | 'b';
   actions?: ReactNode;
   className?: string;
+  bodyClassName?: string;
   children: ReactNode;
 }) {
   const labelledBy = label ?? (typeof title === 'string' ? title : undefined);
+  const barClass = bar === 'a' ? 'bg-bar-a text-bar-a-ink' : 'bg-bar-b text-bar-b-ink';
   return (
-    <section aria-label={labelledBy} className={`rounded-lg border border-line bg-panel p-4 ${className}`}>
-      {(title !== undefined || eyebrow !== undefined || actions !== undefined) && (
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <div className="min-w-0">
-            {eyebrow !== undefined && (
-              <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">{eyebrow}</p>
-            )}
-            {title !== undefined && (
-              <h3 className="font-display text-xl leading-tight font-semibold tracking-wide text-ink">{title}</h3>
-            )}
-          </div>
-          {actions !== undefined && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    <section aria-label={labelledBy} className={`px-frame bg-panel ${className}`}>
+      {(title !== undefined || actions !== undefined) && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 border-b-[3px] border-outline px-3 py-1.5 ${barClass}`}
+        >
+          {title !== undefined && <h3 className="min-w-0 font-display text-xl leading-tight font-bold">{title}</h3>}
+          {actions !== undefined && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
         </div>
       )}
-      {children}
+      <div className={bodyClassName}>{children}</div>
     </section>
   );
 }
@@ -114,15 +113,44 @@ export function AttributeDot({ attribute, className = '' }: { attribute: Attribu
   );
 }
 
-/** Cost pips: 4 slots, `cost` filled seal. Purely visual (cost stays in text). */
+/** Cost pips: 4 square 5px slots, `cost` filled. Purely visual (cost stays in text). */
 export function CostPips({ cost }: { cost: number }) {
   return (
     <span aria-hidden="true" className="inline-flex items-center gap-0.5">
       {[1, 2, 3, 4].map((slot) => (
-        <span
-          key={slot}
-          className={`h-1.5 w-1.5 rounded-[2px] ${slot <= cost ? 'bg-seal' : 'bg-panel-3'}`}
-        />
+        <span key={slot} className={`h-[5px] w-[5px] ${slot <= cost ? 'bg-pip' : 'bg-panel-3'}`} />
+      ))}
+    </span>
+  );
+}
+
+const METER_BLOCK = {
+  /** Roll value: 10 blocks of 6x10px. */
+  roll: 'h-[10px] w-[6px]',
+  /** Substat tier: 4 blocks of 8x8px. */
+  tier: 'h-2 w-2',
+} as const;
+
+/**
+ * Segment meter: `total` blocks with 2px gaps inside a 2px outline, the
+ * first `filled` lit. Exposed as an image with `label` for assistive tech.
+ */
+export function SegmentMeter({
+  filled,
+  total,
+  size = 'roll',
+  label,
+}: {
+  filled: number;
+  total: number;
+  size?: keyof typeof METER_BLOCK;
+  label: string;
+}) {
+  const lit = Math.max(0, Math.min(total, Math.round(filled)));
+  return (
+    <span role="img" aria-label={label} className="inline-flex gap-0.5 border-2 border-outline bg-panel p-0.5">
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={`${METER_BLOCK[size]} ${i < lit ? 'bg-meter' : 'bg-panel-3'}`} />
       ))}
     </span>
   );
@@ -130,7 +158,7 @@ export function CostPips({ cost }: { cost: number }) {
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-line-strong bg-panel px-4 py-8 text-center">
+    <div className="border-2 border-dashed border-line-strong bg-panel px-4 py-8 text-center">
       <p className="text-sm text-fog">{children}</p>
     </div>
   );

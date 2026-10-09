@@ -107,7 +107,7 @@ export function SuggestInput({
             id={`${id}-suggestions`}
             role="listbox"
             aria-label={`${label} suggestions`}
-            className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-line-strong bg-panel p-1 shadow-lg"
+            className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto border-2 border-line-strong bg-panel p-1 shadow-lg"
           >
             {matches.length === 0 ? (
               <li className="px-2 py-1.5 text-sm text-fog">No matches — custom ids still work.</li>
@@ -123,13 +123,13 @@ export function SuggestInput({
                     onMouseMove={() => {
                       if (i !== highlight) setHighlight(i);
                     }}
-                    className={`flex w-full items-baseline justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-terminal ${
+                    className={`flex w-full items-baseline justify-between gap-2 px-2 py-1.5 text-left text-sm transition-terminal ${
                       i === current ? 'bg-panel-2 text-ink' : 'text-fog'
                     }`}
                   >
                     <span className="min-w-0 truncate">{option.label}</span>
                     {option.hint !== undefined && (
-                      <span className="shrink-0 font-mono text-[10px] tracking-[0.08em] text-fog uppercase">
+                      <span className="shrink-0 text-xs text-fog">
                         {option.hint}
                       </span>
                     )}

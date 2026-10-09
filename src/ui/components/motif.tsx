@@ -74,7 +74,7 @@ export function FrequencyStrip({
 /** Empty state with a still waveform mark above the message. */
 export function MotifEmptyState({ seed, children }: { seed: string; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-line-strong bg-panel px-4 py-8 text-center">
+    <div className="border-2 border-dashed border-line-strong bg-panel px-4 py-8 text-center">
       <FrequencyStrip seed={seed} bars={24} animated={false} className="mx-auto h-6 w-44 opacity-70" />
       <p className="mt-3 text-sm text-fog">{children}</p>
     </div>

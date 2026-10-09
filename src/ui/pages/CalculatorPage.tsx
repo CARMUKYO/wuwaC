@@ -18,7 +18,7 @@ import { RotationOptimizer } from '../components/RotationOptimizer.tsx';
 import { RotationTimeline } from '../components/RotationTimeline.tsx';
 import { SliderField } from '../components/SliderField.tsx';
 import { btnOutline, labelClass, selectClass } from '../components/classes.ts';
-import { Alert, PageHeader, Panel } from '../components/ui.tsx';
+import { Alert, PageHeader, Window } from '../components/ui.tsx';
 
 /** Default weapon for a character: first of its type, else the first weapon. */
 function defaultWeaponFor(snapshot: Snapshot, characterId: string): string {
@@ -231,12 +231,11 @@ export function CalculatorPage() {
   return (
     <section>
       <PageHeader
-        eyebrow="03 // Damage lab"
         title="Damage Calculator"
         description="Build a rotation from real kit motions — DPR sums every action, DPS divides by rotation time."
       />
 
-      <Panel label="Resonator" title="Resonator" eyebrow="Who hits" className="mt-4">
+      <Window label="Resonator" title="Resonator" className="mt-4">
       <div className="grid gap-4 md:grid-cols-3">
         <div>
           <label htmlFor="calc-roster" className={labelClass}>
@@ -297,14 +296,14 @@ export function CalculatorPage() {
           )}
         </div>
       </div>
-      </Panel>
+      </Window>
 
       {character === undefined ? (
-        <p className="mt-4 rounded-lg border border-dashed border-line-strong bg-panel px-4 py-6 text-center text-sm text-fog">
+        <p className="mt-4 border-2 border-dashed border-line-strong bg-panel px-4 py-6 text-center text-sm text-fog">
           Pick a character above — or prefill from your roster — to unlock level and skill inputs.
         </p>
       ) : (
-        <Panel label="Investment" title="Investment" eyebrow="Levels & fortes" className="mt-4">
+        <Window label="Investment" title="Investment" className="mt-4">
           <div className="grid gap-x-4 gap-y-3 md:grid-cols-2">
             <SliderField
               id="calc-level"
@@ -367,7 +366,7 @@ export function CalculatorPage() {
           </div>
 
           <fieldset className="mt-5">
-            <legend className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Skill levels (1-10)</legend>
+            <legend className="text-xs text-fog">Skill levels (1-10)</legend>
             <div className="mt-2 grid gap-x-4 gap-y-3 md:grid-cols-2">
               {scorable.map((skill) => (
                 <SliderField
@@ -391,7 +390,7 @@ export function CalculatorPage() {
 
           {character.forteNodes.length > 0 && (
             <fieldset className="mt-5">
-              <legend className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Forte nodes unlocked</legend>
+              <legend className="text-xs text-fog">Forte nodes unlocked</legend>
               <div className="mt-2 grid gap-1 md:grid-cols-2">
                 {character.forteNodes.map((node) => {
                   const unlocked = calc.forteUnlockedIds === null
@@ -420,7 +419,7 @@ export function CalculatorPage() {
               </div>
             </fieldset>
           )}
-        </Panel>
+        </Window>
       )}
 
       <div className="mt-4">
@@ -434,15 +433,14 @@ export function CalculatorPage() {
         />
       </div>
 
-      <Panel
+      <Window
         label="Echo loadout"
         title="Echo Loadout"
-        eyebrow="Gear"
         className="mt-4"
         actions={
           <span
             key={costTotal}
-            className={`animate-tt-pop rounded border px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.08em] tnum ${
+            className={`animate-tt-pop border-2 px-2 py-0.5 text-xs font-medium tnum ${
               costTotal > 12
                 ? 'border-ember/40 bg-ember-wash text-ember'
                 : costTotal === 12
@@ -492,14 +490,13 @@ export function CalculatorPage() {
             Over the 12-cost budget — swap in cheaper Echoes.
           </p>
         )}
-      </Panel>
+      </Window>
 
       {character !== undefined && weapon !== undefined && (
         <section aria-label="Rotation builder" className="mt-6">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <p className="font-mono text-[11px] font-medium tracking-[0.22em] text-accent-text uppercase">The main event</p>
-              <h3 className="font-display text-3xl leading-none font-semibold tracking-wide text-ink">Rotation Builder</h3>
+              <h3 className="font-display text-3xl leading-none font-semibold text-ink">Rotation Builder</h3>
             </div>
             <div className="w-40">
               <label htmlFor="calc-crit" className={labelClass}>
@@ -523,12 +520,12 @@ export function CalculatorPage() {
             </Alert>
           )}
           {echoGateOpen && (
-            <p className="mt-3 rounded-md border border-dashed border-line-strong bg-panel px-3 py-2 text-sm text-fog">
+            <p className="mt-3 border-2 border-dashed border-line-strong bg-panel px-3 py-2 text-sm text-fog">
               Pick 5 distinct echoes above to score the rotation — blocks and buffs stay editable meanwhile.
             </p>
           )}
           {teams.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-line bg-panel p-4">
+            <div className="mt-3 flex flex-wrap items-end gap-2 border-2 border-line bg-panel p-4">
               <div className="min-w-48 flex-1">
                 <label htmlFor="calc-team-import" className={labelClass}>
                   Import Outro / team buffs from a team
@@ -561,7 +558,7 @@ export function CalculatorPage() {
             </p>
           )}
           {charPresets.length > 0 && (
-            <div className="mt-3 rounded-lg border border-line bg-panel p-4">
+            <div className="mt-3 border-2 border-line bg-panel p-4">
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-48 flex-1">
                   <label htmlFor="calc-preset" className={labelClass}>

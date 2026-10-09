@@ -34,7 +34,7 @@ export function GameIcon({ name, iconUrl, size = 'md' }: GameIconProps) {
       draggable={false}
       onError={() => setFailed(true)}
       onLoad={() => setLoaded(true)}
-      className={`${SIZES[size]} shrink-0 rounded-md border border-line bg-panel-2 object-cover transition-opacity duration-200 ${
+      className={`${SIZES[size]} shrink-0 border-2 border-line bg-panel-2 object-cover transition-opacity duration-200 ${
         loaded ? 'opacity-100' : 'opacity-0'
       }`}
     />

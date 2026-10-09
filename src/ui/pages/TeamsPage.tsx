@@ -11,7 +11,7 @@ import { Skeleton, ToastStack } from '../components/feedback.tsx';
 import { useToasts } from '../toasts.ts';
 import { MotifEmptyState } from '../components/motif.tsx';
 import { SuggestInput } from '../components/SuggestInput.tsx';
-import { Alert, AttributeDot, PageHeader, Panel } from '../components/ui.tsx';
+import { Alert, AttributeDot, PageHeader, Window } from '../components/ui.tsx';
 
 export function TeamsPage() {
   const teams = useTeamStore((s) => s.teams);
@@ -69,7 +69,6 @@ export function TeamsPage() {
   return (
     <section>
       <PageHeader
-        eyebrow="04 // Trios"
         title="Team Builder"
         description="3-character teams with Sonata coverage from equipped Echoes plus each member's transcribed Outro / team buffs — importable in the calculator."
       />
@@ -80,7 +79,7 @@ export function TeamsPage() {
         </Alert>
       )}
 
-      <Panel label="Assemble a team" title="Assemble a team" eyebrow="New trio" className="mt-4">
+      <Window label="Assemble a team" title="Assemble a team" className="mt-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div>
           <label htmlFor="team-name" className={labelClass}>
@@ -118,7 +117,7 @@ export function TeamsPage() {
           </button>
         </div>
       </div>
-      </Panel>
+      </Window>
 
       <div className="mt-4">
         {!loaded ? (
@@ -130,9 +129,9 @@ export function TeamsPage() {
             {teams.map((team) => {
               const coverage = teamSonataCoverage(echoes, team, sonataNameOf);
               return (
-                <li key={team.id} className="animate-tt-fade rounded-lg border border-line bg-panel p-4">
+                <li key={team.id} className="animate-tt-fade border-2 border-line bg-panel p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="min-w-0 flex-1 basis-48 truncate font-display text-2xl leading-none font-semibold tracking-wide text-ink">{team.name}</h3>
+                    <h3 className="min-w-0 flex-1 basis-48 truncate font-display text-2xl leading-none font-semibold text-ink">{team.name}</h3>
                     <button
                       type="button"
                       onClick={() => void removeTeam(team.id).then(() => pushToast(`Team “${team.name}” deleted.`))}
@@ -146,7 +145,7 @@ export function TeamsPage() {
                       const provided = TEAM_BUFFS.filter((e) => e.characterId === member.characterId);
                       const memberCharacter = snapshot.characters.find((c) => c.id === member.characterId);
                       return (
-                        <div key={member.characterId} className="rounded-md border border-line bg-canvas p-3">
+                        <div key={member.characterId} className="border-2 border-line bg-canvas p-3">
                           <div className="flex items-center gap-1.5">
                             <GameIcon
                               name={characterName(member.characterId)}
@@ -159,13 +158,13 @@ export function TeamsPage() {
                             </p>
                           </div>
                           {member.pieces.length === 0 ? (
-                            <p className="mt-1.5 font-mono text-[11px] text-fog">No echoes equipped</p>
+                            <p className="mt-1.5 text-xs text-fog">No echoes equipped</p>
                           ) : (
                             <ul className="mt-1.5 flex flex-wrap gap-1">
                               {member.pieces.map((piece) => (
                                 <li
                                   key={piece.sonataId}
-                                  className="rounded border border-line-strong bg-panel px-1.5 py-px font-mono text-[10px] tracking-[0.06em] text-fog uppercase tnum"
+                                  className="border-2 border-line-strong bg-panel px-1.5 py-px text-xs text-fog tnum"
                                 >
                                   {piece.sonataName} ×{piece.count}
                                 </li>
@@ -173,16 +172,16 @@ export function TeamsPage() {
                             </ul>
                           )}
                           {provided.length === 0 ? (
-                            <p className="mt-1.5 font-mono text-[11px] text-fog">No transcribed team buffs</p>
+                            <p className="mt-1.5 text-xs text-fog">No transcribed team buffs</p>
                           ) : (
                             <ul className="mt-1.5 space-y-1 text-xs text-fog">
                               {provided.map((entry) => (
                                 <li key={`${entry.skillId}-${entry.label}`} title={entry.assumption}>
                                   <span className="text-ink">{entry.label}</span>
                                   {entry.windowSeconds !== undefined && (
-                                    <span className="ml-1 rounded bg-panel-3 px-1 font-mono text-[10px] text-fog tnum">{entry.windowSeconds}s</span>
+                                    <span className="ml-1 bg-panel-3 px-1 text-xs text-fog tnum">{entry.windowSeconds}s</span>
                                   )}
-                                  <span className="font-mono text-[11px]">
+                                  <span className="text-xs">
                                     {` (${entry.mods.map((m) => `${statLabel(m.stat)} ${toDisplayValue(m.stat, m.value)}`).join(', ')})`}
                                   </span>
                                 </li>
@@ -194,7 +193,7 @@ export function TeamsPage() {
                     })}
                   </div>
                   {coverage.combined.length > 0 && (
-                    <p className="mt-3 font-mono text-[11px] tracking-[0.06em] text-fog uppercase tnum">
+                    <p className="mt-3 text-xs text-fog tnum">
                       Team totals:{' '}
                       <span className="text-fog">{coverage.combined.map((c) => `${c.sonataName} ×${c.count}`).join(' · ')}</span>
                     </p>

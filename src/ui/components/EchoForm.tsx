@@ -254,7 +254,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
         </Alert>
       )}
       {overMax.length > 0 && (
-        <div role="status" aria-label="Above-reference warnings" className="rounded-md border border-amber/40 bg-amber-wash px-3 py-2 text-sm text-amber">
+        <div role="status" aria-label="Above-reference warnings" className="border-2 border-amber/40 bg-amber-wash px-3 py-2 text-sm text-amber">
           <ul className="list-disc pl-5">
             {overMax.map((message) => (
               <li key={message}>{message}</li>
@@ -281,7 +281,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
                 type="button"
                 aria-pressed={costFilter === c}
                 onClick={() => setCostFilter(costFilter === c ? null : c)}
-                className={`rounded-md border px-2.5 py-1 font-mono text-xs font-medium tnum transition-terminal ${costFilter === c ? 'border-seal bg-seal text-seal-ink' : 'border-line-strong text-fog hover:bg-panel-2'}`}
+                className={`border-2 px-2.5 py-1 text-xs font-medium tnum transition-terminal ${costFilter === c ? 'border-seal bg-seal text-seal-ink' : 'border-line-strong text-fog hover:bg-panel-2'}`}
               >
                 {c}
               </button>
@@ -305,10 +305,10 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
           <p className="mt-1 text-xs text-fog">No echoes match — clear the search or cost filter.</p>
         )}
         {def && (
-          <div className="mt-2 rounded-md border border-line bg-canvas p-2.5 text-xs text-fog">
+          <div className="mt-2 border-2 border-line bg-canvas p-2.5 text-xs text-fog">
             <p>
-              <span className="font-display text-base font-semibold tracking-wide text-accent-text">{def.name}</span>
-              <span className="font-mono text-[11px]">
+              <span className="font-display text-base font-semibold text-accent-text">{def.name}</span>
+              <span className="text-xs">
                 {' · '}{def.element ?? 'No element'} · Cost {def.cost} · {def.sonataIds.map(sonataName).join(' / ')}
               </span>
             </p>
@@ -335,7 +335,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
             <div>
               <span className={labelClass}>Sonata set</span>
               {def.sonataIds.length === 1 ? (
-                <p className="mt-1 rounded-md border border-line bg-canvas px-2 py-1.5 text-sm">{sonataName(def.sonataIds[0])}</p>
+                <p className="mt-1 border-2 border-line bg-canvas px-2 py-1.5 text-sm">{sonataName(def.sonataIds[0])}</p>
               ) : (
                 <select
                   aria-label="Sonata set"
@@ -351,7 +351,7 @@ export function EchoForm({ initial, submitLabel, onSubmit }: EchoFormProps) {
             </div>
             <div>
               <span className={labelClass}>Cost</span>
-              <p className="mt-1 rounded-md border border-line bg-canvas px-2 py-1.5 text-sm">{def.cost} (from {def.name})</p>
+              <p className="mt-1 border-2 border-line bg-canvas px-2 py-1.5 text-sm">{def.cost} (from {def.name})</p>
             </div>
             <div>
               <label htmlFor="echo-level" className={labelClass}>Level</label>
@@ -554,7 +554,7 @@ function MainStatSlider({ defCost, stat, valueText, onPick }: {
         onChange={(e) => onPick(snap(Number(e.target.value)))}
         className="terminal-range w-full"
       />
-      <p className="font-mono text-[11px] text-fog tnum">
+      <p className="text-xs text-fog tnum">
         5★ Lv25 reference: {toDisplayValue(stat, range.min)} – {toDisplayValue(stat, range.max)}
       </p>
     </div>
@@ -593,7 +593,7 @@ function SubstatTierSlider({ index, stat, valueText, onPick }: {
         onChange={(e) => onPick(toDisplayValue(stat, tiers[Number(e.target.value)]))}
         className="terminal-range min-w-0 flex-1"
       />
-      <span className="shrink-0 font-mono text-[11px] text-fog tnum">
+      <span className="shrink-0 text-xs text-fog tnum">
         {toDisplayValue(stat, tiers[closest])} (tier {closest + 1}/{tiers.length})
       </span>
     </div>

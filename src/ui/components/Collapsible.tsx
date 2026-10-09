@@ -7,14 +7,12 @@ import { useState, type ReactNode } from 'react';
  */
 export function Collapsible({
   title,
-  eyebrow,
   open,
   defaultOpen = false,
   onToggle,
   children,
 }: {
   title: ReactNode;
-  eyebrow?: string;
   open?: boolean;
   defaultOpen?: boolean;
   onToggle?: (next: boolean) => void;
@@ -44,12 +42,7 @@ export function Collapsible({
           ▸
         </span>
         <span className="min-w-0">
-          {eyebrow !== undefined && (
-            <span className="block font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">
-              {eyebrow}
-            </span>
-          )}
-          <span className="block font-display text-xl leading-tight font-semibold tracking-wide text-ink">
+          <span className="block font-display text-xl leading-tight font-bold text-ink">
             {title}
           </span>
         </span>

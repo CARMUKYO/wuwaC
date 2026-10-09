@@ -160,7 +160,7 @@ function RotationStrip({
   const span = Math.max(totalDuration, rotationTime, 0.001);
   return (
     <div aria-label="Rotation overview" className="mb-2">
-      <div className="flex h-5 gap-px overflow-hidden rounded bg-panel-3">
+      <div className="flex h-5 gap-px overflow-hidden bg-panel-3">
         {blocks.map((block, index) => {
           const width = anyTimed
             ? Math.max(1.5, ((block.durationSeconds ?? 0) / span) * 100)
@@ -177,7 +177,7 @@ function RotationStrip({
           );
         })}
       </div>
-      <div className="mt-0.5 flex justify-between font-mono text-[10px] text-fog tnum">
+      <div className="mt-0.5 flex justify-between text-xs text-fog tnum">
         <span>0s</span>
         <span>{formatSeconds(rotationTime)}s</span>
       </div>
@@ -283,15 +283,15 @@ export function RotationTimeline(props: RotationTimelineProps) {
       {dpr !== null && dps !== null && (
         <div
           aria-label="Rotation results"
-          className="sticky top-2 z-[5] overflow-hidden rounded-lg border border-line bg-panel shadow-md"
+          className="sticky top-2 z-[5] overflow-hidden border-2 border-line bg-panel shadow-md"
         >
-          <div className="freq-ticks px-4 pt-3 pb-2">
-            <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">Rotation results</p>
+          <div className="px-4 pt-3 pb-2">
+            <h3 className="font-display text-2xl leading-tight font-semibold text-ink">Rotation results</h3>
           </div>
           <div className="grid grid-cols-3 gap-2 px-4 pt-1 pb-4 text-center">
             <div className="min-w-0">
-              <p className="font-mono text-[11px] tracking-[0.2em] text-fog uppercase">DPR</p>
-              <p className="mt-0.5 truncate font-display text-3xl leading-none font-semibold tracking-wide text-accent-text sm:text-4xl">
+              <p className="text-xs text-fog">DPR</p>
+              <p className="mt-0.5 truncate font-display text-3xl leading-none font-semibold text-accent-text sm:text-4xl">
                 <AnimatedNumber value={dpr} />
               </p>
               <div className="mt-1 flex h-4 items-center justify-center">
@@ -299,8 +299,8 @@ export function RotationTimeline(props: RotationTimelineProps) {
               </div>
             </div>
             <div className="min-w-0 border-x border-line">
-              <p className="font-mono text-[11px] tracking-[0.2em] text-fog uppercase">DPS</p>
-              <p className="mt-0.5 truncate font-display text-3xl leading-none font-semibold tracking-wide text-ink sm:text-4xl">
+              <p className="text-xs text-fog">DPS</p>
+              <p className="mt-0.5 truncate font-display text-3xl leading-none font-semibold text-ink sm:text-4xl">
                 <AnimatedNumber value={dps} />
               </p>
               <div className="mt-1 flex h-4 items-center justify-center">
@@ -308,8 +308,8 @@ export function RotationTimeline(props: RotationTimelineProps) {
               </div>
             </div>
             <div className="min-w-0">
-              <p className="font-mono text-[11px] tracking-[0.2em] text-fog uppercase">Time</p>
-              <p className="mt-0.5 truncate font-display text-3xl leading-none font-semibold tracking-wide text-ink tnum sm:text-4xl">{rotationTime}s</p>
+              <p className="text-xs text-fog">Time</p>
+              <p className="mt-0.5 truncate font-display text-3xl leading-none font-semibold text-ink tnum sm:text-4xl">{rotationTime}s</p>
             </div>
           </div>
         </div>
@@ -330,7 +330,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
           <RotationStrip blocks={blocks} starts={starts} rotationTime={rotationTime} anyTimed={anyTimed} />
         )}
         {blocks.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-line-strong bg-panel px-4 py-6 text-center text-sm text-fog">No actions yet — add your first hit below to start the rotation.</p>
+          <p className="border-2 border-dashed border-line-strong bg-panel px-4 py-6 text-center text-sm text-fog">No actions yet — add your first hit below to start the rotation.</p>
         ) : (
           <ol className="space-y-2">
             {blocks.map((block, index) => {
@@ -344,7 +344,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
               const echoSkill = block.damageKind === 'echoSkill';
               const specialKind = negativeStatus || tuneBreak || tuneRupture || echoSkill;
               const echoSubtitle = echoSkill
-                ? `${((block.echoMotionValue ?? 0) * 100).toFixed(1)}% ${block.echoAttribute ?? '?'}${(block.echoFlatDamage ?? 0) > 0 ? ` +${block.echoFlatDamage}` : ''}${(block.echoScaling ?? 'ATK') !== 'ATK' ? ` [${block.echoScaling}]` : ''}`
+                ? `${((block.echoMotionValue ?? 0) * 100).toFixed(1)}% ${block.echoAttribute ?? '?'}${(block.echoFlatDamage ?? 0) > 0 ? `+${block.echoFlatDamage}` : ''}${(block.echoScaling ?? 'ATK') !== 'ATK' ? `[${block.echoScaling}]` : ''}`
                 : null;
               const lanceBlock = !specialKind && skill !== undefined &&
                 skill.motionValues.length === 0 && !isBuffOnlySkill(character.id, skill);
@@ -354,16 +354,16 @@ export function RotationTimeline(props: RotationTimelineProps) {
               const skillKind = skill?.kind;
               const blockCap = maxStatusStacks(block.statusType ?? 'aeroErosion', character.id, resonanceChain);
               return (
-                <li key={block.id} className="animate-tt-fade rounded-lg border border-line bg-panel px-4 py-3">
+                <li key={block.id} className="animate-tt-fade border-2 border-line bg-panel px-4 py-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="min-w-0 flex-1 basis-48">
-                      <p className="truncate font-display text-lg leading-tight font-semibold tracking-wide text-ink">
-                        <span className="mr-1.5 font-mono text-[11px] font-medium text-accent-text tnum">{String(index + 1).padStart(2, '0')}</span>
+                      <p className="truncate font-display text-lg leading-tight font-semibold text-ink">
+                        <span className="mr-1.5 text-xs font-medium text-accent-text tnum">{String(index + 1).padStart(2, '0')}</span>
                         {blockLabel}
-                        {anyTimed && <span className="ml-1.5 font-mono text-[11px] font-medium text-fog tnum">@{formatSeconds(starts[index])}s</span>}
-                        {result?.buffCarrier && <span className="ml-1.5 font-mono text-[10px] tracking-[0.08em] text-fog uppercase">buff carrier</span>}
+                        {anyTimed && <span className="ml-1.5 text-xs font-medium text-fog tnum">@{formatSeconds(starts[index])}s</span>}
+                        {result?.buffCarrier && <span className="ml-1.5 text-xs text-fog">buff carrier</span>}
                       </p>
-                      <p className="mt-0.5 truncate font-mono text-[11px] text-fog tnum">
+                      <p className="mt-0.5 truncate text-xs text-fog tnum">
                         {negativeStatus
                           ? `${block.statusStacks ?? 1} stack${(block.statusStacks ?? 1) === 1 ? '' : 's'}`
                           : tuneBreak
@@ -756,7 +756,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                                       onChange={() => onToggleBlockBuff(block.id, buff.id)}
                                     />
                                     <span>[{buff.source}] {buff.label}</span>
-                                    {inWindow && <span className="rounded bg-panel-3 px-1 text-fog">window</span>}
+                                    {inWindow && <span className="bg-panel-3 px-1 text-fog">window</span>}
                                   </label>
                                 );
                               })}
@@ -773,12 +773,11 @@ export function RotationTimeline(props: RotationTimelineProps) {
         )}
       </section>
 
-      <section aria-label="Add actions" className="rounded-lg border border-line bg-panel p-4">
-        <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">Build the sequence</p>
-        <h3 className="font-display text-2xl leading-tight font-semibold tracking-wide text-ink">Add Actions</h3>
+      <section aria-label="Add actions" className="border-2 border-line bg-panel p-4">
+        <h3 className="font-display text-2xl leading-tight font-semibold text-ink">Add Actions</h3>
         {resonanceModes.length > 0 && (
-          <div className="mt-3 rounded-md border border-line bg-canvas p-3">
-            <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Resonance Mode</p>
+          <div className="mt-3 border-2 border-line bg-canvas p-3">
+            <p className="text-xs text-fog">Resonance Mode</p>
             <p className="mt-1 text-xs text-fog">
               This kit scores differently per mode — pick the one this rotation runs.
             </p>
@@ -790,7 +789,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                   role="radio"
                   aria-checked={resonanceMode === mode}
                   onClick={() => onSetResonanceMode(mode)}
-                  className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-terminal hover:bg-panel-2 ${
+                  className={`border-2 px-2.5 py-1 text-xs font-medium transition-terminal hover:bg-panel-2 ${
                     resonanceMode === mode
                       ? 'border-glacio text-glacio'
                       : 'border-line-strong text-ink'
@@ -805,7 +804,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
         <div className="mt-3 space-y-3">
           {kinds.map((kind) => (
             <div key={kind}>
-              <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">{KIND_LABELS[kind]}</p>
+              <p className="text-xs text-fog">{KIND_LABELS[kind]}</p>
               <div className="mt-1 flex flex-wrap gap-1">
                 {character.skills.filter((s) => s.kind === kind).flatMap((skill) => {
                   if (skill.motionValues.length === 0 && !isBuffOnlySkill(character.id, skill)) {
@@ -816,7 +815,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         type="button"
                         title={`${(JIYAN_OUTRO_LANCE_MV * 100).toFixed(1)}% ATK · Aero + coordinated buckets`}
                         onClick={() => onAddBlock(skill.id, '', forteLevels[skill.id] ?? 10)}
-                        className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
+                        className="border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
                       >
                         {skill.label} (coordinated lance)
                       </button>
@@ -827,7 +826,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                       key={skill.id}
                       type="button"
                       onClick={() => onAddBlock(skill.id, '', forteLevels[skill.id] ?? 10)}
-                      className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
+                      className="border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
                     >
                       {skill.label} (buff carrier)
                     </button>
@@ -838,7 +837,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         type="button"
                         title={motionTitle(skill, motion, forteLevels[skill.id] ?? 10)}
                         onClick={() => onAddBlock(skill.id, motion.name, forteLevels[skill.id] ?? 10)}
-                        className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
+                        className="border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
                       >
                         {motion.name} · {motionPercent(skill, motion.name, forteLevels[skill.id] ?? 10)}
                         {motionScaling(skill, motion) !== 'ATK' && ` [${motionScaling(skill, motion)}]`}
@@ -855,8 +854,8 @@ export function RotationTimeline(props: RotationTimelineProps) {
           const def = negativeStatusDef(status);
           const cap = maxStatusStacks(status, character.id, resonanceChain);
           return (
-            <div key={status} className="mt-3 rounded-md border border-line bg-canvas p-3">
-              <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Negative Status DMG</p>
+            <div key={status} className="mt-3 border-2 border-line bg-canvas p-3">
+              <p className="text-xs text-fog">Negative Status DMG</p>
               <p className="mt-1 text-xs text-fog">
                 {def.label} ignores {def.element}/action DMG bonuses and Crit. Its damage is resolved from the selected stack count.
               </p>
@@ -870,7 +869,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                       statusType: status,
                       statusStacks: stacks,
                     })}
-                    className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
+                    className="border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
                   >
                     {def.label} ×{stacks}
                   </button>
@@ -880,8 +879,8 @@ export function RotationTimeline(props: RotationTimelineProps) {
           );
         })}
         {ruptureResponses.length > 0 && resonanceMode === 'tuneRupture' && (
-          <div className="mt-3 rounded-md border border-line bg-canvas p-3">
-            <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Tune Rupture Response (provisional)</p>
+          <div className="mt-3 border-2 border-line bg-canvas p-3">
+            <p className="text-xs text-fog">Tune Rupture Response (provisional)</p>
             <p className="mt-1 text-xs text-fog">
               Response instances use the snapshot MV with trail scaling, no base Crit, and no verified formula — tune the trail count per block.
             </p>
@@ -897,7 +896,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                       damageKind: 'tuneRupture',
                       tuneResponseStacks: 0,
                     })}
-                    className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
+                    className="border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
                   >
                     {motionName}
                   </button>
@@ -906,8 +905,8 @@ export function RotationTimeline(props: RotationTimelineProps) {
             </div>
           </div>
         )}
-        <div className="mt-3 rounded-md border border-line bg-canvas p-3">
-          <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Tune Break (provisional)</p>
+        <div className="mt-3 border-2 border-line bg-canvas p-3">
+          <p className="text-xs text-fog">Tune Break (provisional)</p>
           <p className="mt-1 text-xs text-fog">
             Mistuned-target break hit: provisional base-10000 shape, no verified formula or coefficients — set the coefficient per block from your own research.
           </p>
@@ -918,15 +917,15 @@ export function RotationTimeline(props: RotationTimelineProps) {
                 damageKind: 'tuneBreak',
                 tuneBreakMultiplier: 1,
               })}
-              className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
+              className="border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
             >
               Tune Break ×1.0
             </button>
           </div>
         </div>
         {mainEchoSkill !== null && (
-          <div className="mt-3 rounded-md border border-line bg-canvas p-3">
-            <p className="font-mono text-[11px] tracking-[0.08em] text-fog uppercase">Echo Skill (slot 1: {mainEchoSkill.echoName})</p>
+          <div className="mt-3 border-2 border-line bg-canvas p-3">
+            <p className="text-xs text-fog">Echo Skill (slot 1: {mainEchoSkill.echoName})</p>
             {mainEchoSkill.hits.length === 0 ? (
               <p className="mt-1 text-xs text-fog">
                 No damaging skill to score — heals, shields, Physical damage, and utility echoes carry no scorable hit.
@@ -950,7 +949,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         echoScaling: hit.scaling,
                         echoCooldown: mainEchoSkill.cooldown,
                       })}
-                      className="rounded-md border border-line-strong px-2 py-1 font-mono text-[11px] text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
+                      className="border-2 border-line-strong px-2 py-1 text-xs text-fog transition-terminal hover:border-fog hover:bg-panel-2 hover:text-ink"
                     >
                       {mainEchoSkill.hits.length > 1 ? `${hit.label} · ` : ''}{(hit.motionValue * 100).toFixed(1)}% {hit.attribute}
                       {hit.flatDamage > 0 && ` +${hit.flatDamage}`}
@@ -964,9 +963,8 @@ export function RotationTimeline(props: RotationTimelineProps) {
         )}
       </section>
 
-      <section aria-label="Buffs" className="rounded-lg border border-line bg-panel p-4">
-        <p className="font-mono text-[10px] font-medium tracking-[0.22em] text-accent-text uppercase">Modifiers</p>
-        <h3 className="font-display text-2xl leading-tight font-semibold tracking-wide text-ink">Buffs</h3>
+      <section aria-label="Buffs" className="border-2 border-line bg-panel p-4">
+        <h3 className="font-display text-2xl leading-tight font-semibold text-ink">Buffs</h3>
         {buffs.length === 0 ? (
           <p className="mt-1 text-xs text-fog">
             No buffs yet — pick a preset below or add a custom buff with its verified numbers.
@@ -1009,7 +1007,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         const num = Number(e.target.value);
                         if (Number.isFinite(num)) onSetBuffWindow(buff.id, num, buff.windowDurationSeconds ?? 0);
                       }}
-                      className="w-20 rounded-md border border-line-strong bg-canvas px-2 py-1 font-mono text-xs text-ink tnum"
+                      className="w-20 border-2 border-line-strong bg-canvas px-2 py-1 text-xs text-ink tnum"
                     />
                     <label htmlFor={`buff-window-duration-${buff.id}`}>Window duration (s)</label>
                     <input
@@ -1024,7 +1022,7 @@ export function RotationTimeline(props: RotationTimelineProps) {
                         const num = Number(e.target.value);
                         if (Number.isFinite(num)) onSetBuffWindow(buff.id, buff.windowStartSeconds ?? 0, num);
                       }}
-                      className="w-20 rounded-md border border-line-strong bg-canvas px-2 py-1 font-mono text-xs text-ink tnum"
+                      className="w-20 border-2 border-line-strong bg-canvas px-2 py-1 text-xs text-ink tnum"
                     />
                     {hasWindow && (
                       <button

@@ -113,7 +113,6 @@ export function BuildsPage() {
   return (
     <section>
       <PageHeader
-        eyebrow="05 // Archive"
         title="Build Library"
         description="Winning optimizer results, saved with their full rotation spec — exportable and shareable by link."
         actions={
@@ -144,7 +143,7 @@ export function BuildsPage() {
         ) : (
           <ul className="space-y-2">
             {builds.map((build) => (
-              <li key={build.id} className="animate-tt-fade row-sweep rounded-lg border border-line bg-panel px-4 py-3 transition-terminal hover:border-line-strong">
+              <li key={build.id} className="animate-tt-fade row-sweep border-2 border-line bg-panel px-4 py-3 transition-terminal hover:border-line-strong">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex min-w-0 flex-1 basis-52 items-center gap-3">
                     <GameIcon
@@ -152,13 +151,13 @@ export function BuildsPage() {
                       iconUrl={snapshot.characters.find((c) => c.id === build.characterId)?.iconUrl}
                     />
                     <div className="min-w-0">
-                      <p className="truncate font-display text-xl leading-tight font-semibold tracking-wide text-ink">{build.name}</p>
-                      <p className="mt-0.5 font-mono text-[11px] tracking-[0.06em] text-fog uppercase tnum">
+                      <p className="truncate font-display text-xl leading-tight font-semibold text-ink">{build.name}</p>
+                      <p className="mt-0.5 text-xs text-fog tnum">
                         {characterName(build.characterId)}
                         {build.score !== undefined && (
                           <>
                             {' · '}
-                            <span className="seal-stamp px-1.5 py-px text-[10px]">
+                            <span className="px-tag px-1.5 py-px text-xs">
                               score {build.score.toFixed(1)}
                             </span>
                           </>
@@ -189,7 +188,7 @@ export function BuildsPage() {
         )}
       </div>
 
-      <div className="mt-6 rounded-lg border border-line bg-panel p-4">
+      <div className="mt-6 border-2 border-line bg-panel p-4">
         <label htmlFor="build-import" className={labelClass}>
           Paste build JSON to import (single build or array)
         </label>
@@ -198,7 +197,7 @@ export function BuildsPage() {
           value={paste}
           onChange={(e) => setPaste(e.target.value)}
           rows={4}
-          className={`${inputClass} mt-1.5 font-mono text-xs`}
+          className={`${inputClass} mt-1.5 text-xs`}
         />
         <button
           type="button"

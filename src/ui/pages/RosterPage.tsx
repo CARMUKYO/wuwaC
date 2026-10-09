@@ -59,7 +59,6 @@ export function RosterPage() {
   return (
     <section>
       <PageHeader
-        eyebrow="02 // Resonators"
         title="Character Roster"
         description="Who you've built — levels, weapons, and forte investment the Calculator can prefill."
         actions={
@@ -115,17 +114,17 @@ export function RosterPage() {
                   ? storedWeapon
                   : undefined;
               return (
-                <li key={entry.characterId} className="animate-tt-fade relative rounded-lg border border-line bg-panel p-4">
-                  <span aria-hidden="true" className="seal-stamp absolute -top-2.5 right-4 px-2 py-0.5 text-xs">
+                <li key={entry.characterId} className="animate-tt-fade relative border-2 border-line bg-panel p-4">
+                  <span aria-hidden="true" className="px-tag absolute -top-2.5 right-4 px-2 py-0.5 text-xs">
                     S{entry.resonanceChain}
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="flex min-w-0 flex-1 basis-48 items-center gap-2.5">
                       <GameIcon name={name} iconUrl={character?.iconUrl} />
                       <div className="min-w-0">
-                        <h3 className="truncate font-display text-2xl leading-none font-semibold tracking-wide text-ink">{name}</h3>
+                        <h3 className="truncate font-display text-2xl leading-none font-semibold text-ink">{name}</h3>
                         {character && (
-                          <p className="mt-1 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.14em] text-fog uppercase">
+                          <p className="mt-1 flex items-center gap-1.5 text-xs text-fog">
                             <AttributeDot attribute={character.attribute} />
                             {character.attribute} · {character.weaponType}
                           </p>
@@ -221,7 +220,7 @@ export function RosterPage() {
                   {scorable.length > 0 && (
                     <div className="mt-4">
                       <Collapsible title="Forte levels" defaultOpen>
-                        <p className="mb-2 font-mono text-[11px] tracking-[0.08em] text-fog uppercase">
+                        <p className="mb-2 text-xs text-fog">
                           Unset shows 10 — touch to store
                         </p>
                         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -245,7 +244,7 @@ export function RosterPage() {
                   {character && character.forteNodes.length > 0 && (
                     <div className="mt-4">
                       <Collapsible title="Forte nodes unlocked" defaultOpen>
-                        <p className="mb-2 font-mono text-[11px] tracking-[0.08em] text-fog uppercase">
+                        <p className="mb-2 text-xs text-fog">
                           Untouched = all active
                         </p>
                         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">

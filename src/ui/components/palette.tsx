@@ -64,7 +64,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
-        className="animate-tt-toast relative w-full max-w-md overflow-hidden rounded-lg border border-line-strong bg-panel shadow-xl"
+        className="animate-tt-toast relative w-full max-w-md overflow-hidden border-2 border-line-strong bg-panel shadow-xl"
       >
         <input
           autoFocus
@@ -114,12 +114,12 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                   onMouseMove={() => {
                     if (i !== highlight) setHighlight(i);
                   }}
-                  className={`flex w-full items-baseline justify-between gap-3 rounded-md px-3 py-2 text-left text-sm transition-terminal ${
+                  className={`flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left text-sm transition-terminal ${
                     i === current ? 'bg-panel-2 text-ink' : 'text-fog'
                   }`}
                 >
                   <span className="font-medium">{action.label}</span>
-                  <span className="shrink-0 font-mono text-[10px] tracking-[0.14em] text-fog uppercase">
+                  <span className="shrink-0 text-xs text-fog">
                     {action.hint}
                   </span>
                 </button>

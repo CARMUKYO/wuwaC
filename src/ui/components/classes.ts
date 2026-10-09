@@ -1,22 +1,35 @@
-/* Shared terminal class strings. Kept separate from ui.tsx so that file
- * only exports components (react-refresh rule). */
+/* Shared Pixel Arcade class strings. Kept separate from ui.tsx so that file
+ * only exports components (react-refresh rule). Frames, buttons and their
+ * variants are defined in src/index.css (`px-*`). */
 
-export const labelClass = 'block font-mono text-[11px] font-medium tracking-[0.08em] text-fog uppercase';
+export const labelClass = 'block text-xs font-bold text-fog';
 
 export const inputClass =
-  'w-full rounded-md border border-line-strong bg-canvas px-2.5 py-1.5 text-sm text-ink transition-terminal placeholder:text-fog hover:border-fog focus:border-seal';
+  'w-full min-h-9 border-2 border-line-strong bg-canvas px-2.5 py-1.5 text-sm text-ink transition-terminal placeholder:text-fog hover:border-fog focus:border-outline';
 
 export const selectClass = inputClass;
 
+/* Layout/typography for every button; the frame comes from `px-button`. */
 export const btnBase =
-  'inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-terminal disabled:cursor-not-allowed disabled:opacity-40';
+  'inline-flex min-h-10 items-center justify-center gap-1.5 px-3 py-1.5 font-display text-base font-semibold disabled:cursor-not-allowed disabled:opacity-50';
 
-export const btnPrimary = `${btnBase} bg-seal text-seal-ink hover:bg-seal-bright`;
+export const btnPrimary = `${btnBase} px-button px-button-primary`;
 
-export const btnOutline = `${btnBase} border border-line-strong text-ink hover:border-fog hover:bg-panel-2 font-medium`;
+/** Secondary: panel fill. */
+export const btnOutline = `${btnBase} px-button`;
 
-export const btnGhost = `${btnBase} text-fog hover:bg-panel-2 hover:text-ink font-medium`;
+/** Edit-style cyan fill. */
+export const btnCyan = `${btnBase} px-button px-button-cyan`;
 
-export const btnDangerGhost = `${btnBase} text-ember hover:bg-ember-wash font-medium`;
+/** Flat text button for dense inline actions — no frame. */
+export const btnGhost = `${btnBase} font-sans text-sm font-bold text-fog transition-terminal hover:bg-panel-2 hover:text-ink`;
 
-export const btnSm = 'min-h-8 px-2 py-1 text-xs';
+export const btnDangerGhost = `${btnBase} px-button px-button-danger`;
+
+export const btnSm = 'min-h-9 px-2 py-1 text-sm';
+
+/** Square filter chip: 2px border, accent fill when active. */
+export const chipClass = (active: boolean): string =>
+  `min-h-9 border-2 px-2.5 py-1 text-xs font-bold tnum transition-terminal ${
+    active ? 'border-outline bg-seal text-seal-ink' : 'border-line-strong text-fog hover:bg-panel-2'
+  }`;

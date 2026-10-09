@@ -35,19 +35,19 @@ export function EchoList({ echoes, snapshot, onEdit, onDelete }: EchoListProps) 
         return (
         <li
           key={echo.id}
-          className="animate-tt-fade row-sweep flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line bg-panel px-3 py-2.5 transition-terminal hover:border-line-strong"
+          className="animate-tt-fade row-sweep flex flex-wrap items-center gap-x-3 gap-y-2 border-2 border-line bg-panel px-3 py-2.5 transition-terminal hover:border-line-strong"
         >
           <GameIcon name={displayName(snapshot, echo)} iconUrl={def?.iconUrl} />
           <div className="min-w-0 flex-1 basis-52">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <p className="truncate font-display text-lg leading-tight font-semibold tracking-wide text-ink">
+              <p className="truncate font-display text-lg leading-tight font-semibold text-ink">
                 {displayName(snapshot, echo)}
               </p>
-              <span className="seal-stamp px-1.5 py-px text-[10px] uppercase">
+              <span className="px-tag px-1.5 py-px text-xs">
                 {sonataName(snapshot, echo.sonataId)}
               </span>
             </div>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] text-fog tnum">
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-fog tnum">
               <span className="inline-flex items-center gap-1.5">
                 <CostPips cost={echo.cost} />
                 <span>C{echo.cost} · Lv{echo.level}</span>
