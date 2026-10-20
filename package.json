@@ -16,11 +16,13 @@
     "dexie": "^4.2.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "tesseract.js": "7.0.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4",
+    "@tesseract.js-data/eng": "1.0.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",

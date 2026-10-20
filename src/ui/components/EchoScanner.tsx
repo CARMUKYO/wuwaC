@@ -1,0 +1,406 @@
+import { useRef, useState, type DragEvent } from 'react';
+import type { Snapshot } from '../../data/schema.ts';
+import { SCAN_ORIGIN } from '../../scanner/draft.ts';
+import { reviewRows, summarize, type ReviewRow } from '../../scanner/review.ts';
+import { useInventoryStore } from '../../state/inventory.ts';
+import { useScanStore } from '../../state/scanStore.ts';
+import { useSnapshotStore } from '../../state/snapshotStore.ts';
+import { formatStatValue, statLabel, toDisplayValue } from '../format.ts';
+import { btnGhost, btnOutline, btnPrimary, btnSm, inputClass, labelClass } from './classes.ts';
+import { EchoForm, type EchoFormValues } from './EchoForm.tsx';
+import { Alert, CostPips, EmptyState, Window } from './ui.tsx';
+
+/**
+ * Echo scanner window: screenshots of the in-game Echo Management detail
+ * panel -> OCR (scanner layer, off the main thread) -> review -> import.
+ * Rendering and input only; every decision (what a read means, whether a
+ * row is importable, whether it is already owned) comes from
+ * `scanner/review.ts`.
+ */
+
+const RARITIES = [5, 4, 3, 2] as const;
+
+const STATE_LABEL: Record<ReviewRow['state'], string> = {
+  reading: 'Reading…',
+  failed: 'Could not read',
+  ready: 'Ready',
+  review: 'Check',
+  fix: 'Needs a fix',
+};
+
+const STATE_CLASS: Record<ReviewRow['state'], string> = {
+  reading: 'text-fog',
+  failed: 'text-ember',
+  ready: 'text-tide',
+  review: 'text-amber',
+  fix: 'text-ember',
+};
+
+function name(snapshot: Snapshot, kind: 'echo' | 'sonata' | 'character', id: string | null): string {
+  if (id === null) return '—';
+  const list = kind === 'echo' ? snapshot.echoDefs : kind === 'sonata' ? snapshot.sonataSets : snapshot.characters;
+  return list.find((x) => x.id === id)?.name ?? id;
+}
+
+/** Pre-fill the Echo form with whatever was read, so a fix is a small edit. */
+function formValues(row: ReviewRow): EchoFormValues {
+  const echo = row.item.parse?.echo;
+  const source = row.draft ?? null;
+  const main = source?.mainStat ?? echo?.mainStat ?? null;
+  const second = source?.secondMainStat ?? echo?.secondMainStat ?? null;
+  const subs = source?.substats ?? echo?.substats.filter((s) => s !== null) ?? [];
+  return {
+    echoDefId: source?.echoDefId ?? echo?.echoDefId ?? '',
+    label: '',
+    sonataId: row.item.batch.sonataId,
+    level: String(source?.level ?? echo?.level ?? 25),
+    rarity: String(row.item.batch.rarity),
+    mainStat: main ? { stat: main.stat, valueText: toDisplayValue(main.stat, main.value) } : { stat: 'atkPct', valueText: '' },
+    secondMainStat: { valueText: second ? toDisplayValue(second.stat, second.value) : '' },
+    substats: subs.map((s) => ({ stat: s.stat, valueText: toDisplayValue(s.stat, s.value) })),
+  };
+}
+
+export function EchoScanner({ onClose, onImported }: { onClose: () => void; onImported: (count: number) => void }) {
+  const snapshot = useSnapshotStore((s) => s.snapshot);
+  const owned = useInventoryStore((s) => s.echoes);
+  const importEchoes = useInventoryStore((s) => s.importEchoes);
+  const { batch, items, engine, engineError, setBatch, addImages, setEquipped, setOverride, setInclude, remove, clear } =
+    useScanStore();
+  const [fixing, setFixing] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const rows = reviewRows(items, owned);
+  const summary = summarize(rows);
+  const inBatch = items.filter((it) => it.batch.sonataId === batch.sonataId).length;
+
+  const add = (files: FileList | File[] | null): void => {
+    const images = Array.from(files ?? []).filter((f) => f.type.startsWith('image/'));
+    if (images.length === 0) return;
+    setError(null);
+    addImages(images).catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not add those images.'));
+  };
+
+  const onDrop = (e: DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    setDragging(false);
+    add(e.dataTransfer.files);
+  };
+
+  const importIncluded = (): void => {
+    const chosen = rows.filter((r) => r.included && r.draft !== null);
+    const drafts = chosen.map((r) => r.draft!);
+    importEchoes(drafts, SCAN_ORIGIN)
+      .then(() => {
+        clear(chosen.map((r) => r.item.id));
+        setError(null);
+        onImported(drafts.length);
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Import failed.'));
+  };
+
+  return (
+    <Window
+      title="Scan Echoes from screenshots"
+      label="Scan echoes"
+      className="animate-tt-rise mt-6"
+      actions={
+        <button type="button" onClick={onClose} className={`${btnGhost} ${btnSm}`}>
+          Close
+        </button>
+      }
+    >
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        className={dragging ? 'outline-2 outline-dashed outline-offset-4 outline-outline' : ''}
+      >
+        <ol className="list-decimal space-y-0.5 pl-5 text-sm text-fog">
+          <li>In game, open Echo Management → Filter, and pick one Sonata set (and 5-Star).</li>
+          <li>Choose the same set here — the panel shows the set only as an icon, so the filter is how it is known.</li>
+          <li>Click each Echo and screenshot it (the whole window, or a region that includes the right-hand panel), then drop the images here.</li>
+        </ol>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_10rem_auto] sm:items-end">
+          <div>
+            <label htmlFor="scan-sonata" className={labelClass}>
+              Sonata set (in-game filter)
+            </label>
+            <select
+              id="scan-sonata"
+              value={batch.sonataId}
+              onChange={(e) => setBatch({ sonataId: e.target.value })}
+              className={inputClass}
+            >
+              <option value="">Pick a set…</option>
+              {snapshot.sonataSets.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="scan-rarity" className={labelClass}>
+              Rarity
+            </label>
+            <select
+              id="scan-rarity"
+              value={batch.rarity}
+              onChange={(e) => setBatch({ rarity: Number(e.target.value) })}
+              className={inputClass}
+            >
+              {RARITIES.map((r) => (
+                <option key={r} value={r}>{`${r}-Star`}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="scan-expected" className={labelClass}>
+              Count in filter (optional)
+            </label>
+            <input
+              id="scan-expected"
+              type="number"
+              min={0}
+              inputMode="numeric"
+              value={batch.expected ?? ''}
+              onChange={(e) => setBatch({ expected: e.target.value === '' ? null : Number(e.target.value) })}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <button
+              type="button"
+              disabled={batch.sonataId === ''}
+              title={batch.sonataId === '' ? 'Pick the Sonata set first' : 'Choose screenshots to scan'}
+              onClick={() => fileRef.current?.click()}
+              className={btnPrimary}
+            >
+              Add screenshots
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              aria-label="Echo screenshots"
+              className="sr-only"
+              onChange={(e) => {
+                add(e.target.files);
+                e.target.value = '';
+              }}
+            />
+          </div>
+        </div>
+
+        {engine === 'loading' && (
+          <Alert tone="info" role="status" className="mt-4">
+            Loading the text reader (about 6 MB, downloaded once and kept for offline use)…
+          </Alert>
+        )}
+        {engineError !== null && (
+          <Alert tone="danger" className="mt-4">{`The text reader failed to load: ${engineError}`}</Alert>
+        )}
+        {error !== null && (
+          <Alert tone="danger" className="mt-4">
+            {error}
+          </Alert>
+        )}
+
+        {items.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState>Nothing scanned yet. Screenshots are read on this device and never uploaded.</EmptyState>
+          </div>
+        ) : (
+          <>
+            <p role="status" className="mt-4 text-sm text-fog">
+              {[
+                `${summary.total} scanned`,
+                summary.reading > 0 ? `${summary.reading} reading` : null,
+                `${summary.ready} ready`,
+                summary.review > 0 ? `${summary.review} to check` : null,
+                summary.fix > 0 ? `${summary.fix} to fix` : null,
+                summary.failed > 0 ? `${summary.failed} unreadable` : null,
+                summary.known > 0 ? `${summary.known} already in your inventory` : null,
+              ]
+                .filter((x) => x !== null)
+                .join(' · ')}
+            </p>
+            {batch.expected !== null && batch.sonataId !== '' && (
+              <p className={`text-sm font-bold ${inBatch === batch.expected ? 'text-tide' : inBatch > batch.expected ? 'text-ember' : 'text-fog'}`}>
+                {`${name(snapshot, 'sonata', batch.sonataId)}: ${inBatch} / ${batch.expected}`}
+                {inBatch > batch.expected && ' — more than the filter shows; is the in-game filter still on this set?'}
+              </p>
+            )}
+
+            <ul className="mt-3 space-y-2">
+              {rows.map((row) => (
+                <ScanRow
+                  key={row.item.id}
+                  row={row}
+                  snapshot={snapshot}
+                  fixing={fixing === row.item.id}
+                  onFix={() => setFixing(fixing === row.item.id ? null : row.item.id)}
+                  onFixed={(draft) => {
+                    setOverride(row.item.id, { ...draft, equippedTo: row.item.parse?.echo.equippedTo ?? null });
+                    setFixing(null);
+                  }}
+                  onInclude={(v) => setInclude(row.item.id, v)}
+                  onEquip={(id) => setEquipped(row.item.id, id)}
+                  onRemove={() => remove(row.item.id)}
+                />
+              ))}
+            </ul>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" disabled={summary.included === 0} onClick={importIncluded} className={btnPrimary}>
+                {`Add ${summary.included} ${summary.included === 1 ? 'echo' : 'echoes'}`}
+              </button>
+              <button type="button" onClick={() => clear()} className={btnOutline}>
+                Clear list
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </Window>
+  );
+}
+
+function ScanRow({
+  row,
+  snapshot,
+  fixing,
+  onFix,
+  onFixed,
+  onInclude,
+  onEquip,
+  onRemove,
+}: {
+  row: ReviewRow;
+  snapshot: Snapshot;
+  fixing: boolean;
+  onFix: () => void;
+  onFixed: (draft: NonNullable<ReviewRow['draft']>) => void;
+  onInclude: (include: boolean) => void;
+  onEquip: (characterId: string | null) => void;
+  onRemove: () => void;
+}) {
+  const { item, draft, state } = row;
+  const echo = item.parse?.echo;
+  const shown = draft ?? null;
+  const defId = shown?.echoDefId ?? echo?.echoDefId ?? null;
+  const cost = shown?.cost ?? echo?.cost ?? null;
+  const level = shown?.level ?? echo?.level ?? null;
+  const main = shown?.mainStat ?? echo?.mainStat ?? null;
+  const second = shown?.secondMainStat ?? echo?.secondMainStat ?? null;
+  const subs = shown?.substats ?? echo?.substats ?? [];
+  const equipped = shown?.equippedTo ?? echo?.equippedTo ?? null;
+  const flags = item.override === undefined ? item.parse?.flags ?? [] : [];
+  const title = defId === null ? item.fileName : name(snapshot, 'echo', defId);
+
+  return (
+    <li className="border-2 border-line-strong bg-panel-2 p-2">
+      <div className="flex gap-3">
+        {item.thumbUrl !== null ? (
+          <img src={item.thumbUrl} alt={`Scanned panel: ${title}`} className="h-28 w-auto shrink-0 border-2 border-outline" />
+        ) : (
+          <div aria-hidden="true" className="h-28 w-20 shrink-0 border-2 border-line-strong bg-panel-3" />
+        )}
+        <div className="min-w-0 flex-1 text-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-bold text-ink">{title}</span>
+            {cost !== null && (
+              <span className="flex items-center gap-1 text-xs text-fog">
+                <CostPips cost={cost} />
+                {`${cost}-cost`}
+              </span>
+            )}
+            {level !== null && <span className="text-xs text-fog">{`+${level}`}</span>}
+            <span className="text-xs text-fog">{name(snapshot, 'sonata', item.batch.sonataId)}</span>
+            <span className={`text-xs font-bold ${STATE_CLASS[state]}`}>{STATE_LABEL[state]}</span>
+            {row.known && <span className="text-xs text-fog">already in inventory</span>}
+          </div>
+
+          {item.status === 'failed' && <p className="mt-1 text-xs text-ember">{item.error}</p>}
+
+          {item.status === 'done' && (
+            <>
+              <p className="mt-1 text-xs text-ink tnum">
+                {[main, second]
+                  .filter((s) => s !== null)
+                  .map((s) => `${statLabel(s.stat)} ${formatStatValue(s.stat, s.value)}`)
+                  .join(' · ')}
+              </p>
+              <p className="text-xs text-fog tnum">
+                {subs.map((s, i) => (s === null ? `#${i + 1} ?` : `${statLabel(s.stat)} ${formatStatValue(s.stat, s.value)}`)).join(' · ')}
+              </p>
+              {echo?.equippedCandidates !== undefined && item.override === undefined ? (
+                <label className="mt-1 flex items-center gap-2 text-xs text-amber">
+                  Equipped by
+                  <select
+                    value=""
+                    onChange={(e) => onEquip(e.target.value === '-' ? null : e.target.value)}
+                    className={`${inputClass} w-auto min-h-7 py-0.5 text-xs`}
+                  >
+                    <option value="" disabled>
+                      which one?
+                    </option>
+                    {echo.equippedCandidates.map((id) => (
+                      <option key={id} value={id}>
+                        {name(snapshot, 'character', id)}
+                      </option>
+                    ))}
+                    <option value="-">leave unequipped</option>
+                  </select>
+                </label>
+              ) : (
+                equipped !== null && <p className="text-xs text-fog">{`Equipped by ${name(snapshot, 'character', equipped)}`}</p>
+              )}
+              {flags.length > 0 && (
+                <ul className="mt-1 space-y-0.5 text-xs">
+                  {flags.map((f, i) => (
+                    <li key={i} className={f.severity === 'error' ? 'text-ember' : 'text-amber'}>
+                      {`${f.severity === 'error' ? '✕' : '!'} ${f.message}`}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <label className="flex items-center gap-1 text-xs font-bold text-ink">
+            <input
+              type="checkbox"
+              checked={row.included}
+              disabled={draft === null}
+              onChange={(e) => onInclude(e.target.checked)}
+            />
+            Add
+          </label>
+          {item.status === 'done' && (
+            <button type="button" onClick={onFix} className={`${btnGhost} ${btnSm}`}>
+              {fixing ? 'Cancel' : state === 'fix' ? 'Fix' : 'Edit'}
+            </button>
+          )}
+          <button type="button" onClick={onRemove} className={`${btnGhost} ${btnSm}`}>
+            Remove
+          </button>
+        </div>
+      </div>
+      {fixing && (
+        <div className="mt-3 border-t-2 border-line-strong pt-3">
+          <EchoForm key={item.id} initial={formValues(row)} submitLabel="Use these values" onSubmit={(d) => onFixed(d)} />
+        </div>
+      )}
+    </li>
+  );
+}

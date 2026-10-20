@@ -231,6 +231,24 @@ interface Team {
   absent; hover (mouse) or tap (touch) freezes her on the current frame via
   canvas. Phones (<md) get a fixed bottom tab bar instead of the top nav. The art is user-supplied — don't add more character art. Theme
   state lives in `src/state/theme.ts`.
+- Echo scanner (screenshots of the in-game Echo Management panel -> OCR ->
+  review -> import; plan + Phase 0 results in
+  `.agents/plans/2026-10-16-echo-scanner.md`) is the `src/scanner/` layer,
+  beside the optimizer (UI -> scanner -> domain -> data). Pure:
+  `parse.ts` (content-located fields, closed-vocab matching, nothing
+  silently corrected — every non-exact read is flagged), `values.ts`
+  (tier/range validation), `layout.ts` + `pipeline.ts` (the 4-pass OCR
+  plan), `draft.ts`, `review.ts`. Browser-only: `engine.ts` (tesseract.js
+  pool, lazily imported by `state/scanStore.ts`). Sonata and rarity are
+  NOT read from pixels — the user mirrors the in-game filter per batch.
+  OCR runtime is self-hosted under `ocr/<tesseract version>/` by the
+  `ocrAssets` plugin in `vite.config.ts` (never precached, never a CDN;
+  tesseract's own IndexedDB cache stays off — unprefixed store name).
+  Regression gate: `src/scanner/fixtures/panels.json` (real OCR words +
+  hand-read truth) must keep ZERO silent errors. Real screenshots live
+  only in gitignored `scan-fixtures/`; re-measure engine changes with
+  `npx tsx scripts/scan-spike.ts` then `npx tsx scripts/scan-eval.ts
+  scan-fixtures/ocr js4pass`.
 - Roll quality (Echo substat tiers, 10-block roll value) is the pure module
   `src/domain/rollValue.ts` over `SUB_STAT_TIERS`; UI only renders it.
 - UI dynamics: live-feedback primitives in `src/ui/components/feedback.tsx` +

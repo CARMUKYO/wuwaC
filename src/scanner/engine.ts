@@ -1,0 +1,126 @@
+import { createWorker, PSM, type Page, type Worker } from 'tesseract.js';
+import { panelRect } from './layout.ts';
+import type { OcrWord } from './parse.ts';
+import { readPanelWords, type OcrFn } from './pipeline.ts';
+
+/**
+ * Scanner layer, browser side: binds the pure 4-pass plan (pipeline.ts)
+ * to a small pool of tesseract.js workers. Each tesseract worker is its
+ * own Web Worker, so recognition never blocks the UI; this module only
+ * queues frames. One frame runs start-to-finish on one worker because the
+ * passes switch worker-level parameters (page-segmentation mode, digit
+ * whitelist) between calls.
+ *
+ * All runtime files come from our own origin (`__WUWA_OCR_DIR__`, served
+ * by the vite.config.ts `ocrAssets` plugin) — never a CDN. tesseract.js's
+ * built-in IndexedDB cache is OFF: it writes to idb-keyval's unprefixed
+ * `keyval-store` database, and this origin is shared with other Pages
+ * repos. The service worker's `wuwa-ocr` cache keeps the files instead.
+ */
+
+export interface FrameWords {
+  words: OcrWord[];
+  width: number;
+  height: number;
+}
+
+export interface ScanEngine {
+  /** OCR one screenshot/frame. Rejects if the image cannot be decoded. */
+  read: (image: Blob) => Promise<FrameWords>;
+  terminate: () => Promise<void>;
+}
+
+function ocrBaseUrl(): string {
+  // Absolute: tesseract's worker runs from a blob: URL, where relative paths do not resolve.
+  return new URL(`${import.meta.env.BASE_URL}${__WUWA_OCR_DIR__}`, window.location.href).href;
+}
+
+function pageWords(page: Page): OcrWord[] {
+  return (page.blocks ?? [])
+    .flatMap((b) => b.paragraphs)
+    .flatMap((p) => p.lines)
+    .flatMap((l) => l.words)
+    .map((w) => ({ text: w.text, confidence: w.confidence, bbox: w.bbox }));
+}
+
+async function frameSize(image: Blob): Promise<{ width: number; height: number }> {
+  const bitmap = await createImageBitmap(image);
+  const size = { width: bitmap.width, height: bitmap.height };
+  bitmap.close();
+  return size;
+}
+
+function bindOcr(worker: Worker, image: Blob): OcrFn {
+  return async (rect, mode) => {
+    await worker.setParameters({
+      tessedit_pageseg_mode: mode === 'sparse' ? PSM.SPARSE_TEXT : PSM.SINGLE_BLOCK,
+      tessedit_char_whitelist: mode === 'digits' ? '0123456789.%' : '',
+    });
+    const { data } = await worker.recognize(image, { rectangle: rect }, { blocks: true });
+    return pageWords(data);
+  };
+}
+
+/** Start `size` OCR workers (each loads the ~3 MB core + ~3 MB model once). */
+export async function createScanEngine(size = 2): Promise<ScanEngine> {
+  const base = ocrBaseUrl();
+  const workers = await Promise.all(
+    Array.from({ length: size }, () =>
+      createWorker('eng', 1, {
+        workerPath: `${base}worker.min.js`,
+        corePath: base,
+        langPath: base.replace(/\/$/, ''),
+        cacheMethod: 'none',
+        gzip: true,
+      }),
+    ),
+  );
+  const idle = [...workers];
+  const waiting: ((w: Worker) => void)[] = [];
+  const acquire = (): Promise<Worker> => {
+    const free = idle.pop();
+    return free !== undefined ? Promise.resolve(free) : new Promise((resolve) => waiting.push(resolve));
+  };
+  const release = (w: Worker): void => {
+    const next = waiting.shift();
+    if (next !== undefined) next(w);
+    else idle.push(w);
+  };
+
+  return {
+    read: async (image) => {
+      const { width, height } = await frameSize(image);
+      const worker = await acquire();
+      try {
+        const words = await readPanelWords(bindOcr(worker, image), width, height);
+        return { words, width, height };
+      } finally {
+        release(worker);
+      }
+    },
+    terminate: async () => {
+      await Promise.all(workers.map((w) => w.terminate()));
+    },
+  };
+}
+
+/**
+ * Small preview of the detail-panel band (the same `panelRect` pass 1
+ * reads) as an object URL, for the review list. Memory only; the caller
+ * revokes it.
+ */
+export async function panelThumbnail(image: Blob, height = 320): Promise<string | null> {
+  const { width: frameW, height: frameH } = await frameSize(image);
+  const r = panelRect(frameW, frameH);
+  const bitmap = await createImageBitmap(image, r.left, r.top, r.width, r.height, {
+    resizeHeight: height,
+    resizeQuality: 'medium',
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.8));
+  return blob === null ? null : URL.createObjectURL(blob);
+}

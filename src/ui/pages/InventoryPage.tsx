@@ -11,6 +11,7 @@ import { echoDefIssues, useInventoryStore } from '../../state/inventory.ts';
 import { seedInventory } from '../../state/seed.ts';
 import { useSnapshotStore } from '../../state/snapshotStore.ts';
 import { EchoForm, type EchoFormValues } from '../components/EchoForm.tsx';
+import { EchoScanner } from '../components/EchoScanner.tsx';
 import { EchoStatus } from '../components/EchoStatus.tsx';
 import { EchoTable } from '../components/EchoTable.tsx';
 import { Mascot } from '../components/Mascot.tsx';
@@ -80,6 +81,7 @@ export function InventoryPage() {
   const removeEcho = useInventoryStore((s) => s.removeEcho);
   const importEchoes = useInventoryStore((s) => s.importEchoes);
   const [adding, setAdding] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [editing, setEditing] = useState<OwnedEcho | null>(null);
   const [sonataFilter, setSonataFilter] = useState('');
   const [costFilter, setCostFilter] = useState<1 | 3 | 4 | null>(null);
@@ -197,6 +199,15 @@ export function InventoryPage() {
               </button>
               <button
                 type="button"
+                onClick={() => setScanning(true)}
+                disabled={scanning}
+                title="Read Echoes from screenshots of the in-game Echo Management panel"
+                className={btnOutline}
+              >
+                Scan screenshots
+              </button>
+              <button
+                type="button"
                 onClick={() => fileRef.current?.click()}
                 title="Import echoes from a WuWa Inventory Kamera JSON file"
                 className={btnOutline}
@@ -236,6 +247,13 @@ export function InventoryPage() {
         <Alert tone="danger" className="mt-4">
           {transferError}
         </Alert>
+      )}
+
+      {scanning && (
+        <EchoScanner
+          onClose={() => setScanning(false)}
+          onImported={(count) => pushToast(`Added ${count} scanned ${count === 1 ? 'echo' : 'echoes'}.`)}
+        />
       )}
 
       {preview !== null && (

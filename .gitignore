@@ -32,3 +32,7 @@ coverage/
 *.njsproj
 *.sln
 *.sw?
+
+# Echo scanner: real game screenshots used for local OCR spikes/tests.
+# Never commit (game art); committed tests use OCR-text fixtures only.
+scan-fixtures/

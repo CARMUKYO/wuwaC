@@ -45,6 +45,20 @@ export const MAIN_STAT_RANGES: Record<1 | 3 | 4, Partial<Record<StatKey, StatRan
 };
 
 /**
+ * Fixed secondary main stat per cost at 5★ +25 (flat HP on 1-cost, flat
+ * ATK on 3/4-cost — reference doc §2). Not in `docs/echostats.md`;
+ * observed in-game on the user's own Echo Management panel, 2026-10-16
+ * (17 screenshots: 8× 1-cost HP 2280, 6× 3-cost ATK 100, 3× 4-cost
+ * ATK 150). Below +25 the value is lower and unsourced — only an upper
+ * bound check applies there.
+ */
+export const SECONDARY_MAIN_STAT_MAX: Record<1 | 3 | 4, { stat: StatKey; value: number }> = {
+  1: { stat: 'hp', value: 2280 },
+  3: { stat: 'atk', value: 100 },
+  4: { stat: 'atk', value: 150 },
+};
+
+/**
  * Substat discrete roll tiers (level-independent — rolled values, not
  * scaled). The form snaps to these exact values. Stats without tiers
  * (healingBonus, action-bucket bonuses outside the shared pool) keep free
