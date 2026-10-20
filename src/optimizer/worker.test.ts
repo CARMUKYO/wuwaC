@@ -2,17 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createProgressTracker,
   isWorkerOut,
+  progressStep,
 } from './protocol.ts';
-import { runOptimization, type WorkerLike } from './worker.ts';
-import type { SearchResult } from './search.ts';
+import { defaultConcurrency, runOptimization, type WorkerLike } from './worker.ts';
+import type { RunMessage } from './protocol.ts';
+import type { OwnedEcho } from '../data/schema.ts';
+import type { RankedBuild, SearchData, SearchResult } from './search.ts';
 import { emptySheet } from '../domain/stats.ts';
 
 describe('isWorkerOut', () => {
   it('accepts protocol messages and rejects impostors', () => {
     expect(isWorkerOut({ type: 'progress', id: 1, evaluated: 3, total: 56 })).toBe(true);
     expect(
-      isWorkerOut({ type: 'result', id: 1, result: { builds: [], evaluated: 0, prunedEchoes: [] } }),
+      isWorkerOut({ type: 'result', id: 1, result: { builds: [], evaluated: 0, scored: 0, total: 0, prunedEchoes: [] } }),
     ).toBe(true);
+    expect(isWorkerOut({ type: 'result', id: 1, result: { builds: [], evaluated: 0, prunedEchoes: [] } })).toBe(false);
     expect(isWorkerOut({ type: 'error', id: 1, message: 'boom' })).toBe(true);
     expect(isWorkerOut({ type: 'nope' })).toBe(false);
     expect(isWorkerOut(null)).toBe(false);
@@ -22,7 +26,7 @@ describe('isWorkerOut', () => {
 });
 
 describe('createProgressTracker', () => {
-  it('fires on step boundaries and flushes the tail', () => {
+  it('fires when a step boundary is crossed and flushes the tail', () => {
     const onProgress = vi.fn();
     const tracker = createProgressTracker(10, onProgress, 4);
     tracker.report(1);
@@ -31,11 +35,33 @@ describe('createProgressTracker', () => {
     tracker.report(4);
     expect(onProgress).toHaveBeenCalledTimes(1);
     expect(onProgress).toHaveBeenLastCalledWith(4, 10);
-    tracker.report(9);
+    tracker.report(7);
     expect(onProgress).toHaveBeenCalledTimes(1);
-    tracker.flush();
+    // A skipped subtree jumps 7 -> 9, past the boundary at 8: fires once.
+    tracker.report(9);
     expect(onProgress).toHaveBeenCalledTimes(2);
     expect(onProgress).toHaveBeenLastCalledWith(9, 10);
+    tracker.report(10);
+    tracker.flush();
+    expect(onProgress).toHaveBeenCalledTimes(3);
+    expect(onProgress).toHaveBeenLastCalledWith(10, 10);
+  });
+
+  it('sizes steps for about 200 updates, never below 1000 combos', () => {
+    expect(progressStep(45)).toBe(1000);
+    expect(progressStep(200_000)).toBe(1000);
+    expect(progressStep(1_000_000)).toBe(5000);
+    expect(progressStep(397_843_677)).toBe(1_989_219);
+  });
+});
+
+describe('defaultConcurrency', () => {
+  it('uses one worker for small pools and cores-minus-one (max 8) otherwise', () => {
+    expect(defaultConcurrency(39, 16)).toBe(1);
+    expect(defaultConcurrency(40, 4)).toBe(3);
+    expect(defaultConcurrency(200, 16)).toBe(8);
+    expect(defaultConcurrency(200, 1)).toBe(1);
+    expect(defaultConcurrency(200, undefined)).toBe(1);
   });
 });
 
@@ -61,6 +87,8 @@ class FakeWorker implements WorkerLike {
 const canned: SearchResult = {
   builds: [{ echoIds: ['a', 'b', 'c', 'd', 'e'], score: 42, sheet: emptySheet(), warnings: [], appliedAssumptions: [] }],
   evaluated: 56,
+  scored: 56,
+  total: 56,
   prunedEchoes: [],
 };
 
@@ -70,7 +98,7 @@ describe('runOptimization', () => {
     const handle = runOptimization(
       { character: 'c' } as never,
       { topN: 5 } as never,
-      { createWorker: () => fake },
+      { createWorker: () => fake, concurrency: 1 },
     );
     expect(fake.posted).toHaveLength(1);
     expect(fake.posted[0]).toMatchObject({ type: 'run' });
@@ -88,7 +116,7 @@ describe('runOptimization', () => {
 
   it('rejects on worker errors and ignores stale ids', async () => {
     const fake = new FakeWorker();
-    const handle = runOptimization({} as never, {} as never, { createWorker: () => fake });
+    const handle = runOptimization({} as never, {} as never, { createWorker: () => fake, concurrency: 1 });
     const id = (fake.posted[0] as { id: number }).id;
 
     fake.deliver({ type: 'progress', id: 9999, evaluated: 1, total: 2 });
@@ -98,7 +126,7 @@ describe('runOptimization', () => {
 
   it('cancel terminates without settling', async () => {
     const fake = new FakeWorker();
-    const handle = runOptimization({} as never, {} as never, { createWorker: () => fake });
+    const handle = runOptimization({} as never, {} as never, { createWorker: () => fake, concurrency: 1 });
     let settled = false;
     void handle.promise.then(
       () => { settled = true; },
@@ -108,5 +136,80 @@ describe('runOptimization', () => {
     expect(fake.terminated).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(settled).toBe(false);
+  });
+});
+
+function echo(id: string): OwnedEcho {
+  return {
+    id, echoDefId: `${id}-def`, sonataId: 'set', cost: 1, level: 25, rarity: 5,
+    mainStat: { stat: 'atk', value: 1 }, substats: [], equippedTo: null, origin: 'manual',
+  };
+}
+
+function build(ids: string[], score: number): RankedBuild {
+  return { echoIds: ids, score, sheet: emptySheet(), warnings: [], appliedAssumptions: [] };
+}
+
+describe('runOptimization across worker shards', () => {
+  const data = { echoes: ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(echo) } as unknown as SearchData;
+
+  it('sends each worker its shard, sums progress, and merges the top-N', async () => {
+    const fakes = [new FakeWorker(), new FakeWorker()];
+    let made = 0;
+    const handle = runOptimization(data, { topN: 2 } as never, {
+      createWorker: () => fakes[made++],
+      concurrency: 2,
+    });
+    const runs = fakes.map((f) => f.posted[0] as RunMessage);
+    expect(runs.map((r) => r.shard)).toEqual([{ index: 0, count: 2 }, { index: 1, count: 2 }]);
+    const onProgress = vi.fn();
+    handle.onProgress(onProgress);
+    fakes[0].deliver({ type: 'progress', id: runs[0].id, evaluated: 10, total: 21 });
+    fakes[1].deliver({ type: 'progress', id: runs[1].id, evaluated: 11, total: 21 });
+    expect(onProgress).toHaveBeenLastCalledWith(21, 21);
+
+    // Equal scores rank by position in data.echoes: {a,b,c,d,f} before {a,b,c,e,f}.
+    const shard0: SearchResult = {
+      builds: [build(['a', 'b', 'c', 'e', 'f'], 9), build(['a', 'b', 'c', 'd', 'g'], 5)],
+      evaluated: 10, scored: 4, total: 21, prunedEchoes: [],
+    };
+    const shard1: SearchResult = {
+      builds: [build(['a', 'b', 'c', 'd', 'f'], 9)],
+      evaluated: 11, scored: 3, total: 21, prunedEchoes: [],
+    };
+    fakes[0].deliver({ type: 'result', id: runs[0].id, result: shard0 });
+    expect(fakes.every((f) => !f.terminated)).toBe(true);
+    fakes[1].deliver({ type: 'result', id: runs[1].id, result: shard1 });
+    const merged = await handle.promise;
+    expect(merged.builds.map((b) => b.echoIds)).toEqual([
+      ['a', 'b', 'c', 'd', 'f'],
+      ['a', 'b', 'c', 'e', 'f'],
+    ]);
+    expect(merged).toMatchObject({ evaluated: 21, scored: 7, total: 21 });
+    expect(fakes.every((f) => f.terminated)).toBe(true);
+  });
+
+  it('one failing shard rejects the run and stops every worker', async () => {
+    const fakes = [new FakeWorker(), new FakeWorker(), new FakeWorker()];
+    let made = 0;
+    const handle = runOptimization(data, { topN: 1 } as never, {
+      createWorker: () => fakes[made++],
+      concurrency: 3,
+    });
+    const id = (fakes[1].posted[0] as RunMessage).id;
+    fakes[1].deliver({ type: 'error', id, message: 'shard boom' });
+    await expect(handle.promise).rejects.toThrow('shard boom');
+    expect(fakes.every((f) => f.terminated)).toBe(true);
+  });
+
+  it('cancel terminates every worker', () => {
+    const fakes = [new FakeWorker(), new FakeWorker()];
+    let made = 0;
+    const handle = runOptimization(data, { topN: 1 } as never, {
+      createWorker: () => fakes[made++],
+      concurrency: 2,
+    });
+    handle.cancel();
+    expect(fakes.every((f) => f.terminated)).toBe(true);
   });
 });

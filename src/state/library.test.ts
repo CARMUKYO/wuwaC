@@ -2,7 +2,9 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from './db.ts';
 import { serializeBuilds, useLibraryStore } from './library.ts';
-import type { Build } from '../data/schema.ts';
+import type { Build, SharedBuild } from '../data/schema.ts';
+import { BACKUP_FORMAT, BACKUP_VERSION, parseBackup } from './backup.ts';
+import { referenceBuildFrom } from './share.ts';
 
 type Draft = Omit<Build, 'id' | 'updatedAt'>;
 
@@ -113,5 +115,84 @@ describe('serializeBuilds', () => {
     useLibraryStore.setState({ builds: [], loaded: true });
     const result = await useLibraryStore.getState().importBuilds(JSON.parse(json));
     expect(result).toEqual({ added: 1, skipped: 0 });
+  });
+});
+
+describe('saved build context', () => {
+  it('survives Dexie and JSON export/import', async () => {
+    const context = {
+      characterId: 'jiyan',
+      level: 70,
+      ascension: 4,
+      resonanceChain: 1,
+      forteLevels: { '1001103': 8 },
+      forteUnlockedIds: ['node-a'],
+      weaponId: 'verdant-summit',
+      weaponLevel: 60,
+      weaponAscension: 3,
+      weaponRank: 2,
+    };
+    const saved = await useLibraryStore.getState().saveBuild({ ...draft, context });
+    expect((await db.builds.get(saved.id))?.context).toEqual(context);
+
+    const exported = serializeBuilds([saved]);
+    await db.builds.clear();
+    useLibraryStore.setState({ builds: [], loaded: true });
+    await useLibraryStore.getState().importBuilds(JSON.parse(exported) as unknown);
+    expect((await db.builds.get(saved.id))?.context).toEqual(context);
+  });
+
+  it('rejects a context for a different character', async () => {
+    await expect(
+      useLibraryStore.getState().saveBuild({
+        ...draft,
+        context: { characterId: 'verina', level: 90, ascension: 6, resonanceChain: 0, forteLevels: {}, weaponId: 'verdant-summit', weaponLevel: 90, weaponRank: 1 },
+      }),
+    ).rejects.toThrow(/context/);
+    expect(await db.builds.count()).toBe(0);
+  });
+});
+
+describe('reference builds (saved share links)', () => {
+  const payload: SharedBuild = {
+    v: 2,
+    name: 'Friend build',
+    summary: 'Expected damage',
+    character: { id: 'jiyan', level: 90, ascension: 6, chain: 0, forte: { '1001103': 10 } },
+    weapon: { id: 'verdant-summit', level: 90, ascension: 6, rank: 1 },
+    echoes: Array.from({ length: 5 }, (_, i) => ({
+      def: `def-${i}`,
+      set: 'sierra-gale',
+      cost: 1 as const,
+      level: 25,
+      rarity: 5,
+      main: { stat: 'atkPct' as const, value: 0.18 },
+      subs: [],
+    })) as unknown as SharedBuild['echoes'],
+  };
+
+  it('persist with their payload and touch nothing in ownedEchoes', async () => {
+    const before = await db.ownedEchoes.count();
+    const { added } = await useLibraryStore.getState().importBuilds([referenceBuildFrom(payload)]);
+    expect(added).toBe(1);
+    useLibraryStore.setState({ builds: [], loaded: false });
+    await useLibraryStore.getState().load();
+    const [row] = useLibraryStore.getState().builds;
+    expect(row.reference).toEqual(payload);
+    expect(await db.ownedEchoes.count()).toBe(before);
+  });
+
+  it('survive JSON export/import and validate in a version-1 backup', () => {
+    const ref = referenceBuildFrom(payload);
+    const exported = JSON.parse(serializeBuilds([ref])) as unknown[];
+    expect(exported[0]).toEqual(ref);
+    const backup = {
+      format: BACKUP_FORMAT,
+      version: 1,
+      exportedAt: '2026-10-21T00:00:00.000Z',
+      tables: { ownedEchoes: [], roster: [], builds: [ref], teams: [] },
+    };
+    expect(BACKUP_VERSION).toBe(1);
+    expect(parseBackup(backup).tables.builds[0].reference).toEqual(payload);
   });
 });

@@ -7,6 +7,9 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#fbf4f1" />
+    <!-- Icon fetches to encore.moe must not carry the page URL. The
+         Content-Security-Policy meta is injected at build time (vite.config.ts). -->
+    <meta name="referrer" content="no-referrer" />
     <script>
       try {
         var t = localStorage.getItem('wuwa-theme');
@@ -21,22 +24,17 @@
       content="WuWa Optimizer — a local-first Echo inventory and damage optimizer for Wuthering Waves."
     />
     <title>WuWa Optimizer</title>
-    <link rel="canonical" href="https://carmukyo.github.io/wuwaC/" />
+    <!-- Canonical address: SITE_URL is CANONICAL_URL from src/site.ts (substituted by vite.config.ts). -->
+    <link rel="canonical" href="%SITE_URL%" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="WuWa Optimizer" />
     <meta
       property="og:description"
       content="Local-first Echo inventory and damage optimizer for Wuthering Waves. Your data stays in your browser."
     />
-    <meta property="og:url" content="https://carmukyo.github.io/wuwaC/" />
-    <meta property="og:image" content="https://carmukyo.github.io/wuwaC/aemeath-ames-still.png" />
+    <meta property="og:url" content="%SITE_URL%" />
+    <meta property="og:image" content="%SITE_URL%aemeath-ames-still.png" />
     <meta name="twitter:card" content="summary" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap"
-      rel="stylesheet"
-    />
   </head>
   <body>
     <div id="root"></div>

@@ -372,10 +372,24 @@ since switching resets kit resources.
   partial build to cut branches early; (4) move the whole thing into a Web
   Worker (or a worker pool, sharding by locked Sonata set) so the UI stays
   responsive.
-- Soundness rule (implemented): dominance pruning must compare within the
-  same Sonata set, not just the same cost — set bonuses depend on combo
-  composition, so a cross-set swap of a pruned Echo for its dominator can
-  lose a 2pc/5pc threshold and lower the score.
+- **Status:** all four steps are implemented. `optimizer/search.ts` runs
+  an exact cost-pattern enumeration with branch-and-bound, split into
+  deterministic worker shards, and is checked against a brute-force oracle.
+- Soundness rules (implemented, 2026-10-20). Dominance pruning must compare
+  within the same cost *and* the same Sonata set, and one dominator is not
+  enough:
+  - **Same set:** set bonuses depend on combo composition, so a cross-set
+    swap of a pruned Echo for its dominator can lose a 2pc/5pc threshold.
+  - **Co-occurrence:** a combo holds several Echoes of the same cost (two
+    3-costs in 4-3-3-1-1), so the dominator may already be in the very
+    combo. An Echo needs ≥ k + topN − 1 counted dominators, where k is the
+    most Echoes of its cost in one legal combo.
+  - **Duplicate defs:** Sonata pieces count *distinct* Echo definitions, so
+    a same-def duplicate doesn't add a piece. Main-slot bonus carriers also
+    need same-def dominators. The full argument is in the `pruneDominated`
+    comment.
+  - **Monotonicity:** both pruning and the search bounds assume the score
+    never decreases when a stat rises.
 - Transcribed `conditional`/`custom` effects (wielded weapon passive at the
   roster rank, met Sonata thresholds, slot-1 Echo bonus) auto-apply in
   `computeStats` at full stacks/uptime so the calculator and optimizer
@@ -469,6 +483,26 @@ pipeline with layered fallbacks, not a direct fetch-on-page-load:
    on every page load, and don't hammer the API in a loop — a manual
    refresh action plus an optional periodic (e.g. daily) background sync
    is enough for a game that patches roughly every 6 weeks.
+
+**As implemented (2026-10-21).** Steps 2 and 3 changed, so that browsers
+never call the provider at all:
+
+- **Who syncs.** The provider is synced only by `npm run sync` (CLI) and a
+  weekly CI workflow (`.github/workflows/sync-gamedata.yml`). The workflow
+  runs every gate and opens a PR with a change summary. A human reviews and
+  merges it, and the merge deploys.
+- **What the build publishes.** Each build publishes the reviewed snapshot
+  as `gamedata/snapshot-<checksum>.json` plus a small
+  `gamedata/manifest.json`.
+- **What browsers do.** They check that same-origin manifest once per
+  session, or on demand. They download the payload only if it's strictly
+  newer, then checksum- and zod-validate it before caching it in IndexedDB.
+- **The 7-day staleness gate is gone.** A manifest check is one small
+  request.
+- **Load on encore.moe** drops from about 370 requests per stale visitor to
+  one CI sync a week.
+- **Source of truth.** See `AGENTS.md` (Data layer runtime contract,
+  Hosting) for the authoritative contract.
 
 ### 8.3 Secondary/cross-check sources
 

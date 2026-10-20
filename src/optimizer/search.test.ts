@@ -2,11 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { loadBundledSnapshot } from '../data/index.ts';
 import type { OwnedEcho, RosterEntry, StatKey } from '../data/schema.ts';
 import { standardMob } from '../domain/damage.ts';
+import { computeStats } from '../domain/stats.ts';
 import {
+  costPatterns,
+  mergeShardResults,
   searchExhaustive,
+  searchReference,
+  selectCandidates,
   type OptimizeRequest,
+  type ProgressUpdate,
   type RankedBuild,
   type SearchData,
+  type SearchResult,
 } from './search.ts';
 
 const snapshot = loadBundledSnapshot();
@@ -361,17 +368,28 @@ describe('searchExhaustive', () => {
   });
 
   it('prunes by default and reports dropped echoes', () => {
-    // Relevant stat is flat atk: e2 (600) dominates same-set e1/e8,
-    // e6 (50) dominates same-set e7. e9 survives despite zero atk — it is
-    // rejuvenating-glow, and cross-set pruning would be unsound (a swap
-    // can lose a set threshold). Four survivor combos fit the budget; the
-    // winner {e2,e3,e4,e6,e9} scores 600 + 50 = 650.
-    const result = searchExhaustive(data, { ...maxAtk, prune: undefined });
-    expect([...result.prunedEchoes].sort()).toEqual(['e1', 'e7', 'e8']);
-    expect(result.evaluated).toBe(4);
-    expect(result.builds).toHaveLength(4);
-    expect(result.builds[0].echoIds).toEqual(['e2', 'e3', 'e4', 'e6', 'e9']);
+    // Relevant stat is flat atk. Budget 10 fits one 4-cost (4+3+1+1+1), so
+    // a single dominator suffices for 4-costs at top-1: e2 (600) drops
+    // same-set e1/e8. e6 (50) beats e7, but up to five 1-costs share a
+    // combo, so e7 stays. Survivors e2-e7, e9: {e2, one 3-cost, e6,e7,e9}
+    // ×3 plus {two 3-costs, e6,e7,e9} ×3 = 6 combos. Winner (first of the
+    // 650 ties) {e2,e3,e6,e7,e9}: 600 + 50.
+    const result = searchExhaustive(data, { ...maxAtk, costBudget: 10, topN: 1, prune: undefined });
+    expect([...result.prunedEchoes].sort()).toEqual(['e1', 'e8']);
+    expect(result.evaluated).toBe(6);
+    expect(result.builds).toHaveLength(1);
+    expect(result.builds[0].echoIds).toEqual(['e2', 'e3', 'e6', 'e7', 'e9']);
     expect(result.builds[0].score).toBe(650);
+  });
+
+  it('does not prune when a dominator could share the combo (top-10, budget 12)', () => {
+    // Budget 12 fits two 4-costs and five 1-costs, and top-10 needs 9 more
+    // dominators on top of that — the old one-dominator rule dropped e1/e7/e8
+    // here and returned 4 builds where the full search has 10.
+    const pruned = searchExhaustive(data, { ...maxAtk, prune: undefined });
+    const full = searchExhaustive(data, maxAtk);
+    expect(pruned.prunedEchoes).toEqual([]);
+    expect(pruned.builds.map((b) => b.score)).toEqual(full.builds.map((b) => b.score));
   });
 
   it('picks the crit build for expected liberation damage', () => {
@@ -465,5 +483,225 @@ describe('searchExhaustive', () => {
     expect(result.evaluated).toBe(45);
     expect(result.builds).toHaveLength(3);
     for (const build of result.builds) expect(build.score).toBeGreaterThan(0);
+  });
+});
+
+describe('costPatterns', () => {
+  it('derives every legal 5-cost multiset for budget 12 (hand-listed)', () => {
+    // Counts of [4, 3, 1]-costs: 4-4-1-1-1 (11), 4-3-3-1-1 (12), 4-3-1-1-1
+    // (10), 4-1-1-1-1 (8), 3-3-3-1-1 (11), 3-3-1-1-1 (9), 3-1-1-1-1 (7),
+    // 1-1-1-1-1 (5). 4-4-3-x and 4-3-3-3-x overflow.
+    expect(costPatterns([4, 3, 1], 12)).toEqual([
+      [2, 0, 3], [1, 2, 2], [1, 1, 3], [1, 0, 4], [0, 3, 2], [0, 2, 3], [0, 1, 4], [0, 0, 5],
+    ]);
+  });
+
+  it('drops the two-4-cost and 4-3-3 patterns at budget 10', () => {
+    expect(costPatterns([4, 3, 1], 10)).toEqual([[1, 1, 3], [1, 0, 4], [0, 2, 3], [0, 1, 4], [0, 0, 5]]);
+  });
+
+  it('handles pools missing a cost', () => {
+    expect(costPatterns([3, 1], 12)).toEqual([[3, 2], [2, 3], [1, 4], [0, 5]]);
+    expect(costPatterns([4], 12)).toEqual([]);
+    expect(costPatterns([], 12)).toEqual([]);
+  });
+});
+
+describe('search progress', () => {
+  it('reports covered combos up to exactly the legal total (45 of 45)', () => {
+    const updates: ProgressUpdate[] = [];
+    const result = searchExhaustive(data, maxAtk, (u) => updates.push(u));
+    expect(updates[0]).toEqual({ evaluated: 0, total: 45 });
+    expect(updates[updates.length - 1]).toEqual({ evaluated: 45, total: 45 });
+    expect(result.total).toBe(45);
+    expect(result.evaluated).toBe(45);
+  });
+
+  it('rejects malformed shards', () => {
+    expect(() => searchExhaustive(data, maxAtk, undefined, { index: 2, count: 2 })).toThrow(/shard/);
+  });
+});
+
+describe('minStats per main-echo choice', () => {
+  it('keeps a combo whose minimum is met by a lower-scoring main echo', () => {
+    // Five Sierra Gale 1-costs incl. Kerasaur (+12% Aero main) and Reactor
+    // Husk (+10% Energy Regen main). Max Aero alone would pick Kerasaur, but
+    // ER >= base + 0.05 is met only with Reactor Husk in slot 1, so the
+    // build is the Husk-main sheet: Aero = baseline (no main Aero bonus).
+    const inv: OwnedEcho[] = [
+      mkEcho('k1', { main: ['atk', 10], cost: 1, def: 'kerasaur' }),
+      mkEcho('r1', { main: ['atk', 10], cost: 1, def: 'reactor-husk' }),
+      mkEcho('f1', { main: ['atk', 10], cost: 1 }),
+      mkEcho('f2', { main: ['atk', 10], cost: 1 }),
+      mkEcho('f3', { main: ['atk', 10], cost: 1 }),
+    ];
+    const setup = { character: jiyan, weapon: verdant, roster, sonataSets };
+    const baseline = computeStats({ ...setup, echoes: inv }).sheet;
+    const request: OptimizeRequest = {
+      costBudget: 12,
+      sonataLock: { mode: 'none' },
+      objective: { kind: 'max-stat', stat: 'dmgBonus:Aero' },
+      minStats: { energyRegen: baseline.energyRegen + 0.05 },
+      topN: 1,
+    };
+    const result = searchExhaustive({ ...data, echoes: inv }, request);
+    expect(result.builds).toHaveLength(1);
+    expect(result.builds[0].mainEchoId).toBe('r1');
+    expect(result.builds[0].score).toBeCloseTo(baseline['dmgBonus:Aero'], 12);
+    expect(result.builds[0].sheet.energyRegen).toBeCloseTo(baseline.energyRegen + 0.1, 12);
+    // Without the minimum, Kerasaur's +0.12 Aero wins slot 1.
+    const free = searchExhaustive({ ...data, echoes: inv }, { ...request, minStats: undefined });
+    expect(free.builds[0].mainEchoId).toBe('k1');
+    expect(free.builds[0].score).toBeCloseTo(baseline['dmgBonus:Aero'] + 0.12, 12);
+  });
+});
+
+/** Deterministic PRNG (mulberry32). */
+function rng(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state |= 0;
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const EQ_SETS = ['sierra-gale', 'lingering-tunes', 'rejuvenating-glow', 'dream-of-the-lost'];
+// Aero main-slot carriers for Jiyan plus plain defs; few defs per set so
+// duplicate copies (which don't add Sonata pieces) come up often.
+const EQ_DEFS = ['kerasaur', 'reactor-husk', 'nameless-explorer', 'plain-a', 'plain-b', 'plain-c', 'plain-d'];
+const EQ_MAINS: StatKey[] = ['atk', 'atkPct', 'critRate', 'critDmg', 'dmgBonus:Aero', 'energyRegen', 'hp'];
+const EQ_SUBS: StatKey[] = ['atk', 'atkPct', 'critRate', 'critDmg', 'energyRegen', 'dmgBonus:liberation', 'defPct'];
+
+function randomInventory(rand: () => number, n: number): OwnedEcho[] {
+  const pick = <T,>(list: readonly T[]): T => list[Math.floor(rand() * list.length)];
+  return Array.from({ length: n }, (_, i) => {
+    const subs: [StatKey, number][] = [];
+    for (const stat of EQ_SUBS) if (rand() < 0.4) subs.push([stat, stat === 'atk' ? 30 + Math.floor(rand() * 30) : 0.02 + rand() * 0.1]);
+    const main = pick(EQ_MAINS);
+    return mkEcho(`r${i}`, {
+      main: [main, main === 'atk' || main === 'hp' ? 100 + Math.floor(rand() * 300) : 0.1 + rand() * 0.3],
+      subs,
+      cost: pick([1, 1, 3, 3, 4] as const),
+      sonata: pick(EQ_SETS),
+      def: pick(EQ_DEFS),
+    });
+  });
+}
+
+function randomRequest(rand: () => number): OptimizeRequest {
+  const pick = <T,>(list: readonly T[]): T => list[Math.floor(rand() * list.length)];
+  const objectives: OptimizeRequest['objective'][] = [
+    { kind: 'max-stat', stat: 'atk' },
+    { kind: 'max-stat', stat: 'dmgBonus:Aero' },
+    {
+      kind: 'expected-damage',
+      skillId: liberation.id,
+      motionName: 'Lance of Qingloong Stage 1 DMG',
+      forteLevel: 10,
+      crit: 'expected',
+    },
+    {
+      kind: 'rotation-dpr',
+      blocks: [{ skillId: liberation.id, motionName: 'Lance of Qingloong Stage 1 DMG', forteLevel: 10, activeBuffIds: [] }],
+      buffs: [],
+      globalBuffIds: [],
+      crit: 'expected',
+    },
+  ];
+  const lockRoll = rand();
+  return {
+    costBudget: pick([10, 12] as const),
+    sonataLock:
+      lockRoll < 0.6
+        ? { mode: 'none' }
+        : lockRoll < 0.8
+          ? { mode: 'five', setId: pick(EQ_SETS) }
+          : { mode: 'twoPlusTwo', setIdA: 'sierra-gale', setIdB: pick(EQ_SETS.slice(1)) },
+    objective: pick(objectives),
+    topN: pick([1, 3, 10]),
+    ...(rand() < 0.3 ? { minStats: { critRate: 0.05 + rand() * 0.3 } } : {}),
+    ...(rand() < 0.2 ? { prune: false } : {}),
+  };
+}
+
+/** Everything a caller can observe, minus the strategy-specific `scored`. */
+function observable(result: SearchResult, lockFree: boolean) {
+  return {
+    builds: result.builds,
+    prunedEchoes: result.prunedEchoes,
+    ...(lockFree ? { evaluated: result.evaluated } : {}),
+  };
+}
+
+describe('exact search equivalence with the brute-force reference', () => {
+  const allSets = snapshot.sonataSets;
+
+  it('matches the reference on 40 seeded random inventories and requests', () => {
+    const rand = rng(20261020);
+    let boundedAway = 0;
+    for (let trial = 0; trial < 40; trial += 1) {
+      const inventory = randomInventory(rand, 9 + Math.floor(rand() * 6));
+      const request = randomRequest(rand);
+      const subject: SearchData = { ...data, echoes: inventory, sonataSets: allSets };
+      const fast = searchExhaustive(subject, request);
+      const reference = searchReference(subject, request);
+      const lockFree = request.sonataLock.mode === 'none';
+      expect(observable(fast, lockFree), `trial ${trial}`).toEqual(observable(reference, lockFree));
+      expect(fast.evaluated).toBe(fast.total);
+      boundedAway += fast.evaluated - fast.scored;
+      // Three shards merged give the single-run answer.
+      const shards = [0, 1, 2].map((index) => searchExhaustive(subject, request, undefined, { index, count: 3 }));
+      expect(shards.reduce((sum, r) => sum + r.evaluated, 0)).toBe(fast.total);
+      expect(mergeShardResults(subject, request.topN, shards).builds, `trial ${trial} shards`).toEqual(fast.builds);
+    }
+    // The bounds must actually skip work somewhere, or this proves nothing.
+    expect(boundedAway).toBeGreaterThan(0);
+  });
+
+  it('skips most combos on a larger inventory and still matches (n = 22)', () => {
+    const inventory = randomInventory(rng(7), 22);
+    const request: OptimizeRequest = {
+      costBudget: 12,
+      sonataLock: { mode: 'none' },
+      objective: {
+        kind: 'expected-damage',
+        skillId: liberation.id,
+        motionName: 'Lance of Qingloong Stage 1 DMG',
+        forteLevel: 10,
+        crit: 'expected',
+      },
+      topN: 5,
+    };
+    const subject: SearchData = { ...data, echoes: inventory, sonataSets: allSets };
+    const fast = searchExhaustive(subject, request);
+    const reference = searchReference(subject, request);
+    expect(observable(fast, true)).toEqual(observable(reference, true));
+    expect(fast.scored).toBeLessThan(fast.evaluated / 4);
+  });
+});
+
+describe('selectCandidates', () => {
+  const pool: OwnedEcho[] = [
+    { ...mkEcho('free', { main: ['atk', 1], cost: 1 }), level: 0 },
+    { ...mkEcho('mine', { main: ['atk', 1], cost: 1 }), level: 25, equippedTo: 'jiyan' },
+    { ...mkEcho('theirs', { main: ['atk', 1], cost: 1 }), level: 20, equippedTo: 'verina' },
+  ];
+
+  it('keeps every echo by default', () => {
+    expect(selectCandidates(pool, 'jiyan').map((e) => e.id)).toEqual(['free', 'mine', 'theirs']);
+  });
+
+  it('drops echoes equipped on other characters, keeping this one\'s and unequipped', () => {
+    expect(selectCandidates(pool, 'jiyan', { excludeEquippedElsewhere: true }).map((e) => e.id)).toEqual([
+      'free',
+      'mine',
+    ]);
+  });
+
+  it('drops echoes below the minimum level (inclusive bound)', () => {
+    expect(selectCandidates(pool, 'jiyan', { minLevel: 20 }).map((e) => e.id)).toEqual(['mine', 'theirs']);
   });
 });

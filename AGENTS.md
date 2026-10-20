@@ -30,32 +30,92 @@ npm run test       # vitest
 npm run build       # production build (+ service worker, manifest)
 npm run preview    # serve dist/ at http://localhost:4173/wuwaC/
 npm run lint       # eslint
-npm run sync       # offline encore.moe -> src/data/generated/ (manual)
-npm run bench      # optimizer scaling benchmark (manual, not a unit test)
+npm run sync       # encore.moe -> src/data/generated/ (CLI; CI runs it weekly via sync-gamedata.yml — avoid ad-hoc full syncs, ~370 requests)
+npm run bench      # optimizer benchmark vs the brute-force oracle (manual; synthetic + realistic inventories, n = 12..300; WORKERS=k, INVENTORY=, REFERENCE_MAX=)
+npx tsx scripts/gamedata-summary.ts <before.json> <after.json>   # Markdown change summary used in sync PRs
 ```
 
 ## Hosting (GitHub Pages)
 
-Deployed at https://carmukyo.github.io/wuwaC/ by `.github/workflows/deploy.yml`
-on push to `main`; `ci.yml` runs lint/test/build on other branches and PRs.
-Still client-only: the app must work offline and from any static host.
+Canonical deploy: https://wuwa-opt.github.io/wuwaC/ (repo `wuwa-opt/wuwaC`),
+by `.github/workflows/deploy.yml` on push to `main`; `ci.yml` runs
+lint/test/build on other branches and PRs. Still client-only: the app must
+work offline and from any static host.
+
+Two deploy modes from one codebase, picked at build time (`src/site.ts`,
+`siteMode()` in `vite.config.ts`):
+
+- **Live** (default, `wuwa-opt/wuwaC`): the app, plus a dismissible
+  first-run hint ("Coming from carmukyo.github.io/wuwaC? Import your
+  backup") when the DB is empty (`ImportHint`, key
+  `wuwa-import-hint-dismissed`).
+- **Moved** (`VITE_MOVED_TO=<https URL ending in />`, set from the repo
+  variable `MOVED_TO`): the original `carmukyo/wuwaC`, kept up as a
+  migration page. It works normally but shows a persistent banner with an
+  Export backup button and a link to the new site (`MovedBanner`). A pending
+  `#b=` share link gets an "Open this shared build on the new site" link
+  with the same fragment. The value is validated at build time
+  (`parseMovedTo`) and is never derived from the page.
+
+The canonical URL lives in one constant, `CANONICAL_URL` in `src/site.ts`.
+`index.html` uses a `%SITE_URL%` placeholder that `vite.config.ts` fills.
+Never hand-copy the host into HTML or components.
 
 - `base: '/wuwaC/'` (`vite.config.ts`) must match the repo name. Reference
   `public/` files via `import.meta.env.BASE_URL`, never a leading `/`.
   Routing is hash-based (`#section`, `#b=`), so no 404.html fallback exists.
 - Service worker via vite-plugin-pwa (`registerType: 'prompt'`, build-only).
   `UpdatePrompt.tsx` (mounted in `main.tsx`, outside `App`) shows the
-  reload banner. Never let the SW cache encore.moe; `activeSnapshot.ts`
-  owns that cache.
-- Build chunks: `snapshot` (game data), `vendor`, and app code are split
-  (`codeSplitting.groups`) so a code-only deploy doesn't re-download the data.
+  reload banner. Never let the SW cache encore.moe or `gamedata/**`;
+  `activeSnapshot.ts` owns game data via IndexedDB.
+- **Build chunks.** `snapshot` (game data), `vendor`, and app code are split
+  (`codeSplitting.groups`) so a code-only deploy doesn't re-download the
+  data. Pages are lazy-loaded per section (`App.tsx` `PAGE_IMPORTS`, with
+  idle prefetch), so the shell entry chunk carries no page or snapshot code.
+  `build.rolldownOptions.plugins` ships the snapshot as a minified JSON
+  string.
+- **Game data publication.** `vite.config.ts` `gamedataPublication()` emits
+  `gamedata/manifest.json` and the content-addressed
+  `gamedata/snapshot-<checksum>.json` from the committed snapshot on every
+  build (also served by `npm run dev`). New data reaches users only by
+  merging a reviewed PR:
+  - `.github/workflows/sync-gamedata.yml` (weekly + manual, guarded to
+    `wuwa-opt/wuwaC`) runs `npm run sync` and every gate in a read-only job.
+  - A write job that runs no npm then commits the artifact to
+    `data/gamedata-sync` and opens or updates a PR with a
+    `scripts/gamedata-summary.ts` change summary.
+  - A timestamp-only sync opens no PR. Nothing auto-merges.
+  - It needs the repo setting "Allow GitHub Actions to create and approve
+    pull requests".
+- **Security headers.** A build-only `<meta>` CSP (`contentSecurityPolicy()`
+  in `vite.config.ts`):
+  - `connect-src 'self'` (browsers never call the provider API);
+  - `img-src` adds `https://api.encore.moe` for game art;
+  - the inline theme script is allowed by an auto-computed sha256, never
+    `'unsafe-inline'`/`'unsafe-eval'`.
+
+  Any new origin the app talks to needs a matching directive there. Meta CSP
+  can't set `frame-ancestors`. zod runs jitless (`data/zodConfig.ts`, the
+  first import of `data/schema.ts`), so it needs no `eval`. The referrer
+  policy is `no-referrer`. Fonts are self-hosted (`@fontsource` woff2 via
+  `@font-face` in `index.css`, latin subset, precached); never load Google
+  Fonts or another font CDN.
+- **CI.** Every action is pinned to a full commit SHA (Dependabot updates
+  them). `pages: write`/`id-token: write` live on the deploy job only, never
+  on a job that runs `npm ci`. CI also runs
+  `npm audit --omit=dev --audit-level=high`.
 - User data lives only in visitors' browsers. `state/backup.ts` is the
   whole-DB export/restore (versioned `wuwa-optimizer-backup` JSON, zod-validated);
   `state/persistence.ts` requests non-evictable storage. A new user table
   must be added to the backup format (bump `BACKUP_VERSION`, keep reading v1).
-- The origin `carmukyo.github.io` is shared with every Pages repo of this
-  account: keep IndexedDB/localStorage names prefixed (`wuwa-optimizer`,
-  `wuwa-*`) and never rename existing ones (that orphans users' data).
+- **Storage is per origin.** The app lives on its own origin
+  (`wuwa-opt.github.io`), so other Pages repos can't read or poison its
+  IndexedDB / Cache Storage. Keep IndexedDB/localStorage names prefixed
+  (`wuwa-optimizer`, `wuwa-*`) and never rename existing ones: users'
+  backups and the first-run hint rely on them. Never transfer or delete
+  `carmukyo/wuwaC`; it is the only place existing users' data can still be
+  exported from. Keep third-party JS out of the `wuwa-opt` org's Pages sites
+  for the same reason.
 
 (Update this block as the real scripts are set up — keep it accurate.)
 
@@ -73,30 +133,67 @@ UI (React components)
   step, not hand-typed — see `docs/WUWA_GAME_REFERENCE.md` section 8 for
   the full fetch-validate-cache-fallback pipeline. What the rest of the
   app actually reads at runtime is a bundled/cached snapshot, never a
-  direct blocking fetch on page load. Runtime contract (`data/activeSnapshot.ts`,
-  React bridge `state/snapshotStore.ts`): fallback order is validated
-  IndexedDB cache (`gamedataCache`/`active` row: payload + FNV checksum,
-  re-validated on every read) -> bundled `snapshot.json` -> opportunistic
-  background provider refresh that never blocks load (one attempt per
-  session when the active snapshot is older than 7 days, plus manual
-  "Check for updates" on the Database page). Version decides who serves
-  (matching-or-newer cache wins), age decides when to revalidate, and a
-  refresh candidate is adopted only if strictly newer — anything else
-  keeps serving current data silently. The CLI sync and the browser
-  refresh share one pipeline (`data/providerSync.ts`); never fork a
-  second one. Beyond that sync step, this layer is plain data — no
-  game-math functions live here.
+  direct blocking fetch on page load.
+
+  Runtime contract (`data/activeSnapshot.ts`, React bridge
+  `state/snapshotStore.ts`). The fallback order is:
+  1. **Validated IndexedDB cache** (`gamedataCache`/`active` row: payload +
+     FNV checksum). The checksum is recomputed on every read; zod validation
+     is memoised once per (production build, checksum).
+  2. **Bundled `snapshot.json`**, imported as a string and `JSON.parse`d. It
+     is trusted at runtime, gated by `src/data/index.test.ts`.
+  3. **Background revalidation** against the reviewed same-origin
+     publication, which never blocks load: one
+     `<base>gamedata/manifest.json` check per session
+     (`cache: 'no-store'`), plus manual "Check for updates" on the Database
+     page. The payload `<base>gamedata/snapshot-<checksum>.json` is
+     downloaded only when the manifest is strictly newer. It must match the
+     manifest's checksum, version and `fetchedAt` and pass zod before
+     `writeCachedSnapshot` adopts it.
+
+  Version decides who serves (matching-or-newer cache wins), adoption needs
+  a strictly newer candidate, and newer-than-app publications are held out.
+  Anything else keeps serving current data silently.
+
+  Browsers never call the provider API (CSP `connect-src 'self'`).
+  `data/providerSync.ts` is the single provider pipeline. It runs only in
+  `npm run sync` (CLI) and the scheduled CI sync; never fork a second one.
+  `data/gamedataPublication.ts` (pure) builds the manifest and payload for
+  the build plugin and holds the client's manifest schema. Beyond that
+  sync step, this layer is plain data; no game-math functions live here.
 - **Domain layer**: pure functions, e.g. `computeStats(character, weapon,
   echoes, sonataBonuses) -> StatSheet` and `computeDamage(statSheet,
   skill, enemy) -> number`. Fully unit-testable without rendering
   anything. This is where the formulas from
   `docs/WUWA_GAME_REFERENCE.md` live.
 - **Optimizer layer**: takes the domain layer's pure functions and
-  searches combinations of Echoes. Runs off the main thread. Naive
-  brute force is fine for a first correctness pass; add pruning
-  (branch-and-bound / per-slot scoring heuristics to cut the search
-  space) once it's correct, since a full cartesian product across 5 echo
-  slots gets large fast for a real inventory.
+  searches combinations of Echoes, off the main thread. The search is
+  exact:
+  - **Search:** `searchExhaustive` uses cost-pattern enumeration plus
+    branch-and-bound over an additive decomposition derived from
+    `computeStats` and verified at runtime. It must return exactly what
+    `searchReference` (brute force) returns. `search.test.ts` holds a
+    seeded equivalence suite; keep it green for any search change.
+  - **Workers:** it runs in `defaultConcurrency` Web Workers as
+    deterministic shards (`SearchShard`), merged by `mergeShardResults`.
+    Domain math stays in `src/domain`; the optimizer only adds and compares
+    vectors `computeStats` produced.
+  - **Pruning:** dominance pruning (`optimizer/prune.ts`) must never change
+    the top-N result.
+    - An Echo is dropped only with ≥ k + topN − 1 counted same-cost,
+      same-set dominators, where k = `maxSameCostInCombo` (the most Echoes
+      of that cost in one legal combo under the budget).
+    - Def rules are in the `pruneDominated` comment; main-slot carriers
+      need same-def dominators.
+    - `prune.soundness.test.ts` (a seeded pruned-vs-unpruned property test)
+      is the regression gate.
+
+    One dominator is unsound: several same-cost Echoes share a combo, and
+    duplicate defs don't add Sonata pieces.
+  - **minStats** are checked per slot-1 choice.
+  - **Bounds and pruning both assume monotonicity:** the score never
+    decreases when a sheet stat rises. A new objective that breaks this must
+    disable both.
 - **UI layer**: rendering and user input only. If you find yourself
   writing a stat formula inside a `.tsx` file, stop — it belongs in the
   domain layer.
@@ -141,7 +238,20 @@ interface Build {
   id: string; characterId: string; weaponId: string;
   echoIds: string[]; // exactly 5, respecting cost budget
   notes?: string;
+  context?: RosterEntry;  // the context the optimizer run used (see below)
+  reference?: SharedBuild; // a saved share-link payload ("reference build")
 }
+
+// Build.context: the RosterEntry the optimizer run actually used, saved with
+//   the build. It may be a calculator draft, not the Roster, and it must match
+//   the build's character and weapon. Share links prefer it; builds without it
+//   (saved before 2026-10-21) fall back to the current Roster entry.
+// Build.reference: a saved v2 share-link payload. Its Echoes live only there,
+//   never in ownedEchoes, and its echoIds are the placeholders ref:0..ref:4.
+//   Code that resolves library echoIds against the inventory must skip
+//   reference builds (isReferenceBuild).
+// Both fields are optional and unindexed: no Dexie version bump, and backup
+// format v1 is unchanged (new backups are a superset).
 
 interface Team {
   id: string; name: string; characterIds: [string, string, string];
@@ -257,7 +367,30 @@ interface Team {
   `src/ui/components/palette.tsx`, free-text suggest in
   `src/ui/components/SuggestInput.tsx`. All keyframes
   live in the Motion section of `src/index.css` (reduced-motion safe);
-  section routing (`#section`, `#b=` reserved) lives in `src/state/store.ts`.
+  section routing (`#section`) lives in `src/state/store.ts`.
+- **Share links.** A `#b=` link opens Builds and is held as
+  `useAppStore.shareLink`, captured at load and on `hashchange`; `syncHash`
+  won't overwrite it.
+  - **Format:** v2 links (`#b=2.<base64url(deflate-raw JSON)>`,
+    `state/share.ts`, schema `sharedBuildSchema`) are self-contained. They
+    carry the 5 Echoes' stats (slot 1 first), the character/weapon context
+    (`Build.context`, else the current Roster entry) and, opt-in, the
+    objective. They never carry Echo ids, `equippedTo`, `origin`, labels or
+    notes. v1 links (`#b=<base64url JSON>`) still decode.
+  - **Untrusted input:** the hash is ≤ 16 384 characters before decoding,
+    and the inflated payload ≤ 64 KiB, checked while streaming. The zod
+    schema is strict. Values are flagged against `data/echoStats.ts`, never
+    corrected.
+  - **Preview:** nothing is written until the user acts. The options are
+    Save as reference, Optimize with my Echoes (a non-persisted Calculator
+    draft; the roster is never written) and Dismiss. Each resolves the link
+    to `#builds`.
+- **Downloads and errors.** File downloads go through `src/ui/download.ts`
+  (`downloadBlob`, `downloadBackup`): object URLs are revoked after a delay,
+  never right after `click()`. `src/ui/components/ErrorBoundary.tsx` wraps
+  the app in `main.tsx` and each section in `App.tsx`. Its fallback offers
+  Export backup, Try again and Reload, and a failed lazy page chunk is
+  retried.
 
 ## Conventions
 

@@ -4,11 +4,14 @@ import './index.css'
 import App from './App.tsx'
 import { hasUserData } from './state/db.ts'
 import { requestPersistentStorage } from './state/persistence.ts'
+import { ErrorBoundary } from './ui/components/ErrorBoundary.tsx'
 import { UpdatePrompt } from './ui/components/UpdatePrompt.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
     <UpdatePrompt />
   </StrictMode>,
 )

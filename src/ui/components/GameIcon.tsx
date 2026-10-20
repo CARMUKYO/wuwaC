@@ -33,6 +33,7 @@ export function GameIcon({ name, iconUrl, size = 'md', tint }: GameIconProps) {
       aria-hidden="true"
       loading="lazy"
       decoding="async"
+      referrerPolicy="no-referrer"
       draggable={false}
       style={tint === undefined ? undefined : { backgroundColor: tint }}
       onError={() => setFailed(true)}

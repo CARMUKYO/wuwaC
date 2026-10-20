@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import {
-  isSnapshotStale,
   loadActiveSnapshot,
   refreshActiveSnapshot,
   type RefreshOutcome,
@@ -19,13 +18,13 @@ import type { Snapshot } from '../data/schema.ts';
  * Domain/optimizer code keeps receiving the plain `Snapshot` object —
  * reactivity stops at this store.
  *
- * Background revalidation: the first `ensureLoaded()` that finds a stale
- * active snapshot fires ONE silent provider refresh for the session
- * (fire-and-forget — it never blocks load or interaction). Any failure
- * keeps serving the current snapshot with a console warning. Manual
- * "Check for updates" goes through `refresh()` and reports its outcome to
- * the caller for toast feedback. Concurrent refreshes share one provider
- * sync (a full sync is ~370 sequential requests — never run two).
+ * Background revalidation: the first `ensureLoaded()` fires ONE silent
+ * check of the same-origin game-data manifest for the session
+ * (fire-and-forget — it never blocks load or interaction; the payload is
+ * downloaded only when the manifest is newer). Any failure keeps serving
+ * the current snapshot with a console warning. Manual "Check for updates"
+ * goes through `refresh()` and reports its outcome to the caller for toast
+ * feedback. Concurrent checks share one request chain.
  */
 
 interface SnapshotStoreState {
@@ -37,7 +36,7 @@ interface SnapshotStoreState {
   refreshing: boolean;
   /** ISO time of the last completed check (auto or manual), if any. */
   lastCheckedAt: string | null;
-  /** Resolve cache -> bundled once; triggers one background refresh if stale. */
+  /** Resolve cache -> bundled once, then one background manifest check per session. */
   ensureLoaded: () => Promise<void>;
   /**
    * Explicit provider revalidation. Resolves the outcome for toast
@@ -72,7 +71,7 @@ export function resetSnapshotStoreForTests(): void {
   useSnapshotStore.setState(seedState());
 }
 
-/** One provider sync shared by concurrent auto/manual refresh callers. */
+/** One manifest check (and payload fetch) shared by concurrent auto/manual callers. */
 function sharedRefresh(active: Snapshot): Promise<RefreshOutcome> {
   refreshPromise ??= refreshActiveSnapshot(active).finally(() => {
     refreshPromise = null;
@@ -95,7 +94,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
           set({ snapshot: active.snapshot, source: active.source });
         }
         const current = get().snapshot;
-        if (!autoRefreshAttempted && isSnapshotStale(current.fetchedAt)) {
+        if (!autoRefreshAttempted) {
           autoRefreshAttempted = true;
           void sharedRefresh(current).then(
             (outcome) => {

@@ -235,6 +235,13 @@ export function CalculatorPage() {
         description="Build a rotation from real kit motions — DPR sums every action, DPS divides by rotation time."
       />
 
+      {calc.draftSource !== null && (
+        <Alert tone="info" role="status" className="mt-4">
+          Loaded from the shared build “{calc.draftSource}”. This is an unsaved draft: your Roster wasn’t
+          changed. Pick your own Echoes below or run the optimizer; “Prefill from roster” switches back.
+        </Alert>
+      )}
+
       <Window label="Resonator" title="Resonator" className="mt-6">
       <div className="grid gap-4 md:grid-cols-3">
         <div>

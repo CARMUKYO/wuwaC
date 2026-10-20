@@ -1,0 +1,173 @@
+name: Sync game data
+
+# Weekly provider sync -> reviewed PR. Browsers never call the provider: they
+# read the reviewed snapshot the deploy publishes under `gamedata/` (see
+# src/data/gamedataPublication.ts). Merging the PR (a human, never
+# auto-merge) is what deploys new data.
+#
+# Two jobs so the write token never shares a runner with `npm ci` install
+# scripts: `sync` is read-only and runs every npm step; `open-pr` runs no npm
+# at all and only commits the artifact `sync` produced.
+#
+# Repo setting required for `open-pr`: Settings -> Actions -> General ->
+# Workflow permissions -> "Allow GitHub Actions to create and approve pull
+# requests".
+
+on:
+  schedule:
+    - cron: '17 4 * * 1' # Mondays 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gamedata-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # The canonical repo only: the original carmukyo/wuwaC is a "moved" page
+    # (see deploy.yml) and must never open sync PRs.
+    if: github.repository == 'wuwa-opt/wuwaC'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Keep the committed snapshot for the summary
+        run: cp src/data/generated/snapshot.json "$RUNNER_TEMP/snapshot-before.json"
+
+      - name: Sync from the provider
+        run: npm run sync
+
+      # Every sync restamps `fetchedAt`, so a raw diff always "changes".
+      # Only real data changes propose a PR; a timestamp-only resync would
+      # make every client re-download identical data.
+      - name: Detect changes
+        id: diff
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src/data/generated/snapshot.json; then
+            changed=false
+          else
+            changed="$(npx tsx scripts/gamedata-summary.ts --changed "$RUNNER_TEMP/snapshot-before.json" src/data/generated/snapshot.json)"
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          if [ "$changed" != true ]; then
+            echo "Game data unchanged (fetch timestamps aside); no artifact, no PR." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # The gates run here, on the synced tree, because the PR `open-pr`
+      # creates uses GITHUB_TOKEN and so does not trigger ci.yml.
+      - name: Lint
+        if: steps.diff.outputs.changed == 'true'
+        run: npm run lint
+
+      - name: Run tests
+        if: steps.diff.outputs.changed == 'true'
+        run: npm run test
+
+      - name: Build project
+        if: steps.diff.outputs.changed == 'true'
+        run: npm run build
+
+      - name: Summarize the change
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/gamedata"
+          npx tsx scripts/gamedata-summary.ts "$RUNNER_TEMP/snapshot-before.json" src/data/generated/snapshot.json \
+            > "$RUNNER_TEMP/gamedata/summary.md"
+          cp src/data/generated/snapshot.json "$RUNNER_TEMP/gamedata/snapshot.json"
+          cat "$RUNNER_TEMP/gamedata/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the synced snapshot
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gamedata-sync
+          path: ${{ runner.temp }}/gamedata/
+          if-no-files-found: error
+          retention-days: 7
+
+  open-pr:
+    needs: sync
+    if: github.repository == 'wuwa-opt/wuwaC' && needs.sync.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      BRANCH: data/gamedata-sync
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Download the synced snapshot
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: gamedata-sync
+          path: ${{ runner.temp }}/gamedata
+
+      - name: Check the artifact
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/gamedata"
+          # Exactly the two expected files, and a JSON snapshot object.
+          test "$(cd "$dir" && ls -A | sort | tr '\n' ' ')" = "snapshot.json summary.md "
+          jq -e 'type == "object" and (.snapshotVersion | type) == "number" and (.fetchedAt | type) == "string"' \
+            "$dir/snapshot.json" > /dev/null
+
+      - name: Commit to the sync branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$BRANCH"
+          cp "$RUNNER_TEMP/gamedata/snapshot.json" src/data/generated/snapshot.json
+          git add src/data/generated/snapshot.json
+          fetched_at="$(jq -r '.fetchedAt' src/data/generated/snapshot.json)"
+          git commit -m "data: sync game data (${fetched_at})"
+          git push --force origin "$BRANCH"
+
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Ask the API: scheduled runs have no repository object in their event payload.
+          base_branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)"
+          test -n "$base_branch"
+          body="$RUNNER_TEMP/pr-body.md"
+          {
+            cat "$RUNNER_TEMP/gamedata/summary.md"
+            echo
+            echo '---'
+            echo
+            echo "Lint, tests and build passed on this exact snapshot in [the sync run]($RUN_URL)."
+            echo 'This PR was opened with `GITHUB_TOKEN`, so `ci.yml` does not run on it; those gates are the ones above.'
+            echo
+            echo 'Review the data, then merge to deploy it. Nothing merges automatically.'
+          } > "$body"
+          number="$(gh pr list --head "$BRANCH" --base "$base_branch" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --body-file "$body"
+          else
+            gh pr create --base "$base_branch" --head "$BRANCH" --title 'Game data sync' --body-file "$body"
+          fi

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   countBackup,
-  createBackup,
   parseBackup,
   restoreBackup,
   type Backup,
@@ -9,6 +8,7 @@ import {
   type RestoreMode,
 } from '../../state/backup.ts';
 import { requestPersistentStorage, storageStatus, type StorageStatus } from '../../state/persistence.ts';
+import { downloadBackup } from '../download.ts';
 import { btnDangerGhost, btnGhost, btnOutline, btnPrimary } from './classes.ts';
 import { Alert, Window } from './ui.tsx';
 
@@ -43,13 +43,7 @@ export function DataSafety({ onToast }: { onToast: (message: string, tone?: 'suc
   const handleExport = async (): Promise<void> => {
     setError(null);
     try {
-      const backup = await createBackup();
-      const url = URL.createObjectURL(new Blob([JSON.stringify(backup)], { type: 'application/json' }));
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `wuwa-optimizer-backup-${backup.exportedAt.slice(0, 10)}.json`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      const backup = await downloadBackup();
       onToast(`Backed up ${describeCounts(countBackup(backup))}.`, 'success');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create the backup.');

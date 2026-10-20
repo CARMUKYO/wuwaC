@@ -24,6 +24,8 @@ const { calls, canned } = vi.hoisted(() => ({
       },
     ],
     evaluated: 1,
+    scored: 1,
+    total: 1,
     prunedEchoes: [] as string[],
   },
 }));

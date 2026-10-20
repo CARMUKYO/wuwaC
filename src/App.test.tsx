@@ -1,10 +1,15 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App.tsx';
 import { useAppStore } from './state/store.ts';
 import { useThemeStore } from './state/theme.ts';
+
+// Pages are lazy chunks: a cold transform in a busy full-suite run can take
+// well over findBy's default 1 s (1.2 s seen), so page headings get 4 s —
+// still inside the 5 s test timeout.
+const PAGE_LOAD = { timeout: 4000 };
 
 beforeEach(() => {
   useAppStore.setState({ activeSection: 'inventory' });
@@ -14,7 +19,7 @@ beforeEach(() => {
 describe('App shell', () => {
   it('opens on the inventory section', async () => {
     render(<App />);
-    expect(await screen.findByRole('heading', { name: /echo inventory/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /echo inventory/i }, PAGE_LOAD)).toBeInTheDocument();
   });
 
   it('switches sections from the terminal nav', async () => {
@@ -23,7 +28,7 @@ describe('App shell', () => {
     // Sidebar and mobile top bar both render (CSS hides one); either navigates.
     const [rosterButton] = screen.getAllByRole('button', { name: /roster/i });
     await user.click(rosterButton);
-    expect(await screen.findByRole('heading', { name: /character roster/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /character roster/i }, PAGE_LOAD)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /echo inventory/i })).not.toBeInTheDocument();
   });
 
@@ -43,5 +48,77 @@ describe('App shell', () => {
     await user.click(within(tabs).getByRole('button', { name: /teams/i }));
     expect(within(tabs).getByRole('button', { name: /teams/i })).toHaveAttribute('aria-current', 'page');
     expect(useAppStore.getState().activeSection).toBe('teams');
+  });
+});
+
+describe('route-level code splitting', () => {
+  // A fresh module registry, so no page chunk has been loaded yet.
+  async function freshApp() {
+    vi.resetModules();
+    const { default: FreshApp } = await import('./App.tsx');
+    const { useAppStore: freshStore } = await import('./state/store.ts');
+    freshStore.setState({ activeSection: 'inventory' });
+    return FreshApp;
+  }
+
+  let idleCallbacks: (() => void)[] = [];
+  beforeEach(() => {
+    idleCallbacks = [];
+    vi.stubGlobal('requestIdleCallback', (cb: () => void) => idleCallbacks.push(cb));
+    vi.stubGlobal('cancelIdleCallback', () => {});
+  });
+  afterEach(() => {
+    cleanup(); // unmount (cancelIdleCallback) before the stubs go away
+    vi.unstubAllGlobals();
+  });
+
+  it('shows a loading status until the opening section chunk arrives', async () => {
+    const FreshApp = await freshApp();
+    render(<FreshApp />);
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /echo inventory/i }, PAGE_LOAD)).toBeInTheDocument();
+  });
+
+  it('prefetches the other sections when idle, so navigation renders without a fallback', async () => {
+    const user = userEvent.setup();
+    const FreshApp = await freshApp();
+    render(<FreshApp />);
+    await screen.findByRole('heading', { name: /echo inventory/i }, PAGE_LOAD);
+    expect(idleCallbacks).toHaveLength(1);
+    idleCallbacks[0]();
+    // Wait for the chunks the prefetch requested, then one task for its callbacks.
+    await import('./ui/pages/DatabasePage.tsx');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const tabs = screen.getByRole('navigation', { name: 'Section tabs' });
+    await user.click(within(tabs).getByRole('button', { name: /database/i }));
+    expect(screen.getByRole('heading', { name: 'Database' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading' })).not.toBeInTheDocument();
+  });
+});
+
+describe('per-section error boundary', () => {
+  afterEach(() => {
+    vi.doUnmock('./ui/pages/RosterPage.tsx');
+    vi.restoreAllMocks();
+  });
+
+  it('keeps the nav alive when a page chunk fails to load', async () => {
+    const user = userEvent.setup();
+    vi.resetModules();
+    vi.doMock('./ui/pages/RosterPage.tsx', () => {
+      throw new Error('Failed to fetch dynamically imported module');
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { default: FreshApp } = await import('./App.tsx');
+    const { useAppStore: freshStore } = await import('./state/store.ts');
+    freshStore.setState({ activeSection: 'roster' });
+    render(<FreshApp />);
+    expect(await screen.findByRole('alert', {}, PAGE_LOAD)).toHaveTextContent(/something broke/i);
+    // The shell survived: navigating away renders the next section.
+    const tabs = screen.getByRole('navigation', { name: 'Section tabs' });
+    await user.click(within(tabs).getByRole('button', { name: /inventory/i }));
+    expect(await screen.findByRole('heading', { name: /echo inventory/i }, PAGE_LOAD)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

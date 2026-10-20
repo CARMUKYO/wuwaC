@@ -206,9 +206,9 @@ export function DatabasePage() {
         if (err instanceof SnapshotRefreshError && err.kind === 'newer-than-app') {
           pushToast(`New data needs an app update — still on ${activeDate}.`, 'danger');
         } else if (err instanceof SnapshotRefreshError && err.kind === 'invalid') {
-          pushToast(`Provider data failed validation — still on ${activeDate}.`, 'danger');
+          pushToast(`Published data failed validation — still on ${activeDate}.`, 'danger');
         } else {
-          pushToast(`Couldn't reach encore.moe — still on ${activeDate}.`, 'danger');
+          pushToast(`Couldn't check for updates — still on ${activeDate}.`, 'danger');
         }
       },
     );
@@ -345,7 +345,7 @@ export function DatabasePage() {
         title="Database"
         description={
           <>
-            Sourced from encore.moe · {activeDate} · {snapshot.echoDefs.length} of 311
+            Synced from encore.moe, reviewed and published with this site · {activeDate} · {snapshot.echoDefs.length} of 311
             echoes have verified cost data (the rest are skipped, never guessed).
           </>
         }
@@ -372,7 +372,7 @@ export function DatabasePage() {
               type="button"
               onClick={handleCheckForUpdates}
               disabled={refreshing}
-              title="Fetch the latest game data from encore.moe in the background"
+              title="Check this site for newer reviewed game data"
               className={btnOutline}
             >
               {refreshing ? 'Checking…' : 'Check for updates'}
@@ -421,8 +421,8 @@ export function DatabasePage() {
       </div>
       <DataSafety onToast={pushToast} />
       <p className="mt-4 text-xs text-fog">
-        Game data from the encore.moe community API. Fan-made tool, not affiliated with or endorsed by Kuro
-        Games.
+        Game data synced from the encore.moe community API, reviewed, and published with this site. Fan-made
+        tool, not affiliated with or endorsed by Kuro Games.
       </p>
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </section>

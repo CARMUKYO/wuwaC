@@ -1,12 +1,16 @@
+import { createHash } from 'node:crypto'
 import { createReadStream, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import type { Plugin } from 'vite'
+import { loadEnv, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
+import { buildGamedataPublication, GAMEDATA_MANIFEST_PATH } from './src/data/gamedataPublication.ts'
+import { CANONICAL_URL, parseMovedTo } from './src/site.ts'
 
-// Must match the GitHub Pages repo path (https://carmukyo.github.io/wuwaC/).
+// Must match the GitHub Pages repo path (https://wuwa-opt.github.io/wuwaC/).
 const BASE = '/wuwaC/'
 
 const require = createRequire(import.meta.url)
@@ -49,6 +53,108 @@ function ocrAssets(): Plugin {
   }
 }
 
+/**
+ * Reviewed game data, published same-origin next to the app (see
+ * src/data/gamedataPublication.ts): `gamedata/manifest.json` plus the
+ * content-addressed `gamedata/snapshot-<checksum>.json`, both built from the
+ * committed snapshot, so `npm run build`/`preview` and the Pages deploy carry
+ * them with no extra step. The dev server serves the same two files live.
+ * The service worker never caches them (the IndexedDB cache owns game data).
+ */
+const SNAPSHOT_FILE = fileURLToPath(new URL('./src/data/generated/snapshot.json', import.meta.url))
+
+function gamedataPublication(): Plugin {
+  const publish = () => buildGamedataPublication(JSON.parse(readFileSync(SNAPSHOT_FILE, 'utf8')) as unknown)
+  return {
+    name: 'wuwa-gamedata',
+    configureServer(server) {
+      server.middlewares.use(`${BASE}gamedata/`, (req, res, next) => {
+        const { manifest, payload } = publish()
+        const name = `gamedata/${(req.url ?? '').replace(/^\//, '').split('?')[0]}`
+        const body = name === GAMEDATA_MANIFEST_PATH ? JSON.stringify(manifest) : name === manifest.path ? payload : null
+        if (body === null) return next()
+        res.setHeader('Content-Type', 'application/json')
+        res.setHeader('Cache-Control', 'no-store')
+        res.end(body)
+      })
+    },
+    generateBundle() {
+      const { manifest, payload } = publish()
+      this.emitFile({ type: 'asset', fileName: GAMEDATA_MANIFEST_PATH, source: JSON.stringify(manifest) })
+      this.emitFile({ type: 'asset', fileName: manifest.path, source: payload })
+    },
+  }
+}
+
+/**
+ * Content-Security-Policy as a <meta> (GitHub Pages can't set headers), added
+ * to production builds only: the dev server injects inline scripts/styles
+ * (React refresh, HMR) that this policy would block. Meta CSP cannot express
+ * `frame-ancestors`, `report-uri` or `sandbox`, so clickjacking protection is
+ * not available on this host.
+ *
+ * - The one inline script (theme bootstrap in index.html) is allowed by
+ *   sha256 hash computed here from the emitted HTML, never 'unsafe-inline'.
+ * - 'wasm-unsafe-eval' is for the OCR core (WebAssembly.instantiate); its
+ *   worker is spawned from a blob: URL that importScripts() the same-origin
+ *   runtime under `ocr/`, hence `worker-src blob:`.
+ * - connect-src: same-origin only — the game-data refresh reads the
+ *   published `gamedata/` files; browsers never call the provider API.
+ * - img-src: provider icon CDN (`iconUrl` in the snapshot); other hosts fall
+ *   back to the initials badge.
+ */
+const CSP_DIRECTIVES = [
+  "default-src 'none'",
+  "script-src 'self' 'wasm-unsafe-eval' {INLINE_HASHES}",
+  "worker-src 'self' blob:",
+  "style-src 'self'",
+  "img-src 'self' data: blob: https://api.encore.moe",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+]
+
+function contentSecurityPolicy(): Plugin {
+  return {
+    name: 'wuwa-csp',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        const hashes = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(
+          (m) => `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`,
+        )
+        const content = CSP_DIRECTIVES.join('; ').replace('{INLINE_HASHES}', hashes.join(' '))
+        return [{ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content }, injectTo: 'head-prepend' }]
+      },
+    },
+  }
+}
+
+/**
+ * Two deploy modes from one codebase.
+ * - Live (default): index.html's canonical / og:url / og:image all come from
+ *   `CANONICAL_URL` (src/site.ts), substituted for the SITE_URL placeholder.
+ * - Moved: set `VITE_MOVED_TO` (the old repo's deploy does, from a repo
+ *   variable) and the app shows a persistent "moved" banner with a backup
+ *   export. The value is validated here, so a malformed one fails the build.
+ */
+function siteMode(): Plugin {
+  return {
+    name: 'wuwa-site-mode',
+    config(_, { mode }) {
+      parseMovedTo(loadEnv(mode, process.cwd(), 'VITE_').VITE_MOVED_TO)
+    },
+    transformIndexHtml: {
+      order: 'pre',
+      handler: (html) => html.replaceAll('%SITE_URL%', CANONICAL_URL),
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   base: BASE,
@@ -59,11 +165,15 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    siteMode(),
     ocrAssets(),
+    gamedataPublication(),
+    contentSecurityPolicy(),
     // Offline support + update prompt for the hosted build. The service
     // worker is build-only (devOptions off), so `npm run dev` and Vitest are
-    // unaffected. encore.moe is deliberately NOT cached here — the snapshot
-    // cache in IndexedDB (data/activeSnapshot.ts) owns that.
+    // unaffected. Game data is deliberately NOT cached here — neither
+    // encore.moe art nor the same-origin `gamedata/` publication; the
+    // snapshot cache in IndexedDB (data/activeSnapshot.ts) owns game data.
     VitePWA({
       registerType: 'prompt',
       injectRegister: false,
@@ -84,10 +194,13 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,gif}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,gif,woff2}'],
         // ~7 MB of OCR runtime: never precached (most visitors never scan);
         // cached on first scan by the `wuwa-ocr` route below instead.
-        globIgnores: ['ocr/**'],
+        // `gamedata/**` (manifest + payload) is never precached either: the
+        // manifest must always come from the network, and the IndexedDB
+        // cache owns adopted snapshots. (No runtime route matches it.)
+        globIgnores: ['ocr/**', 'gamedata/**'],
         // The game-data snapshot chunk is ~2 MB; precache it so offline works.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         cleanupOutdatedCaches: true,
@@ -104,26 +217,27 @@ export default defineConfig({
               expiration: { maxEntries: 10 },
             },
           },
-          {
-            urlPattern: ({ url }) => url.origin === 'https://fonts.googleapis.com',
-            handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'google-fonts-css' },
-          },
-          {
-            urlPattern: ({ url }) => url.origin === 'https://fonts.gstatic.com',
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-files',
-              cacheableResponse: { statuses: [0, 200] },
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
         ],
       },
     }),
   ],
   build: {
     rolldownOptions: {
+      plugins: [
+        {
+          // src/data/index.ts imports the bundled snapshot as a string
+          // (`?raw`) and JSON.parses it: much cheaper at startup than
+          // evaluating a multi-MB object literal. The committed file is
+          // pretty-printed for reviewable diffs; ship it minified (~2x
+          // smaller string). Build-only — dev/tests read the file as-is.
+          name: 'wuwa-minify-snapshot-json',
+          transform(_code, id) {
+            if (!/src[\\/]data[\\/]generated[\\/]snapshot\.json\?raw$/.test(id)) return null
+            const minified = JSON.stringify(JSON.parse(readFileSync(id.replace(/\?raw$/, ''), 'utf8')))
+            return { code: `export default ${JSON.stringify(minified)}`, map: null }
+          },
+        },
+      ],
       output: {
         // Separate long-lived chunks so a code-only deploy doesn't make
         // returning visitors re-download the multi-MB game-data snapshot
@@ -147,7 +261,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
-          include: ['src/**/*.test.ts'],
+          include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
         },
       },
       {

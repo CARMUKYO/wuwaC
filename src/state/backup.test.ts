@@ -131,4 +131,35 @@ describe('backup', () => {
     expect(() => parseBackup(bad)).toThrow(/at tables\.roster\.0\.level/);
     expect(await db.roster.count()).toBe(0);
   });
+
+  describe('saved build context (optional field, backup format stays v1)', () => {
+    const withContext: Build = {
+      ...build,
+      id: 'build-ctx',
+      context: { ...entry, level: 70, resonanceChain: 2, forteLevels: { '1001103': 9 }, weaponLevel: 60, weaponAscension: 3, weaponRank: 2 },
+    };
+
+    it('a v1 backup without context still parses and restores unchanged', async () => {
+      const legacy = {
+        format: BACKUP_FORMAT,
+        version: 1,
+        exportedAt: '2026-10-01T00:00:00.000Z',
+        tables: { ownedEchoes: [], roster: [entry], builds: [build], teams: [] },
+      };
+      const parsed = parseBackup(legacy);
+      expect(parsed.tables.builds[0]).toEqual(build);
+      expect(parsed.tables.builds[0].context).toBeUndefined();
+      await restoreBackup(parsed, 'replace');
+      expect(await db.builds.get('build-1')).toEqual(build);
+    });
+
+    it('round-trips a build with context through JSON backup and restore', async () => {
+      await db.builds.add(withContext);
+      const json = JSON.parse(JSON.stringify(await createBackup())) as unknown;
+      expect((json as { version: number }).version).toBe(1);
+      await clearAll();
+      await restoreBackup(parseBackup(json), 'replace');
+      expect(await db.builds.get('build-ctx')).toEqual(withContext);
+    });
+  });
 });

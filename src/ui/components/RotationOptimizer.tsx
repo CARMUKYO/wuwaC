@@ -11,7 +11,7 @@ import type {
 import type { ResonanceMode } from '../../domain/characterMods.ts';
 import type { CritMode, EnemyProfile } from '../../domain/damage.ts';
 import { runOptimization, type OptimizationHandle } from '../../optimizer/worker.ts';
-import type { OptimizeRequest, SearchData, SearchResult } from '../../optimizer/search.ts';
+import { selectCandidates, type OptimizeRequest, type SearchData, type SearchResult } from '../../optimizer/search.ts';
 import { useLibraryStore } from '../../state/library.ts';
 import { btnOutline, btnPrimary, labelClass, selectClass } from './classes.ts';
 import { Alert, Window } from './ui.tsx';
@@ -57,6 +57,9 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
   const [lockMode, setLockMode] = useState<'none' | 'five' | 'twoPlusTwo'>('none');
   const [lockSetA, setLockSetA] = useState('');
   const [lockSetB, setLockSetB] = useState('');
+  // Candidate filters; the defaults search the whole inventory (as before).
+  const [excludeEquipped, setExcludeEquipped] = useState(false);
+  const [minLevel, setMinLevel] = useState('0');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [result, setResult] = useState<SearchResult | null>(null);
   const [lastRun, setLastRun] = useState<{ data: SearchData; request: OptimizeRequest } | null>(null);
@@ -68,13 +71,24 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
   useEffect(() => () => runRef.current?.cancel(), []);
 
   const echoLabels = new Map(echoes.map((e) => [e.id, e.label ?? e.echoDefId]));
+  const parsedMinLevel = Number(minLevel.trim());
+  const minLevelValid = Number.isInteger(parsedMinLevel) && parsedMinLevel >= 0 && parsedMinLevel <= 25;
+  const candidates = selectCandidates(echoes, character.id, {
+    excludeEquippedElsewhere: excludeEquipped,
+    minLevel: minLevelValid ? parsedMinLevel : 0,
+  });
   const tooFew = echoes.length < 5;
-  const canRun = blocks.length > 0 && !tooFew;
+  const tooFewCandidates = candidates.length < 5;
+  const canRun = blocks.length > 0 && !tooFew && !tooFewCandidates;
 
   const handleRun = (): void => {
     const parsedTopN = Number(topN.trim());
     if (!Number.isInteger(parsedTopN) || parsedTopN < 1 || parsedTopN > 50) {
       setStatus({ kind: 'error', message: 'Top N must be a whole number from 1 to 50.' });
+      return;
+    }
+    if (!minLevelValid) {
+      setStatus({ kind: 'error', message: 'Minimum level must be a whole number from 0 to 25.' });
       return;
     }
     if (lockMode === 'five' && lockSetA === '') {
@@ -85,7 +99,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
       setStatus({ kind: 'error', message: 'Pick two different Sonata sets for the 2+2 lock.' });
       return;
     }
-    const data: SearchData = { character, weapon, roster, echoes, sonataSets, enemy, resonanceMode };
+    const data: SearchData = { character, weapon, roster, echoes: candidates, sonataSets, enemy, resonanceMode };
     const request: OptimizeRequest = {
       costBudget: budget === '10' ? 10 : 12,
       sonataLock:
@@ -129,6 +143,9 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
   const handleSave = async (echoIds: string[], mainEchoId: string | undefined): Promise<void> => {
     if (!lastRun || saveName.trim() === '') return;
     const key = echoIds.join('+');
+    // The context this run actually used (Roster prefill, manual input or a
+    // shared-build draft), so share links stay faithful to the saved build.
+    const { forteUnlockedIds, weaponAscension, ...used } = lastRun.data.roster;
     await saveBuild({
       name: saveName.trim(),
       characterId: lastRun.data.character.id,
@@ -137,6 +154,12 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
       objectiveId: 'Rotation DPR',
       objective: lastRun.request.objective,
       score: result?.builds.find((b) => b.echoIds.join('+') === key)?.score,
+      context: {
+        ...used,
+        forteLevels: { ...used.forteLevels },
+        ...(forteUnlockedIds === undefined ? {} : { forteUnlockedIds: [...forteUnlockedIds] }),
+        ...(weaponAscension === undefined ? {} : { weaponAscension }),
+      },
     });
     setSavingKey(null);
     setSaveName('');
@@ -204,6 +227,20 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
             )}
           </div>
         )}
+        <div className="mt-3 grid grid-cols-1 items-end gap-3 sm:grid-cols-3">
+          <div>
+            <label htmlFor="ropt-min-level" className={labelClass}>Minimum echo level</label>
+            <input id="ropt-min-level" value={minLevel} onChange={(e) => setMinLevel(e.target.value)} inputMode="numeric" className={`${selectClass} mt-0.5`} />
+          </div>
+          <label className="flex min-h-10 items-center gap-2 text-xs text-fog sm:col-span-2">
+            <input type="checkbox" checked={excludeEquipped} onChange={() => setExcludeEquipped((v) => !v)} />
+            <span>Skip echoes equipped on other characters</span>
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-fog tnum">
+          Searching {candidates.length.toLocaleString()} of {echoes.length.toLocaleString()} echoes.
+          {tooFewCandidates && ' Loosen the filters: at least 5 are needed.'}
+        </p>
         <button
           type="button"
           onClick={handleRun}
@@ -218,7 +255,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
 
       {status.kind === 'running' && (
         <p className="mt-3 text-xs text-accent-text tnum" role="status">
-          Evaluated {status.evaluated} of {status.total} combos…
+          Checked {status.evaluated.toLocaleString()} of {status.total.toLocaleString()} combos…
         </p>
       )}
       {status.kind === 'error' && (
@@ -317,7 +354,7 @@ export function RotationOptimizer(props: RotationOptimizerProps) {
             </ol>
           )}
           <p className="mt-3 text-xs text-fog tnum">
-            Scored {result.evaluated} combos
+            Checked {result.evaluated.toLocaleString()} combos ({result.scored.toLocaleString()} scored in full)
             {result.prunedEchoes.length > 0 && `, pruned ${result.prunedEchoes.length} dominated echoes`}.
           </p>
         </div>

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { writeCachedSnapshot } from '../../data/activeSnapshot.ts';
+import { buildGamedataPublication } from '../../data/gamedataPublication.ts';
 import { loadBundledSnapshot } from '../../data/index.ts';
 import { db } from '../../state/db.ts';
 import { resetSnapshotStoreForTests } from '../../state/snapshotStore.ts';
@@ -10,13 +11,32 @@ import { DatabasePage } from './DatabasePage.tsx';
 
 /**
  * Database freshness affordance: which snapshot is active (cached vs
- * bundled date) and the manual "Check for updates" control. The suite's
- * fetch stub (offline) stands unless a test overrides it — never real
- * network.
+ * bundled date) and the manual "Check for updates" control, which reads
+ * the same-origin publication. The suite's fetch stub (offline) stands
+ * unless a test overrides it — never real network.
  */
 
 vi.spyOn(console, 'warn').mockImplementation(() => {});
 vi.spyOn(console, 'info').mockImplementation(() => {});
+
+/**
+ * Serve `snapshot` as the same-origin game-data publication (stub fetch).
+ * `failFirst` drops the first manifest request (the page's own background
+ * check on mount), so a test can exercise the manual check alone.
+ */
+function servePublication(snapshot: unknown, { failFirst = false } = {}): void {
+  const { manifest, payload } = buildGamedataPublication(snapshot);
+  let manifestRequests = 0;
+  vi.stubGlobal('fetch', (url: string) => {
+    if (url === `${import.meta.env.BASE_URL}gamedata/manifest.json`) {
+      manifestRequests += 1;
+      if (failFirst && manifestRequests === 1) return Promise.reject(new Error('offline for a moment'));
+      return Promise.resolve(new Response(JSON.stringify(manifest)));
+    }
+    if (url === `${import.meta.env.BASE_URL}${manifest.path}`) return Promise.resolve(new Response(payload));
+    return Promise.resolve(new Response('not found', { status: 404 }));
+  });
+}
 
 beforeEach(async () => {
   await db.gamedataCache.clear();
@@ -50,97 +70,45 @@ describe('DatabasePage freshness', () => {
 
     await user.click(screen.getByRole('button', { name: /check for updates/i }));
 
-    expect(await screen.findByText(/couldn't reach encore\.moe/i)).toBeInTheDocument();
+    expect(await screen.findByText(/couldn't check for updates/i)).toBeInTheDocument();
     expect(screen.getByText(/^Bundled · /)).toBeInTheDocument();
     expect(screen.getByText('Jiyan')).toBeInTheDocument();
   });
 
-  it('manual check adopts a newer provider snapshot live', async () => {
-    const staleAt = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    await writeCachedSnapshot({ ...loadBundledSnapshot(), fetchedAt: staleAt });
-    const motionValues = Array.from({ length: 10 }, (_, i) => `${10 + i}%`);
-    const responses = new Map<string, unknown>([
-      ['/character', { roleList: [{ Id: 1, Name: 'Testina' }] }],
-      [
-        '/character/1',
-        {
-          Id: 1,
-          Name: { Content: 'Testina' },
-          QualityId: 5,
-          ElementName: 'Aero',
-          WeaponTypeName: 'Sword',
-          Properties: [
-            { Name: 'HP', GrowthValues: [{ level: 1, value: 800 }] },
-            { Name: 'ATK', GrowthValues: [{ level: 1, value: 20 }] },
-            { Name: 'DEF', GrowthValues: [{ level: 1, value: 90 }] },
-          ],
-          Skills: [
-            {
-              SkillId: 1001,
-              SkillType: 'Normal Attack',
-              SkillName: 'Test Strike',
-              SkillDescribe: 'Deals damage.',
-              SkillAttributes: [{ attributeName: 'Stage 1 DMG', values: motionValues }],
-              DamageList: [{ PropertyName: 'ATK', Type: 'Basic Attack', RateLv: motionValues }],
-            },
-          ],
-          SkillTree: [],
-          ResonantChain: [1, 2, 3, 4, 5, 6].map((rank) => ({
-            GroupIndex: rank,
-            NodeName: `Test Chain ${rank}`,
-            AttributesDescription: 'Effect text.',
-          })),
-        },
-      ],
-      ['/weapon', { weapons: [{ Id: 7, Name: 'Test Blade' }] }],
-      [
-        '/weapon/7',
-        {
-          WeaponName: 'Test Blade',
-          WeaponTypeName: 'Sword',
-          QualityId: 5,
-          Properties: [{ Name: 'ATK', GrowthValues: [{ level: 1, value: 30 }] }],
-          ResonName: 'Test Passive',
-          Desc: 'Does things.',
-          DescParams: [{ ArrayString: ['1'] }],
-        },
-      ],
-      [
-        '/echo',
-        {
-          Echo: [
-            {
-              Id: 42,
-              Name: 'Testecho',
-              FetterGroups: [
-                { Id: 9, Name: 'Test Sonata', Fetters: [{ Key: 2, Name: 'x', EffectDescription: 'Aero DMG + 10%' }] },
-              ],
-            },
-          ],
-        },
-      ],
-      [
-        '/echo/42',
-        {
-          Element: { Name: 'Aero' },
-          FetterGroup: [9],
-          Handbook: { Intensity: 'Common Class', Descrtption1: 'pool text (not parsed)' },
-        },
-      ],
-    ]);
-    vi.stubGlobal(
-      'fetch',
-      ((url: string) => {
-        const path = String(url).replace('https://api-v2.encore.moe/api/en', '');
-        const body = responses.get(path);
-        if (body === undefined) return Promise.reject(new Error(`no stub for ${path}`));
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
-      }) as unknown as typeof fetch,
-    );
-
+  it('manual check reports up to date when the publication matches', async () => {
+    servePublication(loadBundledSnapshot());
     const user = userEvent.setup();
     render(<DatabasePage />);
-    await screen.findByText(/^Cached · /);
+    await screen.findByText(/^Bundled · /);
+
+    await user.click(screen.getByRole('button', { name: /check for updates/i }));
+
+    expect(await screen.findByText(/already up to date/i)).toBeInTheDocument();
+  });
+
+  /** Bundled data with one renamed character and a newer fetch time. */
+  function newerPublication(): unknown {
+    const bundled = loadBundledSnapshot();
+    return {
+      ...bundled,
+      fetchedAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      characters: [{ ...bundled.characters[0], name: 'Testina' }],
+    };
+  }
+
+  it('adopts a newer publication in the background on first visit', async () => {
+    servePublication(newerPublication());
+    render(<DatabasePage />);
+    expect(await screen.findByText('Testina')).toBeInTheDocument();
+    expect(screen.getByText(/^Cached · /)).toBeInTheDocument();
+    expect(screen.queryByText('Jiyan')).not.toBeInTheDocument();
+  });
+
+  it('manual check adopts a newer publication live', async () => {
+    servePublication(newerPublication(), { failFirst: true });
+    const user = userEvent.setup();
+    render(<DatabasePage />);
+    await screen.findByText(/^Bundled · /);
 
     await user.click(screen.getByRole('button', { name: /check for updates/i }));
 

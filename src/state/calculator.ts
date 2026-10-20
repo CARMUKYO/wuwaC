@@ -6,6 +6,7 @@ import { maxStatusStacks } from '../domain/negativeStatus.ts';
 import type { ActionBlock, RotationBuff } from '../domain/rotation.ts';
 import { blockStartTimes } from '../domain/rotation.ts';
 import { attributeSchema, type RosterEntry } from '../data/schema.ts';
+import type { SharedCalculatorDraft } from './share.ts';
 
 /**
  * Calculator page state (Phase 1: input controls; Phase 2: rotation).
@@ -123,6 +124,14 @@ interface CalculatorState {
   /** Active Resonance Mode for dual-mode kits; null until the user picks one. */
   resonanceMode: ResonanceMode | null;
   setResonanceMode: (mode: ResonanceMode | null) => void;
+  /**
+   * Name of the shared build the inputs were loaded from ("Optimize with my
+   * Echoes"); null otherwise. Display-only: the draft is session-local like
+   * every other input here, and never touches the roster.
+   */
+  draftSource: string | null;
+  /** Load a shared build's context as an unsaved draft (Echo slots cleared). */
+  loadSharedDraft: (draft: SharedCalculatorDraft) => void;
 }
 
 export const useCalculatorStore = create<CalculatorState>()((set) => ({
@@ -147,6 +156,7 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
   globalBuffIds: [],
   crit: 'expected',
   resonanceMode: null,
+  draftSource: null,
 
   setCharacterId: (id) =>
     set((s) => ({
@@ -164,6 +174,7 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       // Node ids differ per character — stale unlocks would gate the wrong nodes.
       forteUnlockedIds: id === s.characterId ? s.forteUnlockedIds : null,
       rosterSourceId: '',
+      draftSource: id === s.characterId ? s.draftSource : null,
     })),
   setResonanceMode: (mode) => set({ resonanceMode: mode }),
   setLevel: (level) =>
@@ -362,6 +373,7 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       weaponAscension: entry.weaponAscension ?? DEFAULT_WEAPON_ASCENSION,
       forteUnlockedIds: entry.forteUnlockedIds ?? null,
       rosterSourceId: entry.characterId,
+      draftSource: null,
       // Same-character refills keep the rotation; a new character's skills
       // invalidate every block (same rule as setCharacterId).
       blocks: entry.characterId === s.characterId ? s.blocks : [],
@@ -389,6 +401,42 @@ export const useCalculatorStore = create<CalculatorState>()((set) => ({
       globalBuffIds: [],
       crit: 'expected',
       resonanceMode: null,
+      draftSource: null,
+    }),
+
+  // Same shape as resetFromRoster, but `rosterSourceId` stays '' (manual):
+  // the inputs came from someone else's link, not from the user's roster.
+  // A carried rotation replaces blocks/buffs/globals/crit (fresh block ids);
+  // without one, the new character's blocks are dropped as usual.
+  loadSharedDraft: (draft) =>
+    set((s) => {
+      const entry = draft.roster;
+      const sameCharacter = entry.characterId === s.characterId;
+      const rotation = draft.rotation
+        ? {
+            blocks: draft.rotation.blocks.map((b) => ({ ...b, id: crypto.randomUUID() })),
+            buffs: draft.rotation.buffs.map((b) => ({ ...b, mods: b.mods.map((m) => ({ ...m })) })),
+            globalBuffIds: [...draft.rotation.globalBuffIds],
+            crit: draft.rotation.crit,
+          }
+        : { blocks: sameCharacter ? s.blocks : [] };
+      return {
+        characterId: entry.characterId,
+        level: entry.level,
+        ascension: entry.ascension,
+        resonanceChain: entry.resonanceChain,
+        forteLevels: { ...entry.forteLevels },
+        weaponId: entry.weaponId,
+        weaponLevel: entry.weaponLevel,
+        weaponRank: entry.weaponRank,
+        weaponAscension: entry.weaponAscension ?? DEFAULT_WEAPON_ASCENSION,
+        forteUnlockedIds: entry.forteUnlockedIds ?? null,
+        resonanceMode: sameCharacter ? s.resonanceMode : null,
+        rosterSourceId: '',
+        echoIds: [...EMPTY_SLOTS] as EchoSlots,
+        draftSource: draft.sourceName,
+        ...rotation,
+      };
     }),
 }));
 

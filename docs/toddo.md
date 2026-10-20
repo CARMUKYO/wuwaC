@@ -69,8 +69,16 @@ correctness cleanups, team-buff audit — are done and committed; see git log.)
 starts, per-buff windows with union resolution, team/outro/preset lengths as real t=0 windows, manual rotationTime + Σ warning,
 old-spec compat verified. (Plan: .agents/plans/2026-09-18-rotation-timestamps.md.)
 
-2. Search scaling (defer). Branch-and-bound stays deferred per search.ts — bench shows ~60k combos/s with
-exactness intact. Revisit only if real inventories outgrow exhaustive search.
+2. Search scaling. DONE 2026-10-20 (perf agent).
+   - The old one-dominator pruning was found unsound and fixed: it needs
+     k + topN − 1 counted dominators (see `prune.ts`).
+   - The search is now exact cost-pattern enumeration plus branch-and-bound,
+     split into worker shards.
+   - Realistic 100–300 Echo inventories take about 1–3 s. The synthetic worst
+     case at n=300 takes about 28 s on 8 workers.
+   - Possible next step: a domain-provided upper bound of the damage formula
+     over a stat box, for loose synthetic inventories.
+   - Report: `.agents/plans/2026-10-20-review/reports/perf-phaseB.md`.
 
 3. Data freshness. DONE 2026-10-03 (runtime snapshot layer — data updates no
 longer need a redeploy): `loadBundledSnapshot()` kept intact; new async
@@ -88,6 +96,14 @@ sync-render tests); (b) reused the existing `gamedataCache` store (single
 a second table; (c) newer-than-app payloads are held out until the schema
 updates (the zod literal pins the usable version); (d) `EchoForm`,
 write-path validation, and seeders stay on the sync bundled loader.
-Follow-ups: lazy-load the bundled snapshot out of the JS bundle (still
-shipped inline); partial `--chars`/`--weapons` syncs still write empty
-sonata/echo arrays (pre-existing, preserved as-is).
+Follow-ups:
+   - Lazy-load the bundled snapshot: partly done 2026-10-20. It's its own
+     chunk, loaded with the first page and parsed via `JSON.parse` without
+     zod. Fully async loading is still blocked by decision (a).
+   - Partial `--chars`/`--weapons` syncs still write empty sonata/echo
+     arrays (pre-existing, preserved as-is).
+   - SUPERSEDED 2026-10-21: browsers no longer re-sync from the provider,
+     and the 7-day staleness gate is gone. A weekly CI sync opens a
+     reviewed PR, and browsers check the same-origin
+     `gamedata/manifest.json` (see the `AGENTS.md` runtime contract and
+     `.agents/plans/2026-10-21-ci-gamedata/`).

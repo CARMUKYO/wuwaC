@@ -1,4 +1,4 @@
-import type { OptimizeRequest, SearchData, SearchResult } from './search.ts';
+import type { OptimizeRequest, SearchData, SearchResult, SearchShard } from './search.ts';
 
 /**
  * Optimizer layer: worker message protocol.
@@ -10,6 +10,8 @@ export interface RunMessage {
   id: number;
   data: SearchData;
   request: OptimizeRequest;
+  /** This worker's slice of the search; absent = the whole search. */
+  shard?: SearchShard;
 }
 
 export interface ProgressMessage {
@@ -48,6 +50,7 @@ export function isWorkerOut(message: unknown): message is WorkerOut {
       return (
         Array.isArray(result.builds) &&
         typeof result.evaluated === 'number' &&
+        typeof result.total === 'number' &&
         Array.isArray(result.prunedEchoes)
       );
     }
@@ -56,6 +59,11 @@ export function isWorkerOut(message: unknown): message is WorkerOut {
     default:
       return false;
   }
+}
+
+/** Progress granularity: about 200 updates per run, never finer than 1000 combos. */
+export function progressStep(total: number): number {
+  return Math.max(1000, Math.ceil(total / 200));
 }
 
 export interface ProgressTracker {
@@ -67,8 +75,9 @@ export interface ProgressTracker {
 
 /**
  * Throttled progress reporter: `onProgress` fires when the evaluated count
- * lands exactly on a `step` multiple, plus on `flush()` for the tail.
- * Deterministic (no wall clock) — trivially unit-testable.
+ * crosses into a new `step` multiple (the search can jump by whole skipped
+ * subtrees, so counts rarely land on a multiple), plus on `flush()` for
+ * the tail. Deterministic (no wall clock) — trivially unit-testable.
  */
 export function createProgressTracker(
   total: number,
@@ -81,7 +90,7 @@ export function createProgressTracker(
   return {
     report: (evaluated: number) => {
       last = evaluated;
-      if (evaluated > 0 && evaluated % step === 0 && evaluated !== fired) {
+      if (Math.floor(evaluated / step) > Math.floor(fired / step)) {
         fired = evaluated;
         onProgress(evaluated, total);
       }

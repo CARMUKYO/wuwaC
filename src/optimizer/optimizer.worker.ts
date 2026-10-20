@@ -1,5 +1,6 @@
 import {
   createProgressTracker,
+  progressStep,
   type ProgressTracker,
   type WorkerIn,
   type WorkerOut,
@@ -19,16 +20,23 @@ const workerSelf = self as unknown as {
 workerSelf.onmessage = (event) => {
   const message = event.data;
   if (message.type !== 'run') return;
-  const { id, data, request } = message;
+  const { id, data, request, shard } = message;
   try {
     // Boxed so TypeScript does not narrow the lazy init across the callback.
     const box: { tracker: ProgressTracker | null } = { tracker: null };
-    const result = searchExhaustive(data, request, ({ evaluated, total }) => {
-      box.tracker ??= createProgressTracker(total, (e, t) =>
-        workerSelf.postMessage({ type: 'progress', id, evaluated: e, total: t }),
-      );
-      box.tracker.report(evaluated);
-    });
+    const result = searchExhaustive(
+      data,
+      request,
+      ({ evaluated, total }) => {
+        box.tracker ??= createProgressTracker(
+          total,
+          (e, t) => workerSelf.postMessage({ type: 'progress', id, evaluated: e, total: t }),
+          progressStep(total),
+        );
+        box.tracker.report(evaluated);
+      },
+      shard,
+    );
     box.tracker?.flush();
     workerSelf.postMessage({ type: 'result', id, result });
   } catch (err) {

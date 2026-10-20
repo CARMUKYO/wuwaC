@@ -1,3 +1,6 @@
+// Must stay the first import: zod's jitless config has to run before any
+// schema below is built (CSP has no 'unsafe-eval'; see zodConfig.ts).
+import './zodConfig.ts';
 import { z } from 'zod';
 
 /**
@@ -547,6 +550,103 @@ export const objectiveSpecSchema = z.discriminatedUnion('kind', [
 ]);
 export type ObjectiveSpec = z.infer<typeof objectiveSpecSchema>;
 
+// --- Share links (v2) -------------------------------------------------------------
+/**
+ * Self-contained build link payload (`#b=2.<deflate-raw, base64url>`), decoded
+ * from UNTRUSTED input: every object is strict (unknown keys reject), strings
+ * and arrays are bounded, numbers are finite (zod 4 rejects NaN/Infinity).
+ * Carries game ids and stat values only — never the sender's Echo ids,
+ * `equippedTo`, `origin`, notes, or labels. `echoes[0]` is slot 1.
+ */
+export const SHARED_BUILD_VERSION = 2;
+
+const shareId = z.string().min(1).max(64);
+const shareStatSchema = z.strictObject({ stat: statKeySchema, value: z.number().min(0).max(100_000) });
+
+export const sharedEchoSchema = z
+  .strictObject({
+    def: shareId,
+    set: shareId,
+    cost: z.union([z.literal(1), z.literal(3), z.literal(4)]),
+    level: z.number().int().min(0).max(25),
+    rarity: z.number().int().min(1).max(5),
+    main: shareStatSchema,
+    second: shareStatSchema.optional(),
+    subs: z.array(shareStatSchema).max(5),
+  })
+  .refine((e) => new Set(e.subs.map((s) => s.stat)).size === e.subs.length, {
+    message: 'duplicate substats on one Echo',
+  });
+export type SharedEcho = z.infer<typeof sharedEchoSchema>;
+
+const sharedBlockSchema = rotationBlockSpecSchema
+  .extend({
+    skillId: z.string().max(64),
+    motionName: z.string().max(120),
+    activeBuffIds: z.array(shareId).max(64),
+    echoName: z.string().min(1).max(120).optional(),
+  })
+  .strict();
+
+const sharedBuffSchema = rotationBuffSpecSchema
+  .extend({
+    id: shareId,
+    label: z.string().min(1).max(120),
+    source: z.string().min(1).max(120),
+    mods: z.array(z.strictObject({ stat: statKeySchema, value: z.number() })).max(32),
+  })
+  .strict();
+
+/** `objectiveSpecSchema`, strict and bounded. Opt-in on the sender side (it can be large). */
+export const sharedObjectiveSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('expected-damage'),
+    skillId: shareId,
+    motionName: z.string().min(1).max(120),
+    forteLevel: z.number().int().min(1).max(10),
+    crit: z.enum(['expected', 'crit', 'nonCrit']),
+  }),
+  z.strictObject({
+    kind: z.literal('max-stat'),
+    stat: statKeySchema,
+  }),
+  z.strictObject({
+    kind: z.literal('rotation-dpr'),
+    blocks: z.array(sharedBlockSchema).min(1).max(200),
+    buffs: z.array(sharedBuffSchema).max(64),
+    globalBuffIds: z.array(shareId).max(64),
+    crit: z.enum(['expected', 'crit', 'nonCrit']),
+  }),
+]);
+
+export const sharedBuildSchema = z.strictObject({
+  v: z.literal(SHARED_BUILD_VERSION),
+  name: z.string().min(1).max(80),
+  score: z.number().optional(),
+  /** Short human summary of the objective (the build's `objectiveId` label). */
+  summary: z.string().max(120),
+  character: z.strictObject({
+    id: shareId,
+    level: z.number().int().min(1).max(90),
+    ascension: z.number().int().min(0).max(6),
+    chain: z.number().int().min(0).max(6),
+    forte: z
+      .record(shareId, z.number().int().min(1).max(10))
+      .refine((r) => Object.keys(r).length <= 16, { message: 'too many forte entries' }),
+    /** Unlocked forte-node ids; absent = all unlocked (roster default). */
+    nodes: z.array(shareId).max(32).optional(),
+  }),
+  weapon: z.strictObject({
+    id: shareId,
+    level: z.number().int().min(1).max(90),
+    ascension: z.number().int().min(0).max(6),
+    rank: z.number().int().min(1).max(5),
+  }),
+  echoes: z.tuple([sharedEchoSchema, sharedEchoSchema, sharedEchoSchema, sharedEchoSchema, sharedEchoSchema]),
+  objective: sharedObjectiveSchema.optional(),
+});
+export type SharedBuild = z.infer<typeof sharedBuildSchema>;
+
 export const buildSchema = z
   .object({
     id: z.string().min(1),
@@ -565,10 +665,29 @@ export const buildSchema = z
     objective: objectiveSpecSchema.optional(),
     score: z.number().optional(),
     notes: z.string().optional(),
+    /**
+     * Present on a build saved from someone else's share link ("Save as
+     * reference"). Its Echoes live here, NOT in `ownedEchoes`; `echoIds`
+     * are then placeholders (`ref:0`..`ref:4`) that resolve to nothing in
+     * the inventory. Optional and unindexed, so no Dexie version bump.
+     */
+    reference: sharedBuildSchema.optional(),
+    /**
+     * Character/weapon context the build was optimized with (levels, chain,
+     * forte, nodes, weapon level/rank), captured at save time — it may be a
+     * calculator draft, not the Roster. Share links prefer it over the
+     * current Roster. Optional and unindexed: no Dexie version bump; builds
+     * saved before it existed simply lack it.
+     */
+    context: rosterEntrySchema.optional(),
     updatedAt: z.string().datetime({ offset: true }),
   })
   .refine((b) => new Set(b.echoIds).size === b.echoIds.length, {
     message: 'the same Echo cannot be equipped twice',
+  })
+  .refine((b) => !b.context || (b.context.characterId === b.characterId && b.context.weaponId === b.weaponId), {
+    message: "the saved context doesn't match the build's character and weapon",
+    path: ['context'],
   });
 export type Build = z.infer<typeof buildSchema>;
 

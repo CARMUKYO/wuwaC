@@ -4,13 +4,15 @@ import type { ObjectiveSpec } from '../domain/objectives.ts';
 /**
  * Optimizer layer: dominance pruning (reference doc §7, step 2).
  *
- * An echo is pruned when another echo of the SAME cost and SAME Sonata set
- * meets-or-beats it on every objective-relevant stat and strictly beats it
- * on at least one. The Sonata restriction is a soundness requirement, not
- * caution: set bonuses depend on combo composition, so a cross-set swap of
- * a pruned echo for its dominator can lose a 2pc/5pc threshold and lower
- * the score. Objective-relative by design: stats outside the relevant set
- * are ignored, so ties (and off-objective strengths) always survive.
+ * An echo D dominates I when both share cost and Sonata set and D
+ * meets-or-beats I on every objective-relevant stat, strictly beating it on
+ * at least one. Objective-relative by design: stats outside the relevant
+ * set are ignored, so ties (and off-objective strengths) always survive.
+ *
+ * One dominator is NOT enough to drop I: a combo can hold several echoes of
+ * the same cost (4-3-3-1-1 holds two 3-costs), so the dominator may already
+ * sit in the very combo I belongs to. See `pruneDominated` for the counting
+ * rule that keeps the top-N result identical to an unpruned search.
  * Pure functions.
  */
 
@@ -94,32 +96,141 @@ export function relevantStatsForObjective(
 
 export interface PruneResult {
   kept: OwnedEcho[];
-  /** Ids dropped as strictly dominated. */
+  /** Ids dropped as dominated. */
   pruned: string[];
 }
 
-/** Drop strictly-dominated echoes, comparing within equal cost and Sonata set only. */
-export function pruneDominated(echoes: OwnedEcho[], relevantStats: StatKey[]): PruneResult {
+export interface PruneOptions {
+  /** The request's cost budget; bounds how many same-cost echoes share a combo. */
+  costBudget: number;
+  /** Ranked results requested; each extra rank needs one extra dominator. */
+  topN: number;
+  /** Whether this echo definition carries a main-slot bonus for the character. */
+  isMainCarrier?: (echoDefId: string) => boolean;
+}
+
+/**
+ * Most echoes of `cost` that one legal 5-echo combo can hold: the largest m
+ * with m·cost + (5 − m)·cheapest ≤ budget, where `cheapest` is the lowest
+ * cost in the pool (every combo needs 5 echoes, so the others cost at least
+ * that). With costs {1, 3, 4}: budget 12 -> 4-cost 2, 3-cost 3, 1-cost 5;
+ * budget 10 -> 4-cost 1, 3-cost 2, 1-cost 5. 0 when no legal combo holds it.
+ */
+export function maxSameCostInCombo(cost: number, costBudget: number, poolCosts: readonly number[]): number {
+  if (poolCosts.length === 0) return 0;
+  const cheapest = Math.min(...poolCosts);
+  for (let m = 5; m >= 1; m -= 1) {
+    if (m * cost + (5 - m) * cheapest <= costBudget) return m;
+  }
+  return 0;
+}
+
+/**
+ * Drop dominated echoes without changing the top-N result.
+ *
+ * Soundness argument. Let k = `maxSameCostInCombo(cost)`. Echo I (def dI,
+ * set s) is dropped only when it has at least k + topN − 1 *counted*
+ * dominators among echoes already kept. Counted dominators are:
+ *   (a) every kept dominator with def dI, and
+ *   (b) one per distinct def d ≠ dI among kept dominators, but only when
+ *       every pool echo of set s with def d has I's cost,
+ * and, when dI carries a main-slot bonus, only (a).
+ *
+ * Swap step: take any combo C containing I and a counted dominator D not
+ * in C, and let C' = C − I + D. Same cost, so the budget holds. Relevant
+ * stats only go up. Set s's distinct-def count can't drop: either dD = dI,
+ * or dD is new to C − I (set s) and replaces at most the lost dI; other
+ * sets are untouched, so every piece threshold and lock still holds.
+ * Main-slot carriers in C' include those of C: a carrier I is only ever
+ * replaced by its own def, and bonuses are non-negative. So
+ * score(C') ≥ score(C).
+ *
+ * Availability: an echo E in C − I blocks at most one counted dominator.
+ * (a) members are blocked only by membership. A (b) slot for def d is
+ * blocked by membership or by any set-s echo of def d in C − I. So E blocks
+ * itself if counted, plus the (b) slot of its own def; when E is counted
+ * those are the same slot (E has def dI and blocks no (b) slot, or E is
+ * the (b) slot of its def). Only echoes of I's cost block anything: a
+ * different-cost echo is never a dominator and never matches a (b) def,
+ * because each such def appears in set s at I's cost only. C holds at most
+ * k echoes of I's cost, I included. So at most k − 1 counted dominators
+ * are blocked, and at least topN stay available.
+ *
+ * Top-N: counted dominators are already kept, so a combo with m dropped
+ * echoes reaches a combo of kept echoes in m swaps, and the last swap
+ * alone has ≥ topN available choices. Those choices are distinct kept
+ * combos, each scoring ≥ the original. So every combo that pruning
+ * removes is matched by topN kept combos that score at least as well,
+ * and the i-th best score (i ≤ topN) is unchanged.
+ *
+ * Chains: echoes are decided in descending relevant-stat sum, so a
+ * dominator is usually decided before what it dominates. Only kept
+ * dominators count, so a pruned dominator is never relied on. Its own
+ * dominators also dominate I (dominance is transitive) and count
+ * directly. Float ties in the sum only make the rule more conservative.
+ */
+export function pruneDominated(
+  echoes: OwnedEcho[],
+  relevantStats: StatKey[],
+  options: PruneOptions,
+): PruneResult {
   const contributions = new Map(echoes.map((e) => [e.id, contributionsOf(e)] as const));
+  const relevantSum = (e: OwnedEcho): number => {
+    const map = contributions.get(e.id)!;
+    return relevantStats.reduce((sum, stat) => sum + (map.get(stat) ?? 0), 0);
+  };
+  const poolCosts = echoes.map((e) => e.cost);
+  // Costs seen per (set, def): a (b) dominator's def must never appear at another cost.
+  const costsBySetDef = new Map<string, Set<number>>();
+  for (const echo of echoes) {
+    const key = setDefKey(echo.sonataId, echo.echoDefId);
+    let costs = costsBySetDef.get(key);
+    if (!costs) {
+      costs = new Set();
+      costsBySetDef.set(key, costs);
+    }
+    costs.add(echo.cost);
+  }
+  const defOnlyAtCost = (sonataId: string, echoDefId: string, cost: number): boolean => {
+    const costs = costsBySetDef.get(setDefKey(sonataId, echoDefId))!;
+    return costs.size === 1 && costs.has(cost);
+  };
+
+  const order = echoes
+    .map((echo, index) => ({ echo, index, sum: relevantSum(echo) }))
+    .sort((x, y) => y.sum - x.sum || x.index - y.index);
+  const kept: OwnedEcho[] = [];
   const pruned = new Set<string>();
-  for (const challenger of echoes) {
-    for (const incumbent of echoes) {
-      if (challenger.id === incumbent.id) continue;
+  for (const { echo: incumbent } of order) {
+    const required =
+      Math.max(1, maxSameCostInCombo(incumbent.cost, options.costBudget, poolCosts)) + options.topN - 1;
+    const carrier = options.isMainCarrier?.(incumbent.echoDefId) ?? false;
+    let sameDef = 0;
+    const otherDefs = new Set<string>();
+    for (const challenger of kept) {
       if (challenger.cost !== incumbent.cost) continue;
       if (challenger.sonataId !== incumbent.sonataId) continue;
-      if (pruned.has(incumbent.id)) continue;
       if (
-        dominates(
-          contributions.get(challenger.id)!,
-          contributions.get(incumbent.id)!,
-          relevantStats,
-        )
+        !dominates(contributions.get(challenger.id)!, contributions.get(incumbent.id)!, relevantStats)
       ) {
-        pruned.add(incumbent.id);
+        continue;
+      }
+      if (challenger.echoDefId === incumbent.echoDefId) sameDef += 1;
+      else if (!carrier && defOnlyAtCost(challenger.sonataId, challenger.echoDefId, incumbent.cost)) {
+        otherDefs.add(challenger.echoDefId);
       }
     }
+    if (sameDef + otherDefs.size >= required) pruned.add(incumbent.id);
+    else kept.push(incumbent);
   }
-  return { kept: echoes.filter((e) => !pruned.has(e.id)), pruned: [...pruned] };
+  return {
+    kept: echoes.filter((e) => !pruned.has(e.id)),
+    pruned: echoes.filter((e) => pruned.has(e.id)).map((e) => e.id),
+  };
+}
+
+function setDefKey(sonataId: string, echoDefId: string): string {
+  return `${sonataId}\u0000${echoDefId}`;
 }
 
 /** Total per-stat contribution: main + secondary + substats. */

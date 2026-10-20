@@ -22,6 +22,7 @@ import { usePrefersReducedMotion, useTypewriter } from '../motion.ts';
 import { Alert, CostPips, EmptyState, PageHeader, Window } from '../components/ui.tsx';
 import { inventorySummary } from '../echoDisplay.ts';
 import { toDisplayValue } from '../format.ts';
+import { revokeObjectUrlLater } from '../download.ts';
 
 function toFormValues(echo: OwnedEcho): EchoFormValues {
   return {
@@ -130,7 +131,7 @@ export function InventoryPage() {
       anchor.href = url;
       anchor.download = 'echoes_wuwainventorykamera.json';
       anchor.click();
-      URL.revokeObjectURL(url);
+      revokeObjectUrlLater(url);
       setTransferError(null);
       pushToast(`Exported ${echoes.length} ${echoes.length === 1 ? 'echo' : 'echoes'}.`);
     } catch (err) {

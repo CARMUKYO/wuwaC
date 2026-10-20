@@ -375,3 +375,56 @@ describe('calculator store', () => {
     expect(selectBlockStartTimes(useCalculatorStore.getState())).toEqual([0, 3, 5]);
   });
 });
+
+describe('loadSharedDraft', () => {
+  const sharedEntry: RosterEntry = { ...entry, level: 90, ascension: 6, resonanceChain: 6, weaponRank: 5, weaponAscension: 6 };
+
+  it('loads the context as a manual (non-roster) draft and clears the Echo slots', () => {
+    const s = freshState();
+    s.resetFromRoster(entry);
+    s.setEchoSlot(0, 'mine-1');
+    useCalculatorStore.getState().loadSharedDraft({ sourceName: 'Friend build', roster: sharedEntry, skippedBlocks: 0 });
+    const after = useCalculatorStore.getState();
+    expect(after).toMatchObject({
+      characterId: 'jiyan',
+      level: 90,
+      ascension: 6,
+      resonanceChain: 6,
+      weaponRank: 5,
+      weaponAscension: 6,
+      rosterSourceId: '',
+      draftSource: 'Friend build',
+    });
+    expect(after.echoIds).toEqual([null, null, null, null, null]);
+  });
+
+  it('replaces the rotation when the link carries one (fresh block ids)', () => {
+    freshState().addBlock({ skillId: 'old', motionName: 'Old', forteLevel: 10, activeBuffIds: [] });
+    useCalculatorStore.getState().loadSharedDraft({
+      sourceName: 'Rotation build',
+      roster: sharedEntry,
+      skippedBlocks: 0,
+      rotation: {
+        blocks: [{ skillId: '1001103', motionName: 'Lance', forteLevel: 10, activeBuffIds: ['b1'] }],
+        buffs: [{ id: 'b1', label: 'Buff', source: 'Team', mods: [{ stat: 'atkPct', value: 0.1 }] }],
+        globalBuffIds: ['b1'],
+        crit: 'crit',
+      },
+    });
+    const after = useCalculatorStore.getState();
+    expect(after.blocks.map((b) => b.motionName)).toEqual(['Lance']);
+    expect(after.blocks[0].id).toEqual(expect.any(String));
+    expect(after.buffs.map((b) => b.id)).toEqual(['b1']);
+    expect(after.globalBuffIds).toEqual(['b1']);
+    expect(after.crit).toBe('crit');
+  });
+
+  it('is cleared by a roster prefill or a reset', () => {
+    freshState().loadSharedDraft({ sourceName: 'X', roster: sharedEntry, skippedBlocks: 0 });
+    useCalculatorStore.getState().resetFromRoster(entry);
+    expect(useCalculatorStore.getState().draftSource).toBeNull();
+    useCalculatorStore.getState().loadSharedDraft({ sourceName: 'X', roster: sharedEntry, skippedBlocks: 0 });
+    useCalculatorStore.getState().resetAll();
+    expect(useCalculatorStore.getState().draftSource).toBeNull();
+  });
+});
